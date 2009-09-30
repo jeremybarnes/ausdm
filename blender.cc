@@ -45,7 +45,8 @@ Linear_Blender::
 void
 Linear_Blender::
 configure(const ML::Configuration & config_,
-          const std::string & name)
+          const std::string & name,
+          int random_seed)
 {
     Configuration config(config_, name, Configuration::PREFIX_APPEND);
     
@@ -94,7 +95,8 @@ predict(const ML::distribution<float> & models) const
 boost::shared_ptr<Blender>
 get_blender(const ML::Configuration & config_,
             const std::string & name,
-            const Data & data)
+            const Data & data,
+            int random_seed)
 {
     Configuration config(config_, name, Configuration::PREFIX_APPEND);
 
@@ -108,10 +110,9 @@ get_blender(const ML::Configuration & config_,
     }
     else throw Exception("Blender of type " + type + " doesn't exist");
 
-    result->configure(config_, name);
+    result->configure(config_, name, random_seed);
     result->init(data);
     
     return result;
 }
-
 

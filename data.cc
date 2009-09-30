@@ -201,11 +201,13 @@ calc_scores()
     for (unsigned i = 0;  i < models.size();  ++i)
         models[model_scores[i].second].rank = i;
 
+#if 1
     for (unsigned i = 0;  i < 20;  ++i) {
         int m = model_scores[i].second;
         cerr << "rank " << i << " " << model_names[m] << " score "
              << models[m].score << endl;
     }
+#endif
 
     model_ranking.clear();
     model_ranking.insert(model_ranking.end(),
@@ -218,6 +220,8 @@ Data::
 hold_out(Data & remove_to, float proportion,
          int random_seed)
 {
+    srand(random_seed);
+
     vector<int> to_remove;
     for (unsigned i = 0;  i < targets.size();  ++i) {
         to_remove.push_back(i);
@@ -231,11 +235,9 @@ hold_out(Data & remove_to, float proportion,
     to_remove.erase(to_remove.begin() + proportion * to_remove.size(),
                     to_remove.end());
 
-
     vector<int> remove_me(targets.size(), false);
     for (unsigned i = 0;  i < to_remove.size();  ++i)
-        remove_me[i] = true;
-    
+        remove_me[to_remove[i]] = true;
 
     remove_to.clear();
     

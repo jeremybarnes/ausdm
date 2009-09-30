@@ -33,6 +33,7 @@
 #include <boost/tuple/tuple.hpp>
 #include <boost/bind.hpp>
 
+#include "stats/moments.h"
 
 using namespace std;
 using namespace ML;
@@ -94,6 +95,9 @@ int main(int argc, char ** argv)
     // What type of target do we predict?
     string target_type;
 
+    // How many cross-validation trials do we perform?
+    int num_trials = 1;
+
     {
         using namespace boost::program_options;
 
@@ -114,6 +118,8 @@ int main(int argc, char ** argv)
              "run a local test and score on held out data")
             ("target-type,t", value<string>(&target_type),
              "select target type: auc or rmse")
+            ("num-trials,r", value<int>(&num_trials),
+             "select number of trials to perform")
             ("output-file,o",
              value<string>(&output_file),
              "dump output file to the given filename");
@@ -165,68 +171,89 @@ int main(int argc, char ** argv)
     else if (target == RMSE) targ_type_uc = "RMSE";
     else throw Exception("unknown target type");
 
+    vector<double> trial_scores;
 
-    Data data_train;
-    data_train.load("download/S_" + targ_type_uc + "_Train.csv", target);
+    if (hold_out_data == 0.0 && num_trials > 1)
+        throw Exception("need to hold out data for multiple trials");
 
-    Data data_test;
-    if (hold_out_data > 0.0)
-        data_train.hold_out(data_test, hold_out_data);
-    else data_test.load("download/S_" + targ_type_uc + "_Score.csv", target);
+    for (unsigned trial = 0;  trial < num_trials;  ++trial) {
+        if (num_trials > 1) cerr << "trial " << trial << endl;
 
-    // Calculate the scores necessary for the job
-    data_train.calc_scores();
+        int rand_seed = hold_out_data > 0.0 ? 1 + trial : 0;
 
-    boost::shared_ptr<Blender> blender
-        = get_blender(config, blender_name, data_train);
+        Data data_train;
+        data_train.load("download/S_" + targ_type_uc + "_Train.csv", target);
 
-    int np = data_test.targets.size();
-
-    // Now run the model
-    Model_Output result;
-    result.resize(np);
-
-    static Worker_Task & worker = Worker_Task::instance(num_threads() - 1);
-
-    cerr << "processing " << np << " predictions..." << endl;
-    
-    boost::progress_display progress(np, cerr);
-    Lock progress_lock;
-
-    // Now, submit it as jobs to the worker task to be done multithreaded
-    int group;
-    int job_num = 0;
-    {
-        int parent = -1;  // no parent group
-        group = worker.get_group(NO_JOB, "dump user results task", parent);
-
-        // Make sure the group gets unlocked once we've populated
-        // everything
-        Call_Guard guard(boost::bind(&Worker_Task::unlock_group,
-                                     boost::ref(worker),
-                                     group));
+        Data data_test;
+        if (hold_out_data > 0.0)
+            data_train.hold_out(data_test, hold_out_data, rand_seed);
+        else data_test.load("download/S_" + targ_type_uc + "_Score.csv", target);
         
-        for (unsigned i = 0;  i < np;  i += 100, ++job_num) {
-            int last = std::min<int>(np, i + 100);
+        // Calculate the scores necessary for the job
+        data_train.calc_scores();
+        
+        boost::shared_ptr<Blender> blender
+            = get_blender(config, blender_name, data_train, rand_seed);
+        
+        int np = data_test.targets.size();
+        
+        // Now run the model
+        Model_Output result;
+        result.resize(np);
+        
+        static Worker_Task & worker = Worker_Task::instance(num_threads() - 1);
+        
+        cerr << "processing " << np << " predictions..." << endl;
+        
+        boost::progress_display progress(np, cerr);
+        Lock progress_lock;
+        
+        // Now, submit it as jobs to the worker task to be done multithreaded
+        int group;
+        int job_num = 0;
+        {
+            int parent = -1;  // no parent group
+            group = worker.get_group(NO_JOB, "dump user results task", parent);
+            
+            // Make sure the group gets unlocked once we've populated
+            // everything
+            Call_Guard guard(boost::bind(&Worker_Task::unlock_group,
+                                         boost::ref(worker),
+                                         group));
+            
+            for (unsigned i = 0;  i < np;  i += 100, ++job_num) {
+                int last = std::min<int>(np, i + 100);
+                
+                // Create the job
+                Predict_Job job(result,
+                                i, last,
+                                *blender, data_test, progress, progress_lock);
+                
+                // Send it to a thread to be processed
+                worker.add(job, "blend job", group);
+            }
+        }
+        
+        // Add this thread to the thread pool until we're ready
+        worker.run_until_finished(group);
+        
+        cerr << " done." << endl;
+        
+        cerr << timer.elapsed() << endl;
 
-            // Create the job
-            Predict_Job job(result,
-                            i, last,
-                            *blender, data_test, progress, progress_lock);
 
-            // Send it to a thread to be processed
-            worker.add(job, "blend job", group);
+        if (hold_out_data > 0.0) {
+            double score = result.calc_score(data_test.targets, target);
+            cerr << format("%0.4f", score) << endl;
+            trial_scores.push_back(score);
         }
     }
 
-    // Add this thread to the thread pool until we're ready
-    worker.run_until_finished(group);
-
-    cerr << " done." << endl;
-
-    cerr << timer.elapsed() << endl;
-
-    if (hold_out_data > 0.0)
-        cout << format("%0.4f", result.calc_score(data_test.targets, target))
-             << endl;
+    if (hold_out_data > 0.0) {
+        double mean = Stats::mean(trial_scores.begin(), trial_scores.end());
+        double std = Stats::std_dev(trial_scores.begin(), trial_scores.end(),
+                                    mean);
+        
+        cout << format("%6.4f +/- %6.4f", mean, std) << endl;
+    }
 }

@@ -25,7 +25,8 @@ struct Blender {
     virtual ~Blender();
 
     virtual void configure(const ML::Configuration & config,
-                           const std::string & name) = 0;
+                           const std::string & name,
+                           int random_seed) = 0;
     
     virtual void init(const Data & training_data) = 0;
 
@@ -43,7 +44,8 @@ struct Linear_Blender : public Blender {
     virtual ~Linear_Blender();
 
     virtual void configure(const ML::Configuration & config,
-                           const std::string & name);
+                           const std::string & name,
+                           int random_seed);
     
     virtual void init(const Data & training_data);
 
@@ -63,7 +65,8 @@ struct Linear_Blender : public Blender {
 boost::shared_ptr<Blender>
 get_blender(const ML::Configuration & config,
             const std::string & name,
-            const Data & data);
+            const Data & data,
+            int random_seed);
 
    
 #endif /* __ausdm__blender_h__ */
