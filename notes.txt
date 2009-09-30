@@ -35,3 +35,52 @@ jeremy@jeremy-desktop:~/projects/ausdm$ for n in 1 2 3 4 5 7 10 12 15 17 20 25 3
 
 So, 15 models seems to be good for RMSE and 5 for AUC
 
+
+
+-------
+
+jeremy@jeremy-desktop:~/projects/ausdm$ for n in 1 2 3 4 5 7 10 12 15 17 20 25 30 40 50; do echo -n "$n "; ./build/x86_64/bin/ausdm -T 0.20 -t rmse blender.num_models=$n -r 10 2>/dev/null | tail -n1; done
+1 0.8761 +/- 0.0151
+2 0.8706 +/- 0.0144
+3 0.8688 +/- 0.0142
+4 0.8681 +/- 0.0145
+5 0.8675 +/- 0.0139
+7 0.8669 +/- 0.0139
+10 0.8664 +/- 0.0140
+12 0.8662 +/- 0.0141
+15 0.8659 +/- 0.0140
+17 0.8659 +/- 0.0140
+20 0.8656 +/- 0.0140
+25 0.8658 +/- 0.0140
+30 0.8661 +/- 0.0140
+40 0.8664 +/- 0.0139
+50 0.8666 +/- 0.0139
+
+
+jeremy@jeremy-desktop:~/projects/ausdm$ for n in 1 2 3 4 5 7 10 12 15 17 20 25 30 40 50; do echo -n "$n "; ./build/x86_64/bin/ausdm -T 0.20 -t auc blender.num_models=$n -r 10 2>/dev/null | tail -n1; done
+1 0.8750 +/- 0.0090
+2 0.8788 +/- 0.0081
+3 0.8792 +/- 0.0080
+4 0.8786 +/- 0.0079
+5 0.8797 +/- 0.0075
+7 0.8804 +/- 0.0072
+10 0.8800 +/- 0.0074
+12 0.8799 +/- 0.0074
+15 0.8798 +/- 0.0075
+17 0.8796 +/- 0.0075
+20 0.8794 +/- 0.0075
+25 0.8789 +/- 0.0077
+30 0.8783 +/- 0.0079
+40 0.8777 +/- 0.0080
+50 0.8774 +/- 0.0081
+
+Better results (more trials): 15-20 for RMSE, 7 for AUC
+
+
+Boosting:
+
+./build/x86_64/bin/ausdm -T 0.20 -t auc blender.num_models=5 -r 10
+
+0.8779 +/- 0.0077
+
+Not much good f as a first try...

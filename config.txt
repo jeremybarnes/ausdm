@@ -1,7 +1,7 @@
 # -* awk -*-
 
 blender {
-    type=linear;
+    type=boosting;
     mode=best_n_weighted;
     num_models=10;
 }

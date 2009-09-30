@@ -38,6 +38,11 @@ struct Model_Output : public distribution<float> {
     double calc_score(const distribution<float> & targets,
                       Target target) const;
     
+
+    /// Calculate the RMSE over the given set of targets
+    double calc_rmse_weighted(const distribution<float> & targets,
+                              const distribution<double> & weights) const;
+    
     /// Score over whatever target we are trying to calculate
     double score;
     

@@ -94,6 +94,20 @@ calc_auc(const distribution<float> & targets) const
 
 double
 Model_Output::
+calc_rmse_weighted(const distribution<float> & targets,
+                   const distribution<double> & weights) const
+{
+    if (targets.size() != size())
+        throw Exception("targets and predictions don't match");
+
+    if (weights.size() != size())
+        throw Exception("weights and predictions don't match");
+
+    return sqrt((sqr(targets - *this) * weights).total() / weights.total());
+}
+
+double
+Model_Output::
 calc_score(const distribution<float> & targets,
          Target target) const
 {
@@ -201,7 +215,7 @@ calc_scores()
     for (unsigned i = 0;  i < models.size();  ++i)
         models[model_scores[i].second].rank = i;
 
-#if 1
+#if 0
     for (unsigned i = 0;  i < 20;  ++i) {
         int m = model_scores[i].second;
         cerr << "rank " << i << " " << model_names[m] << " score "
