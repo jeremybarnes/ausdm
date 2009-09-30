@@ -1,8 +1,8 @@
-/* github.cc                                                       -*- C++ -*-
+/* ausdm.cc                                                       -*- C++ -*-
    Jeremy Barnes, 6 August 2009
    Copyright (c) 2009 Jeremy Barnes.  All rights reserved.
 
-   Code to implement a basic github recommendation engine.
+   AusDM entry.
 */
 
 #include "data.h"
@@ -47,6 +47,9 @@ int main(int argc, char ** argv)
     // Extra configuration options
     vector<string> extra_config_options;
 
+    // Do we perform a fake test (with held-out data)?
+    float hold_out_data = 0.0;
+
     // Tranche specification
     string tranches = "1";
 
@@ -64,6 +67,8 @@ int main(int argc, char ** argv)
         options_description control_options("Control Options");
 
         control_options.add_options()
+            ("hold-out-data,T", value<float>(&hold_out_data),
+             "run a local test and score on held out data")
             ("output-file,o",
              value<string>(&output_file),
              "dump output file to the given filename");
@@ -104,10 +109,32 @@ int main(int argc, char ** argv)
     Timer timer;
 
     cerr << "loading data...";
+
     Data data_rmse_train, data_auc_train;
     data_rmse_train.load("download/S_RMSE_Train.csv", RMSE);
     data_auc_train.load("download/S_AUC_Train.csv", AUC);
-    cerr << " done." << endl;
 
+    Data data_rmse_test, data_auc_test;
+    if (hold_out_data > 0.0) {
+        data_rmse_train.hold_out(data_rmse_test, hold_out_data);
+        data_auc_train.hold_out(data_auc_test, hold_out_data);
+    }
+    else {
+        data_rmse_test.load("download/S_RMSE_Score.csv");
+        data_auc_test.load("download/S_AUC_Score.csv");
+    }
+
+    // Calculate the scores necessary for the job
+    data_rmse_train.calc_scores();
+    data_auc_train.calc_scores();
+
+    // Train average of top twenty models
+    
+
+
+    Data::Model_Output result;
+
+    cerr << " done." << endl;
+    
     cerr << timer.elapsed() << endl;
 }

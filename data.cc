@@ -10,87 +10,21 @@
 #include "stats/distribution_ops.h"
 #include "stats/distribution_simd.h"
 #include "utils/vector_utils.h"
+#include "utils/pair_utils.h"
 
 
 using namespace std;
 using namespace ML;
 using ML::Stats::sqr;
 
-void
-Data::
-load(const std::string & filename, Target target)
-{
-    this->target = target;
 
-    Parse_Context c(filename);
 
-    // First row: header.
-    c.expect_literal("RowID,Target");
-
-    while (!c.match_eol()) {
-        c.expect_literal(',');
-        string model_name = c.expect_text(",\n");
-        model_names.push_back(model_name);
-    }
-
-    // Create the data structures
-    cerr << model_names.size() << " models... ";
-    
-    models.resize(model_names.size());
-    for (unsigned i = 0;  i < models.size();  ++i) {
-        models[i].reserve(50000);
-    }
-    
-    int num_rows = 0;
-    for (; c; ++num_rows) {
-        int id = c.expect_int();
-        model_ids.push_back(id);
-        c.expect_literal(',');
-
-        float target_val = c.expect_int();
-
-        if (target == RMSE) target_val /= 1000.0;
-
-        targets.push_back(target_val);
-
-        for (unsigned i = 0;  i < models.size();  ++i) {
-            c.expect_literal(',');
-            int score = c.expect_int();
-            models[i].push_back(score / 1000.0);
-        }
-
-        c.skip_whitespace();
-        c.expect_eol();
-    }
-
-    cerr << num_rows << " rows... ";
-
-    vector<pair<float, int> > model_scores;
-
-    for (unsigned i = 0;  i < models.size();  ++i) {
-        if (target == RMSE)
-            models[i].score = models[i].calc_rmse(targets);
-        else models[i].score = models[i].calc_auc(targets);
-
-        model_scores.push_back(make_pair(models[i].score, i));
-    }
-
-    if (target == RMSE)
-        sort_on_first_ascending(model_scores);
-    else sort_on_first_descending(model_scores);
-
-    for (unsigned i = 0;  i < models.size();  ++i)
-        models[model_scores[i].second].rank = i;
-
-    for (unsigned i = 0;  i < 20;  ++i) {
-        int m = model_scores[i].second;
-        cerr << "rank " << i << " " << model_names[m] << " score "
-             << models[m].score << endl;
-    }
-}
+/*****************************************************************************/
+/* MODEL_OUTPUT                                                              */
+/*****************************************************************************/
 
 double
-Data::Model::
+Model_Output::
 calc_rmse(const distribution<float> & targets) const
 {
     if (targets.size() != size())
@@ -103,7 +37,7 @@ calc_rmse(const distribution<float> & targets) const
 }
         
 double
-Data::Model::
+Model_Output::
 calc_auc(const distribution<float> & targets) const
 {
     if (targets.size() != size())
@@ -156,4 +90,166 @@ calc_auc(const distribution<float> & targets) const
 
     // 5.  Final score is absolute value
     return fabs(gini);
+}
+
+
+/*****************************************************************************/
+/* DATA                                                                      */
+/*****************************************************************************/
+
+void
+Data::
+load(const std::string & filename, Target target)
+{
+    this->target = target;
+
+    Parse_Context c(filename);
+
+    // First row: header.
+    c.expect_literal("RowID,Target");
+
+    while (!c.match_eol()) {
+        c.expect_literal(',');
+        string model_name = c.expect_text(",\n");
+        model_names.push_back(model_name);
+    }
+
+    // Create the data structures
+    cerr << model_names.size() << " models... ";
+    
+    models.resize(model_names.size());
+    for (unsigned i = 0;  i < models.size();  ++i) {
+        models[i].reserve(50000);
+    }
+    
+    int num_rows = 0;
+    for (; c; ++num_rows) {
+        int id = c.expect_int();
+        model_ids.push_back(id);
+        c.expect_literal(',');
+
+        float target_val = c.expect_int();
+
+        if (target == RMSE) target_val /= 1000.0;
+
+        targets.push_back(target_val);
+
+        for (unsigned i = 0;  i < models.size();  ++i) {
+            c.expect_literal(',');
+            int score = c.expect_int();
+            models[i].push_back(score / 1000.0);
+        }
+
+        c.skip_whitespace();
+        c.expect_eol();
+    }
+
+    cerr << num_rows << " rows... ";
+}
+
+void
+Data::
+clear()
+{
+    targets.clear();
+    model_names.clear();
+    model_ids.clear();
+    models.clear();
+    model_ranking.clear();
+}
+
+void
+Data::
+swap(Data & other)
+{
+    std::swap(target, other.target);
+    targets.swap(other.targets);
+    model_names.swap(other.model_names);
+    model_ids.swap(other.model_ids);
+    models.swap(other.models);
+    model_ranking.swap(other.model_ranking);
+}
+
+void
+Data::
+calc_scores()
+{
+    vector<pair<float, int> > model_scores;
+
+    for (unsigned i = 0;  i < models.size();  ++i) {
+        if (target == RMSE)
+            models[i].score = models[i].calc_rmse(targets);
+        else models[i].score = models[i].calc_auc(targets);
+
+        model_scores.push_back(make_pair(models[i].score, i));
+    }
+
+    if (target == RMSE)
+        sort_on_first_ascending(model_scores);
+    else sort_on_first_descending(model_scores);
+
+    for (unsigned i = 0;  i < models.size();  ++i)
+        models[model_scores[i].second].rank = i;
+
+    for (unsigned i = 0;  i < 20;  ++i) {
+        int m = model_scores[i].second;
+        cerr << "rank " << i << " " << model_names[m] << " score "
+             << models[m].score << endl;
+    }
+
+    model_ranking.clear();
+    model_ranking.insert(model_ranking.end(),
+                         second_extractor(model_scores.begin()),
+                         second_extractor(model_scores.end()));
+}
+
+void
+Data::
+hold_out(Data & remove_to, float proportion,
+         int random_seed)
+{
+    vector<int> to_remove;
+    for (unsigned i = 0;  i < targets.size();  ++i) {
+        to_remove.push_back(i);
+    }
+
+    std::random_shuffle(to_remove.begin(), to_remove.end());
+
+    if (proportion < 0 || proportion > 1.0)
+        throw Exception("bad proportion");
+    
+    to_remove.erase(to_remove.begin() + proportion * to_remove.size(),
+                    to_remove.end());
+
+
+    vector<int> remove_me(targets.size(), false);
+    for (unsigned i = 0;  i < to_remove.size();  ++i)
+        remove_me[i] = true;
+    
+
+    remove_to.clear();
+    
+    Data new_me;
+
+    new_me.target = remove_to.target = target;
+    new_me.model_names = remove_to.model_names = model_names;
+    
+    new_me.models.resize(model_names.size());
+    remove_to.models.resize(model_names.size());
+
+    for (unsigned i = 0;  i < model_names.size();  ++i) {
+        new_me.models[i].reserve(targets.size() - to_remove.size());
+        remove_to.models[i].reserve(to_remove.size());
+    }
+
+    for (unsigned i = 0;  i < targets.size();  ++i) {
+        Data & add_to = remove_me[i] ? remove_to : new_me;
+        add_to.targets.push_back(targets[i]);
+        add_to.model_ids.push_back(model_ids[i]);
+
+        for (unsigned j = 0;  j < model_names.size();  ++j)
+            add_to.models[j].push_back(models[j][i]);
+    }
+
+    swap(new_me);
 }

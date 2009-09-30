@@ -23,6 +23,27 @@ using ML::distribution;
 
 
 /*****************************************************************************/
+/* MODEL_OUTPUT                                                              */
+/*****************************************************************************/
+
+/// The output of one of the models that we are blending
+struct Model_Output : public distribution<float> {
+    
+    /// Calculate the RMSE over the given set of targets
+    double calc_rmse(const distribution<float> & targets) const;
+    
+    /// Calculate the AUC over the given set of targets
+    double calc_auc(const distribution<float> & targets) const;
+    
+    /// Score over whatever target we are trying to calculate
+    double score;
+    
+    /// Rank in accuracy over targets we are trying to calculate
+    int rank;
+};
+
+
+/*****************************************************************************/
 /* DATA                                                                      */
 /*****************************************************************************/
 
@@ -30,6 +51,15 @@ using ML::distribution;
 
 struct Data {
     void load(const std::string & filename, Target target);
+
+    void calc_scores();
+
+    void hold_out(Data & remove_to, float proportion,
+                  int random_seed = 1);
+
+    void clear();
+
+    void swap(Data & other);
 
     Target target;
 
@@ -42,23 +72,10 @@ struct Data {
     /// ID values of the models
     std::vector<int> model_ids;
 
-    /// The output of one of the models that we are blending
-    struct Model : public distribution<float> {
-        
-        /// Calculate the RMSE over the given set of targets
-        double calc_rmse(const distribution<float> & targets) const;
-        
-        /// Calculate the AUC over the given set of targets
-        double calc_auc(const distribution<float> & targets) const;
+    std::vector<Model_Output> models;
 
-        /// Score over whatever target we are trying to calculate
-        double score;
-
-        /// Rank over targets we are trying to calculate
-        int rank;
-    };
-
-    std::vector<Model> models;
+    /// Sorted list of models in order of score
+    std::vector<int> model_ranking;
 };
 
 #endif /* __ausdm__data_h__ */
