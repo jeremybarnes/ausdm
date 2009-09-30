@@ -104,8 +104,9 @@ int main(int argc, char ** argv)
     Timer timer;
 
     cerr << "loading data...";
-    Data data;
-    data.load("download/S_AUC_Score.csv");
+    Data data_rmse_train, data_auc_train;
+    data_rmse_train.load("download/S_RMSE_Train.csv", RMSE);
+    data_auc_train.load("download/S_AUC_Train.csv", AUC);
     cerr << " done." << endl;
 
     cerr << timer.elapsed() << endl;
