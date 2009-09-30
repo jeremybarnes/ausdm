@@ -6,6 +6,7 @@
 */
 
 #include "data.h"
+#include "blender.h"
 
 #include <fstream>
 #include <iterator>
@@ -19,6 +20,7 @@
 #include "utils/configuration.h"
 #include "arch/timers.h"
 #include "utils/guard.h"
+#include "arch/threads.h"
 
 #include "boosting/worker_task.h"
 
@@ -35,6 +37,42 @@
 using namespace std;
 using namespace ML;
 
+struct Predict_Job {
+    Model_Output & result;
+    int first, last;
+    const Blender & blender;
+    const Data & data;
+    boost::progress_display & progress;
+    Lock & progress_lock;
+
+    Predict_Job(Model_Output & result,
+                int first, int last,
+                const Blender & blender,
+                const Data & data,
+                boost::progress_display & progress,
+                Lock & progress_lock)
+        : result(result), first(first), last(last), blender(blender),
+          data(data), progress(progress), progress_lock(progress_lock)
+    {
+    }
+
+    void operator () ()
+    {
+        for (int j = first;  j < last;  ++j) {
+            distribution<float> model_inputs(data.models.size());
+            for (unsigned i = 0;  i < data.models.size();  ++i) {
+                model_inputs[i] = data.models[i][j];
+            }
+
+            float val = blender.predict(model_inputs);
+            result.at(j) = val;
+
+            Guard guard(progress_lock);
+            ++progress;
+        }
+    }
+};
+
 
 int main(int argc, char ** argv)
 {
@@ -44,14 +82,17 @@ int main(int argc, char ** argv)
     // Configuration file to use
     string config_file = "config.txt";
 
+    // Name of blender in config file
+    string blender_name = "blender";
+
     // Extra configuration options
     vector<string> extra_config_options;
 
     // Do we perform a fake test (with held-out data)?
     float hold_out_data = 0.0;
 
-    // Tranche specification
-    string tranches = "1";
+    // What type of target do we predict?
+    string target_type;
 
     {
         using namespace boost::program_options;
@@ -61,6 +102,8 @@ int main(int argc, char ** argv)
         config_options.add_options()
             ("config-file,c", value<string>(&config_file),
              "configuration file to read configuration options from")
+            ("blender-name,n", value<string>(&blender_name),
+             "name of blender in configuration file")
             ("extra-config-option", value<vector<string> >(&extra_config_options),
              "extra configuration option=value (can go directly on command line)");
 
@@ -69,6 +112,8 @@ int main(int argc, char ** argv)
         control_options.add_options()
             ("hold-out-data,T", value<float>(&hold_out_data),
              "run a local test and score on held out data")
+            ("target-type,t", value<string>(&target_type),
+             "select target type: auc or rmse")
             ("output-file,o",
              value<string>(&output_file),
              "dump output file to the given filename");
@@ -98,6 +143,11 @@ int main(int argc, char ** argv)
         }
     }
 
+    Target target;
+    if (target_type == "auc") target = AUC;
+    else if (target_type == "rmse") target = RMSE;
+    else throw Exception("target type " + target_type + " not known");
+
     // Load up configuration
     Configuration config;
     if (config_file != "") config.load(config_file);
@@ -110,31 +160,73 @@ int main(int argc, char ** argv)
 
     cerr << "loading data...";
 
-    Data data_rmse_train, data_auc_train;
-    data_rmse_train.load("download/S_RMSE_Train.csv", RMSE);
-    data_auc_train.load("download/S_AUC_Train.csv", AUC);
+    string targ_type_uc;
+    if (target == AUC) targ_type_uc = "AUC";
+    else if (target == RMSE) targ_type_uc = "RMSE";
+    else throw Exception("unknown target type");
 
-    Data data_rmse_test, data_auc_test;
-    if (hold_out_data > 0.0) {
-        data_rmse_train.hold_out(data_rmse_test, hold_out_data);
-        data_auc_train.hold_out(data_auc_test, hold_out_data);
-    }
-    else {
-        data_rmse_test.load("download/S_RMSE_Score.csv");
-        data_auc_test.load("download/S_AUC_Score.csv");
-    }
+
+    Data data_train;
+    data_train.load("download/S_" + targ_type_uc + "_Train.csv", target);
+
+    Data data_test;
+    if (hold_out_data > 0.0)
+        data_train.hold_out(data_test, hold_out_data);
+    else data_test.load("download/S_" + targ_type_uc + "_Score.csv", target);
 
     // Calculate the scores necessary for the job
-    data_rmse_train.calc_scores();
-    data_auc_train.calc_scores();
+    data_train.calc_scores();
 
-    // Train average of top twenty models
+    boost::shared_ptr<Blender> blender
+        = get_blender(config, blender_name, data_train);
+
+    int np = data_test.targets.size();
+
+    // Now run the model
+    Model_Output result;
+    result.resize(np);
+
+    static Worker_Task & worker = Worker_Task::instance(num_threads() - 1);
+
+    cerr << "processing " << np << " predictions..." << endl;
     
+    boost::progress_display progress(np, cerr);
+    Lock progress_lock;
 
+    // Now, submit it as jobs to the worker task to be done multithreaded
+    int group;
+    int job_num = 0;
+    {
+        int parent = -1;  // no parent group
+        group = worker.get_group(NO_JOB, "dump user results task", parent);
 
-    Data::Model_Output result;
+        // Make sure the group gets unlocked once we've populated
+        // everything
+        Call_Guard guard(boost::bind(&Worker_Task::unlock_group,
+                                     boost::ref(worker),
+                                     group));
+        
+        for (unsigned i = 0;  i < np;  i += 100, ++job_num) {
+            int last = std::min<int>(np, i + 100);
+
+            // Create the job
+            Predict_Job job(result,
+                            i, last,
+                            *blender, data_test, progress, progress_lock);
+
+            // Send it to a thread to be processed
+            worker.add(job, "blend job", group);
+        }
+    }
+
+    // Add this thread to the thread pool until we're ready
+    worker.run_until_finished(group);
 
     cerr << " done." << endl;
-    
+
     cerr << timer.elapsed() << endl;
+
+    if (hold_out_data > 0.0)
+        cout << format("%0.4f", result.calc_score(data_test.targets, target))
+             << endl;
 }

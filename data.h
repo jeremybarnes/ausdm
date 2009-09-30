@@ -34,6 +34,9 @@ struct Model_Output : public distribution<float> {
     
     /// Calculate the AUC over the given set of targets
     double calc_auc(const distribution<float> & targets) const;
+
+    double calc_score(const distribution<float> & targets,
+                      Target target) const;
     
     /// Score over whatever target we are trying to calculate
     double score;

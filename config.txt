@@ -1,0 +1,7 @@
+# -* awk -*-
+
+blender {
+    type=linear;
+    mode=best_n_weighted;
+    num_models=10;
+}

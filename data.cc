@@ -92,6 +92,16 @@ calc_auc(const distribution<float> & targets) const
     return fabs(gini);
 }
 
+double
+Model_Output::
+calc_score(const distribution<float> & targets,
+         Target target) const
+{
+    if (target == AUC) return calc_auc(targets);
+    else if (target == RMSE) return calc_rmse(targets);
+    else throw Exception("unknown target");
+}
+
 
 /*****************************************************************************/
 /* DATA                                                                      */
