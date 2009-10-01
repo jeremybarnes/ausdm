@@ -56,37 +56,27 @@ calc_auc(const distribution<float> & targets) const
 
     std::sort(sorted.begin(), sorted.end());
     
-    // 2.  Get (x,y) points
-    vector<pair<float, float> > points;
-    points.push_back(make_pair(0.0, 0.0));
+    // 2.  Get (x,y) points and calculate the AUC
     int total_pos = 0, total_neg = 0;
+
+    float prevx = 0.0, prevy = 0.0;
+
+    double total_area = 0.0;
 
     for (unsigned i = 0;  i < sorted.size();  ++i) {
         if (sorted[i].second == -1) ++total_neg;
         else ++total_pos;
-
-        points.push_back(make_pair(total_pos * 1.0 / num_pos,
-                                   total_neg * 1.0 / num_neg));
-    }
-
-    // 3.  Calculate the AUC
-    std::sort(points.begin(), points.end());
-
-    double total = 0.0;
-    for (unsigned i = 1;  i < points.size();  ++i) {
-        float prevx = points[i - 1].first;
-        float prevy = points[i - 1].second;
         
-        float x = points[i].first;
-        float y = points[i].second;
-
+        float x = total_pos * 1.0 / num_pos;
+        float y = total_neg * 1.0 / num_neg;
+        
         double area = (x - prevx) * (y + prevy) * 0.5;
 
-        total += area;
+        total_area += area;
     }
 
     // 4.  Convert to gini
-    double gini = 2.0 * (total - 0.5);
+    double gini = 2.0 * (total_area - 0.5);
 
     // 5.  Final score is absolute value
     return fabs(gini);
@@ -215,7 +205,7 @@ calc_scores()
     for (unsigned i = 0;  i < models.size();  ++i)
         models[model_scores[i].second].rank = i;
 
-#if 0
+#if 1
     for (unsigned i = 0;  i < 20;  ++i) {
         int m = model_scores[i].second;
         cerr << "rank " << i << " " << model_names[m] << " score "
