@@ -102,3 +102,15 @@ With early stopping:
 
 Even worse, not encouraging
 
+
+With selection via margin:
+
+0.8773 +/- 0.0076
+
+Not any better!
+
+
+Minor tweaks:
+
+0.8779 +/- 0.0080
+

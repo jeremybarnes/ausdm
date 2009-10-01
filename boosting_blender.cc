@@ -52,6 +52,9 @@ init(const Data & training_data)
     Data validate_set;
     training_set.hold_out(validate_set, 0.2);
 
+    training_set.calc_scores();
+    validate_set.calc_scores();
+
     distribution<double> example_weights(training_set.targets.size(), 1.0);
     
     distribution<double> training_predictions(training_set.targets.size(), 0.0);
@@ -110,8 +113,9 @@ init(const Data & training_data)
         for (unsigned m = 0;  m < training_set.models.size();  ++m) {
             // Calculate the model score
             double error;
+            double score;
             if (target == RMSE)
-                error
+                error = score
                     = 1.0 - training_set.models[m]
                                 .calc_rmse_weighted(training_set.targets,
                                                     example_weights);
@@ -143,30 +147,37 @@ init(const Data & training_data)
 
                 error = incorrect / (correct + incorrect);
 
+#if 0
                 //cerr << "correct = " << correct << " incorrect = "
                 //     << incorrect << " error " << error << endl;
-                //cerr << "error = " << error << " avg_margin = "
-                //     << total_margin << endl;
+                cerr << "model " << m
+                     << " error = " << error << " avg_margin = "
+                     << total_margin << " rank " << training_set.models[m].rank
+                     << " model score " << training_set.models[m].score
+                     << endl;
+#endif
 
-                //error = total_margin;
+                score = total_margin;
             }
 
-            weak_scores.push_back(make_pair(m, error));
+            weak_scores.push_back(make_pair(m, score));
         }
 
-        sort_on_second_ascending(weak_scores);
+        sort_on_second_descending(weak_scores);
 
         int weak_model = weak_scores[0].first;
-        double error = weak_scores[0].second;
+        double score = weak_scores[0].second;
 
+        cerr << "score = " << score << " model " << weak_model
+             << " rank " << training_set.models[weak_model].rank << endl;
+
+        //if (score < 0.0) break;
+        
         //cerr << "error = " << error << endl;
 
-        if (error >= 0.5) break;
+        //if (error >= 0.5) break;
 
-        double beta = error / (1.0 - error);
-
-        double weight = -0.5 * log(beta);
-        
+        double weight = exp(score);
 
         //cerr << "weight is " << weight << endl;
 
@@ -205,7 +216,7 @@ init(const Data & training_data)
                          << endl;
             }
 
-            example_weights[x] *= exp(2.0 * -weight * margin);
+            example_weights[x] *= exp(-margin * 0.5);
  
             min_weight = std::min(example_weights[x], min_weight);
             max_weight = std::max(example_weights[x], max_weight);
@@ -237,7 +248,7 @@ init(const Data & training_data)
             if (target == AUC)
                 pred = (pred - 3.0) / 2.0;
 
-            training_predictions[x] += pred;
+            training_predictions[x] += weight * pred;
         }
 
         for (unsigned x = 0;  x < validate_set.targets.size();  ++x) {
@@ -245,7 +256,7 @@ init(const Data & training_data)
             if (target == AUC)
                 pred = (pred - 3.0) / 2.0;
 
-            validate_predictions[x] += pred;
+            validate_predictions[x] += weight * pred;
         }
 
         Model_Output training_output, validate_output;
@@ -278,10 +289,10 @@ init(const Data & training_data)
         //cerr << "training score: " << training_score << endl;
         //cerr << "validate score: " << validate_score << endl;
 
-        cerr << format("iter %4d model %5d error %6.4f train %6.4f val %6.4f wt %6.4f",
+        cerr << format("iter %4d model %5d score %6.4f train %6.4f val %6.4f wt %6.4f",
                        iter, weak_model,
                        training_set.model_names[weak_model].c_str(),
-                       error, training_score, validate_score,
+                       score, training_score, validate_score,
                        weight) << endl;
     }
 
