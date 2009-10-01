@@ -93,6 +93,12 @@ With impossible examples excluded:
 
 0.8776 +/- 0.0080
 
-
 Still not much good...
+
+
+With early stopping:
+
+0.8772 +/- 0.0077
+
+Even worse, not encouraging
 

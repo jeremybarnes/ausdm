@@ -88,6 +88,11 @@ init(const Data & training_data)
 
     example_weights.normalize();
 
+    distribution<double> best_model_weights = model_weights;
+    float best_validate_score = 0.0;
+    int best_iter = -1;
+
+
     for (int iter = 0;  iter < max_iter;  ++iter) {
         // Calculate the (weighted) score for each of the weak learners
         vector<pair<int, float> > weak_scores;
@@ -232,6 +237,13 @@ init(const Data & training_data)
         
         double validate_score
             = validate_output.calc_score(validate_set.targets, target);
+
+        if (validate_score >= best_validate_score) {
+            best_validate_score = validate_score;
+            best_model_weights = model_weights;
+            best_iter = iter;
+        }
+            
         
         //cerr << "iter " << iter << " chose model " << weak_model << " ("
         //     << training_set.model_names[weak_model] << ") with error "
@@ -247,4 +259,7 @@ init(const Data & training_data)
                        error, training_score, validate_score,
                        weight) << endl;
     }
+
+    cerr << "best was on iter " << best_iter << endl;
+    model_weights = best_model_weights;
 }
