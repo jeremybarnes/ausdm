@@ -7,6 +7,7 @@
 
 #include "boosting_blender.h"
 #include "utils/vector_utils.h"
+#include "boosting/boosting_core.h"
 
 
 using namespace ML;
@@ -45,6 +46,7 @@ init(const Data & training_data)
     //     the current weights
     // 4.  Calculate residuals at each iteration to choose weight and updates
 
+    //ML::Boosting_Loss loss;
 
     Data training_set = training_data;
     Data validate_set;
@@ -119,6 +121,7 @@ init(const Data & training_data)
                 error = 0.0;
 
                 double correct = 0.0, incorrect = 0.0;
+                double total_margin = 0.0;
 
                 for (unsigned x = 0;  x < training_set.targets.size();  ++x) {
                     // scores are between 1.000 and 5.000, so we say that it
@@ -134,12 +137,18 @@ init(const Data & training_data)
 
                     if (margin < 0.0) incorrect += example_weights[x];
                     else correct += example_weights[x];
+
+                    total_margin += example_weights[x] * margin;
                 }
 
                 error = incorrect / (correct + incorrect);
 
                 //cerr << "correct = " << correct << " incorrect = "
                 //     << incorrect << " error " << error << endl;
+                //cerr << "error = " << error << " avg_margin = "
+                //     << total_margin << endl;
+
+                //error = total_margin;
             }
 
             weak_scores.push_back(make_pair(m, error));
@@ -154,7 +163,10 @@ init(const Data & training_data)
 
         if (error >= 0.5) break;
 
-        double weight = 0.5 * log((1.0 - error) / error);
+        double beta = error / (1.0 - error);
+
+        double weight = -0.5 * log(beta);
+        
 
         //cerr << "weight is " << weight << endl;
 
@@ -163,8 +175,14 @@ init(const Data & training_data)
         double total_ex_weight = 0.0;
         double min_weight = INFINITY, max_weight = -INFINITY;
 
+        double total_weight_correct = 0.0, total_weight_incorrect = 0.0;
+
         for (unsigned x = 0;  x < training_set.targets.size();  ++x) {
-            if (!possible[x]) continue;
+            if (!possible[x]) {
+                if (example_weights[x] != 0.0)
+                    throw Exception("impossible example not ignored");
+                continue;
+            }
 
             double margin;
 
@@ -183,22 +201,29 @@ init(const Data & training_data)
                          << example_weights[x] * example_weights.size()
                          << " newwt "
                          << (example_weights[x] * example_weights.size()
-                             * exp(-weight * margin))
+                                 * exp(-weight * margin))
                          << endl;
             }
 
-            example_weights[x] *= exp(-weight * margin);
+            example_weights[x] *= exp(2.0 * -weight * margin);
  
             min_weight = std::min(example_weights[x], min_weight);
             max_weight = std::max(example_weights[x], max_weight);
 
             total_ex_weight += example_weights[x];
+
+            if (margin > 0.0)
+                total_weight_correct += example_weights[x];
+            else total_weight_incorrect += example_weights[x];
         }
         
         //cerr << "min_weight = " << (min_weight / total_ex_weight * example_weights.size()) << endl;
         //cerr << "max_weight = " << (max_weight / total_ex_weight * example_weights.size()) << endl;
 
         //cerr << "total_ex_weight = " << total_ex_weight << endl;
+
+        cerr << "total_weight_correct = " << total_weight_correct << endl;
+        cerr << "total_weight_incorrect = " << total_weight_incorrect << endl;
 
         example_weights /= total_ex_weight;
 
