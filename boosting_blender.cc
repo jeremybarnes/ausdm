@@ -51,7 +51,6 @@ init(const Data & training_data)
     training_set.hold_out(validate_set, 0.2);
 
     distribution<double> example_weights(training_set.targets.size(), 1.0);
-    example_weights.normalize();
     
     distribution<double> training_predictions(training_set.targets.size(), 0.0);
     distribution<double> validate_predictions(validate_set.targets.size(), 0.0);
@@ -62,9 +61,44 @@ init(const Data & training_data)
     model_weights.clear();
     model_weights.resize(training_set.models.size(), 0.0);
 
+    int num_possible = 0, num_impossible = 0;
+
+    vector<int> possible(training_set.targets.size(), false);
+
+    for (unsigned x = 0;  x < training_set.targets.size();  ++x) {
+        float label = training_set.targets[x];
+        int & is_possible = possible[x];
+        for (unsigned m = 0;  m < training_set.models.size() && !is_possible;
+             ++m) {
+
+            float pred = (training_set.models[m][x] - 3.0) / 2.0;
+            float margin = pred * label;
+            if (margin > 0.0) is_possible = true;
+        }
+
+        if (!is_possible) {
+            num_impossible += 1;
+            example_weights[x] = 0.0;
+        }
+        else num_possible += 1;
+    }
+
+    cerr << "examples: possible " << num_possible << " impossible "
+         << num_impossible << endl;
+
+    example_weights.normalize();
+
     for (int iter = 0;  iter < max_iter;  ++iter) {
         // Calculate the (weighted) score for each of the weak learners
         vector<pair<int, float> > weak_scores;
+
+#if 0
+        cerr << "example weights: "
+             << distribution<double>(example_weights.begin(),
+                                     example_weights.begin() + 20)
+                 * example_weights.size()
+             << endl;
+#endif
         
         for (unsigned m = 0;  m < training_set.models.size();  ++m) {
             // Calculate the model score
@@ -78,17 +112,29 @@ init(const Data & training_data)
                 // AUC calculation; we want a normal weighted accuracy thing
                 // A weighted, real AUC doesn't make much sense really
                 error = 0.0;
+
+                double correct = 0.0, incorrect = 0.0;
+
                 for (unsigned x = 0;  x < training_set.targets.size();  ++x) {
                     // scores are between 1.000 and 5.000, so we say that it
                     // is correct if it is on the right side of 3
                     // Might need something a bit more clever here, though
                     float pred = (training_set.models[m][x] - 3.0) / 2.0;
-                    float correct = training_set.targets[x];
+                    float label = training_set.targets[x];
+                    float margin = pred * label;
 
-                    if ((pred < 0.0 && correct >= 0.0)
-                        || (pred > 0.0 && correct <= 0.0))
-                        error += example_weights[x];
+                    //cerr << "pred = " << pred << " correct = " << correct
+                    //     << " margin = " << margin << " weight "
+                    //     << example_weights[x] << endl;
+
+                    if (margin < 0.0) incorrect += example_weights[x];
+                    else correct += example_weights[x];
                 }
+
+                error = incorrect / (correct + incorrect);
+
+                //cerr << "correct = " << correct << " incorrect = "
+                //     << incorrect << " error " << error << endl;
             }
 
             weak_scores.push_back(make_pair(m, error));
@@ -113,6 +159,8 @@ init(const Data & training_data)
         double min_weight = INFINITY, max_weight = -INFINITY;
 
         for (unsigned x = 0;  x < training_set.targets.size();  ++x) {
+            if (!possible[x]) continue;
+
             double margin;
 
             if (target == RMSE)
@@ -122,6 +170,16 @@ init(const Data & training_data)
                 float pred = (training_set.models[weak_model][x] - 3.0) / 2.0;
                 float correct = training_set.targets[x];
                 margin = pred * correct;
+                
+                if (x < 20 && false)
+                    cerr << "x = " << x << " pred " << pred << " correct "
+                         << correct << " margin " << margin
+                         << " oldwt "
+                         << example_weights[x] * example_weights.size()
+                         << " newwt "
+                         << (example_weights[x] * example_weights.size()
+                             * exp(-weight * margin))
+                         << endl;
             }
 
             example_weights[x] *= exp(-weight * margin);
@@ -145,13 +203,19 @@ init(const Data & training_data)
 
         // Now score accuracy of training and validate examples
         for (unsigned x = 0;  x < training_set.targets.size();  ++x) {
-            training_predictions[x]
-                += weight * training_set.models[weak_model][x];
+            float pred = training_set.models[weak_model][x];
+            if (target == AUC)
+                pred = (pred - 3.0) / 2.0;
+
+            training_predictions[x] += pred;
         }
 
         for (unsigned x = 0;  x < validate_set.targets.size();  ++x) {
-            validate_predictions[x]
-                += weight * validate_set.models[weak_model][x];
+            float pred = validate_set.models[weak_model][x];
+            if (target == AUC)
+                pred = (pred - 3.0) / 2.0;
+
+            validate_predictions[x] += pred;
         }
 
         Model_Output training_output, validate_output;
@@ -160,15 +224,15 @@ init(const Data & training_data)
                                training_predictions.end());
 
         validate_output.insert(validate_output.end(),
-                                 validate_predictions.begin(),
-                                 validate_predictions.end());
+                               validate_predictions.begin(),
+                               validate_predictions.end());
         
         double training_score
             = training_output.calc_score(training_set.targets, target);
-
+        
         double validate_score
             = validate_output.calc_score(validate_set.targets, target);
-
+        
         //cerr << "iter " << iter << " chose model " << weak_model << " ("
         //     << training_set.model_names[weak_model] << ") with error "
         //     << weak_scores[0].second << endl;
@@ -177,9 +241,10 @@ init(const Data & training_data)
         //cerr << "training score: " << training_score << endl;
         //cerr << "validate score: " << validate_score << endl;
 
-        cerr << format("iter %4d model %5d error %6.4f train %6.4f val %6.4f",
+        cerr << format("iter %4d model %5d error %6.4f train %6.4f val %6.4f wt %6.4f",
                        iter, weak_model,
                        training_set.model_names[weak_model].c_str(),
-                       error, training_score, validate_score) << endl;
+                       error, training_score, validate_score,
+                       weight) << endl;
     }
 }

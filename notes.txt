@@ -84,3 +84,15 @@ Boosting:
 0.8779 +/- 0.0077
 
 Not much good f as a first try...
+
+
+
+With impossible examples excluded:
+
+./build/x86_64/bin/ausdm -T 0.20 -t auc blender.num_models=5 -r 10
+
+0.8776 +/- 0.0080
+
+
+Still not much good...
+
