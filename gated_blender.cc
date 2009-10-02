@@ -79,7 +79,9 @@ conf(const ML::distribution<float> & models) const
 
         cerr << "model " << i << ": model_prediction = "
              << model_prediction << " real_prediction = "
-             << real_prediction << endl;
+             << real_prediction << " error = "
+             << fabs(model_prediction - real_prediction)
+             << endl;
 
         result[i] = 1.0;
     }

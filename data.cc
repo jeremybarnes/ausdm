@@ -289,32 +289,43 @@ decompose()
 
     int nvalues = std::min(m, n);
 
+    cerr << "n = " << n << " m = " << m << " nvalues = " << nvalues << endl;
+
     distribution<float> svalues(nvalues);
-    boost::multi_array<float, 2> lvectors(boost::extents[nvalues][m]);
-    boost::multi_array<float, 2> rvectorsT(boost::extents[n][nvalues]);
+    boost::multi_array<float, 2> lvectorsT(boost::extents[nvalues][m]);
+    boost::multi_array<float, 2> rvectors(boost::extents[n][nvalues]);
 
     int result = LAPack::gesdd("S", m, n,
                                values.data(), m,
                                &svalues[0],
-                               &lvectors[0][0], m,
-                               &rvectorsT[0][0], nvalues);
+                               &lvectorsT[0][0], m,
+                               &rvectors[0][0], nvalues);
 
     if (result != 0)
         throw Exception("gesdd returned non-zero");
 
     // Transpose rvectors
-    boost::multi_array<float, 2> rvectors(boost::extents[nvalues][n]);
-    for (unsigned i = 0;  i < nvalues;  ++i)
-        for (unsigned j = 0;  j < n;  ++j)
-            rvectors[i][j] = rvectorsT[j][i];
+    //boost::multi_array<float, 2> rvectors(boost::extents[nvalues][n]);
+    //for (unsigned i = 0;  i < nvalues;  ++i)
+    //    for (unsigned j = 0;  j < n;  ++j)
+    //        rvectors[i][j] = rvectorsT[j][i];
+
+    // Transpose lvectors
+    boost::multi_array<float, 2> lvectors(boost::extents[m][nvalues]);
+    for (unsigned i = 0;  i < m;  ++i)
+        for (unsigned j = 0;  j < nvalues;  ++j)
+            lvectors[i][j] = lvectorsT[j][i];
 
     singular_values = svalues;
+
+    cerr << "singular_values = " << singular_values << endl;
 
     singular_models.resize(models.size());
     
     for (unsigned i = 0;  i < models.size();  ++i)
         singular_models[i]
-            = distribution<float>(&lvectors[i][0], &lvectors[i][0] + nvalues);
+            = distribution<float>(&lvectors[i][0],
+                                  &lvectors[i][nvalues - 1] + 1);
 
     cerr << "singular_models[0] = " << singular_models[0] << endl;
     cerr << "singular_models[1] = " << singular_models[1] << endl;
@@ -323,5 +334,8 @@ decompose()
 
     for (unsigned i = 0;  i < targets.size();  ++i)
         singular_targets[i]
-            = distribution<float>(&rvectors[i][0], &rvectors[i][0] + nvalues);
+            = distribution<float>(&rvectors[i][0], &rvectors[i][nvalues - 1] + 1);
+
+    cerr << "singular_targets[0] = " << singular_targets[0] << endl;
+    cerr << "singular_targets[1] = " << singular_targets[1] << endl;
 }
