@@ -282,14 +282,14 @@ decompose()
 {
     cerr << "doing decomposition" << endl;
 
-    boost::multi_array<float, 2> values(boost::extents[models.size()][targets.size()]);
-
-    for (unsigned m = 0;  m < models.size();  ++m)
-        for (unsigned x = 0;  x < targets.size();  ++x)
-            values[m][x] = models[m][x];
-
     int m = models.size();
     int n = targets.size();
+
+    boost::multi_array<float, 2> values(boost::extents[n][m]);
+
+    for (unsigned i = 0;  i < m;  ++i)
+        for (unsigned j = 0;  j < n;  ++j)
+            values[j][i] = models[i][j];
 
     int minmn = std::min(m, n);
 
@@ -302,14 +302,18 @@ decompose()
 
     Timer timer;
 
-    int result = LAPack::gesdd("S", n, m,
-                               values.data(), n,
+    int result = LAPack::gesdd("S", m, n,
+                               values.data(), m,
                                &svalues[0],
                                &rvectors[0][0], n,
                                &lvectors[0][0], m);
 
-    //lvectors = transpose(lvectors);
-    //rvectors = transpose(rvectors);
+    // Transpose lvectors in-place
+    for (unsigned i = 0;  i < m;  ++i) {
+        for (unsigned j = 0;  j < i;  ++j) {
+            std::swap(lvectors[i][j], lvectors[j][i]);
+        }
+    }
 
     cerr << timer.elapsed() << endl;
     timer.restart();
@@ -359,13 +363,15 @@ decompose()
     cerr << "result->Vt->cols = " << svdresult->Vt->cols << endl;
 
     distribution<float> u0(svdresult->Ut->value[0], svdresult->Ut->value[0] + m);
-    distribution<float> u02(&lvectors[0][0], &lvectors[0][0] + m);
+    distribution<float> u02(&rvectors[0][0], &rvectors[0][0] + m);
 
     cerr << "u0 = " << u0 << endl;
     cerr << "u02 = " << u02 << endl;
     
     distribution<float> v0(svdresult->Vt->value[0], svdresult->Vt->value[0] + 50/*n*/);
+    distribution<float> v02(&lvectors[0][0], &lvectors[0][0] + 50);
     cerr << "v0 = " << v0 << endl;
+    cerr << "v02 = " << v02 << endl;
 
     distribution<double> mean_rating(50);
     for (unsigned i = 0;  i < 50;  i++)
@@ -374,6 +380,7 @@ decompose()
 
     cerr << "mean ratings " << mean_rating << endl;
 
+    distribution<float> calc_values(50);
 
     // Free up memory (TODO: put into guards...)
     delete[] matrix2.pointr;
