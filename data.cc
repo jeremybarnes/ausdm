@@ -316,6 +316,9 @@ decompose()
         singular_models[i]
             = distribution<float>(&lvectors[i][0], &lvectors[i][0] + nvalues);
 
+    cerr << "singular_models[0] = " << singular_models[0] << endl;
+    cerr << "singular_models[1] = " << singular_models[1] << endl;
+
     singular_targets.resize(targets.size());
 
     for (unsigned i = 0;  i < targets.size();  ++i)

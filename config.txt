@@ -1,7 +1,5 @@
 # -* awk -*-
 
 blender {
-    type=boosting;
-    mode=best_n_weighted;
-    num_models=10;
+    type=gated;
 }
