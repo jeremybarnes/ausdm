@@ -11,12 +11,14 @@
 #include "stats/distribution_simd.h"
 #include "utils/vector_utils.h"
 #include "utils/pair_utils.h"
-
+#include "algebra/lapack.h"
+#include "svdlibc/svdlib.h"
+#include "arch/timers.h"
+#include "algebra/matrix_ops.h"
 
 using namespace std;
 using namespace ML;
 using ML::Stats::sqr;
-
 
 
 /*****************************************************************************/
@@ -73,7 +75,11 @@ calc_auc(const distribution<float> & targets) const
         double area = (x - prevx) * (y + prevy) * 0.5;
 
         total_area += area;
+
+        prevx = x;
+        prevy = y;
     }
+
 
     // 4.  Convert to gini
     double gini = 2.0 * (total_area - 0.5);
@@ -124,7 +130,7 @@ load(const std::string & filename, Target target)
 
     while (!c.match_eol()) {
         c.expect_literal(',');
-        string model_name = c.expect_text(",\n");
+        string model_name = c.expect_text(",\n\r");
         model_names.push_back(model_name);
     }
 
@@ -205,7 +211,7 @@ calc_scores()
     for (unsigned i = 0;  i < models.size();  ++i)
         models[model_scores[i].second].rank = i;
 
-#if 1
+#if 0
     for (unsigned i = 0;  i < 20;  ++i) {
         int m = model_scores[i].second;
         cerr << "rank " << i << " " << model_names[m] << " score "
@@ -268,4 +274,112 @@ hold_out(Data & remove_to, float proportion,
     }
 
     swap(new_me);
+}
+
+void
+Data::
+decompose()
+{
+    cerr << "doing decomposition" << endl;
+
+    boost::multi_array<float, 2> values(boost::extents[models.size()][targets.size()]);
+
+    for (unsigned m = 0;  m < models.size();  ++m)
+        for (unsigned x = 0;  x < targets.size();  ++x)
+            values[m][x] = models[m][x];
+
+    int m = models.size();
+    int n = targets.size();
+
+    int minmn = std::min(m, n);
+
+    cerr << "m = " << m << " n = " << n << " minnm = " << minmn << endl;
+
+    distribution<float> svalues(minmn);
+    
+    boost::multi_array<float, 2> lvectors(boost::extents[m][m]);
+    boost::multi_array<float, 2> rvectors(boost::extents[n][n]);
+
+    Timer timer;
+
+    int result = LAPack::gesdd("S", n, m,
+                               values.data(), n,
+                               &svalues[0],
+                               &rvectors[0][0], n,
+                               &lvectors[0][0], m);
+
+    //lvectors = transpose(lvectors);
+    //rvectors = transpose(rvectors);
+
+    cerr << timer.elapsed() << endl;
+    timer.restart();
+
+    cerr << "result was " << result << endl;
+    cerr << "svectors = " << svalues << endl;
+
+    struct smat matrix2;
+    matrix2.rows = m;
+    matrix2.cols = n;
+    matrix2.vals = m * n;
+    matrix2.pointr = new long[n + 1];
+    matrix2.rowind = new long[m * n];
+    matrix2.value  = new double[m * n];
+
+    matrix2.pointr[0] = 0;
+
+    for (unsigned i = 0;  i < n;  ++i) {
+        for (unsigned j = 0;  j < m;  ++j) {
+            int idx = i * m + j;
+            matrix2.rowind[idx] = j;
+            matrix2.value[idx] = models[j][i];
+        }
+        matrix2.pointr[i + 1] = (i + 1) * m;
+    }
+
+    int nvalues = 50;
+
+
+    // Run the SVD
+    svdrec * svdresult = svdLAS2A(&matrix2, nvalues);
+
+    cerr << "SVD elapsed: " << timer.elapsed() << endl;
+
+    if (!svdresult)
+        throw Exception("error performing SVD");
+
+    //cerr << "num_valid_repos = " << num_valid_repos << endl;
+    
+    distribution<float> svalues2(svdresult->S, svdresult->S + nvalues);
+
+    cerr << "highest values: " << svalues2 << endl;
+
+    cerr << "result->Ut->rows = " << svdresult->Ut->rows << endl;
+    cerr << "result->Ut->cols = " << svdresult->Ut->cols << endl;
+    cerr << "result->Vt->rows = " << svdresult->Vt->rows << endl;
+    cerr << "result->Vt->cols = " << svdresult->Vt->cols << endl;
+
+    distribution<float> u0(svdresult->Ut->value[0], svdresult->Ut->value[0] + m);
+    distribution<float> u02(&lvectors[0][0], &lvectors[0][0] + m);
+
+    cerr << "u0 = " << u0 << endl;
+    cerr << "u02 = " << u02 << endl;
+    
+    distribution<float> v0(svdresult->Vt->value[0], svdresult->Vt->value[0] + 50/*n*/);
+    cerr << "v0 = " << v0 << endl;
+
+    distribution<double> mean_rating(50);
+    for (unsigned i = 0;  i < 50;  i++)
+        for (unsigned j = 0;  j < m;  ++j)
+            mean_rating[i] += models[j][i] / m;
+
+    cerr << "mean ratings " << mean_rating << endl;
+
+
+    // Free up memory (TODO: put into guards...)
+    delete[] matrix2.pointr;
+    delete[] matrix2.rowind;
+    delete[] matrix2.value;
+    svdFreeSVDRec(svdresult);
+
+
 }

@@ -35,7 +35,7 @@ LIBAUSDM_SOURCES := \
 	data.cc blender.cc boosting_blender.cc
 
 LIBAUSDM_LINK := \
-	utils ACE boost_date_time-mt db arch boosting svdlibc
+	utils ACE boost_date_time-mt db arch boosting svdlibc algebra
 
 $(eval $(call library,ausdm,$(LIBAUSDM_SOURCES),$(LIBAUSDM_LINK)))
 

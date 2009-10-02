@@ -184,6 +184,8 @@ int main(int argc, char ** argv)
         Data data_train;
         data_train.load("download/S_" + targ_type_uc + "_Train.csv", target);
 
+        data_train.decompose();
+
         Data data_test;
         if (hold_out_data > 0.0)
             data_train.hold_out(data_test, hold_out_data, rand_seed);

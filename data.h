@@ -69,6 +69,8 @@ struct Data {
 
     void swap(Data & other);
 
+    void decompose();
+
     Target target;
 
     /// Target values to predict
