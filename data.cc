@@ -291,34 +291,34 @@ decompose()
 
     distribution<float> svalues(nvalues);
     boost::multi_array<float, 2> lvectors(boost::extents[nvalues][m]);
-    boost::multi_array<float, 2> rvectors(boost::extents[n][nvalues]);
+    boost::multi_array<float, 2> rvectorsT(boost::extents[n][nvalues]);
 
     int result = LAPack::gesdd("S", m, n,
                                values.data(), m,
                                &svalues[0],
                                &lvectors[0][0], m,
-                               &rvectors[0][0], nvalues);
+                               &rvectorsT[0][0], nvalues);
 
     if (result != 0)
         throw Exception("gesdd returned non-zero");
 
-    // Transpose lvectors in-place
-    for (unsigned i = 0;  i < m;  ++i)
-        for (unsigned j = 0;  j < i;  ++j)
-            std::swap(lvectors[i][j], lvectors[j][i]);
+    // Transpose rvectors
+    boost::multi_array<float, 2> rvectors(boost::extents[nvalues][n]);
+    for (unsigned i = 0;  i < nvalues;  ++i)
+        for (unsigned j = 0;  j < n;  ++j)
+            rvectors[i][j] = rvectorsT[j][i];
 
-    cerr << "svalues = " << svalues << endl;
+    singular_values = svalues;
 
-    distribution<float> u02(&lvectors[0][0], &lvectors[0][0] + m);
-    cerr << "u02 = " << u02 << endl;
-
-    distribution<float> u03(m);
-    for (unsigned i = 0;  i < m;  ++i)
-        u03[i] = lvectors[i][0];
-    cerr << "u03 = " << u03 << endl;
+    singular_models.resize(models.size());
     
-    distribution<float> v02(50);
-    for (unsigned i = 0;  i < 50;  ++i)
-        v02[i] = rvectors[i][0];
-    cerr << "v02 = " << v02 << endl;
+    for (unsigned i = 0;  i < models.size();  ++i)
+        singular_models[i]
+            = distribution<float>(&lvectors[i][0], &lvectors[i][0] + nvalues);
+
+    singular_targets.resize(targets.size());
+
+    for (unsigned i = 0;  i < targets.size();  ++i)
+        singular_targets[i]
+            = distribution<float>(&rvectors[i][0], &rvectors[i][0] + nvalues);
 }

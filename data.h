@@ -86,6 +86,15 @@ struct Data {
 
     /// Sorted list of models in order of score
     std::vector<int> model_ranking;
+
+    /// Singular values of SVD on rankings
+    distribution<float> singular_values;
+
+    /// Singular representation of each model
+    std::vector<distribution<float> > singular_models;
+
+    /// Singular representation of each target
+    std::vector<distribution<float> > singular_targets;
 };
 
 #endif /* __ausdm__data_h__ */
