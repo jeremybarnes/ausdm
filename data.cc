@@ -318,7 +318,7 @@ decompose()
 
     singular_values = svalues;
 
-    cerr << "singular_values = " << singular_values << endl;
+    //cerr << "singular_values = " << singular_values << endl;
 
     singular_models.resize(models.size());
     
@@ -327,8 +327,8 @@ decompose()
             = distribution<float>(&lvectors[i][0],
                                   &lvectors[i][nvalues - 1] + 1);
 
-    cerr << "singular_models[0] = " << singular_models[0] << endl;
-    cerr << "singular_models[1] = " << singular_models[1] << endl;
+    //cerr << "singular_models[0] = " << singular_models[0] << endl;
+    //cerr << "singular_models[1] = " << singular_models[1] << endl;
 
     singular_targets.resize(targets.size());
 
@@ -336,6 +336,6 @@ decompose()
         singular_targets[i]
             = distribution<float>(&rvectors[i][0], &rvectors[i][nvalues - 1] + 1);
 
-    cerr << "singular_targets[0] = " << singular_targets[0] << endl;
-    cerr << "singular_targets[1] = " << singular_targets[1] << endl;
+    //cerr << "singular_targets[0] = " << singular_targets[0] << endl;
+    //cerr << "singular_targets[1] = " << singular_targets[1] << endl;
 }

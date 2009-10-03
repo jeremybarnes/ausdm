@@ -114,3 +114,11 @@ Minor tweaks:
 
 0.8779 +/- 0.0080
 
+------------------------
+
+Gated solution, try 1:
+
+./build/x86_64/bin/ausdm -T 0.20 -t auc -r 10
+
+0.8799 +/- 0.0074
+

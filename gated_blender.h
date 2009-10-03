@@ -38,7 +38,15 @@ struct Gated_Blender : public Blender {
     
     virtual float predict(const ML::distribution<float> & models) const;
 
+    void train_model(int model, const Data & training_data);
+
+    distribution<float>
+    get_model_features(int model,
+                       const distribution<float> & model_outputs,
+                       const distribution<double> & target_singular) const;
+
     const Data * data;
+    std::vector<ML::distribution<float> > model_coefficients;
 };
 
 #endif /* __ausdm__gated_blender_h__ */
