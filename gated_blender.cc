@@ -136,7 +136,7 @@ init(const Data & training_data)
     // Now to train.  For each of the models, we go through the training
     // data and create a data file; we then do an IRLS on the model.
 
-    int num_models_to_train = 10;
+    int num_models_to_train = 20;
 
     model_coefficients.resize(training_data.models.size());
 

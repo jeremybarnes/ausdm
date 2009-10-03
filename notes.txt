@@ -126,3 +126,14 @@ Gated solution, try 1:
 With bug fixes:
 
 0.8804 +/- 0.0074
+
+
+Predicting actual margin (but using logit) (removed)
+
+0.8801 +/- 0.0074
+
+
+20 inputs
+
+0.8798 +/- 0.0076
+
