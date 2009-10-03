@@ -54,6 +54,8 @@ calc_auc(const distribution<float> & targets) const
         else ++num_pos;
     }
 
+    //cerr << "num_pos = " << num_pos << " num_neg = " << num_neg << endl;
+
     std::sort(sorted.begin(), sorted.end());
     
     // 2.  Get (x,y) points and calculate the AUC
@@ -174,6 +176,9 @@ clear()
     model_ids.clear();
     models.clear();
     model_ranking.clear();
+    singular_values.clear();
+    singular_models.clear();
+    singular_targets.clear();
 }
 
 void
@@ -186,6 +191,9 @@ swap(Data & other)
     model_ids.swap(other.model_ids);
     models.swap(other.models);
     model_ranking.swap(other.model_ranking);
+    singular_values.swap(other.singular_values);
+    singular_models.swap(other.singular_models);
+    singular_targets.swap(other.singular_targets);
 }
 
 void
@@ -253,13 +261,22 @@ hold_out(Data & remove_to, float proportion,
 
     new_me.target = remove_to.target = target;
     new_me.model_names = remove_to.model_names = model_names;
+    new_me.singular_values = remove_to.singular_values = singular_values;
+    new_me.singular_models = remove_to.singular_models = singular_models;
     
     new_me.models.resize(model_names.size());
     remove_to.models.resize(model_names.size());
 
+    bool has_st = !singular_targets.empty();
+
     for (unsigned i = 0;  i < model_names.size();  ++i) {
         new_me.models[i].reserve(targets.size() - to_remove.size());
         remove_to.models[i].reserve(to_remove.size());
+    }
+
+    if (has_st) {
+        new_me.singular_targets.reserve(targets.size() - to_remove.size());
+        remove_to.singular_targets.reserve(to_remove.size());
     }
 
     for (unsigned i = 0;  i < targets.size();  ++i) {
@@ -269,6 +286,11 @@ hold_out(Data & remove_to, float proportion,
 
         for (unsigned j = 0;  j < model_names.size();  ++j)
             add_to.models[j].push_back(models[j][i]);
+
+        if (has_st) {
+            add_to.singular_targets.push_back(distribution<float>());
+            add_to.singular_targets.back().swap(singular_targets[i]);
+        }
     }
 
     swap(new_me);

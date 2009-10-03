@@ -122,3 +122,7 @@ Gated solution, try 1:
 
 0.8799 +/- 0.0074
 
+
+With bug fixes:
+
+0.8804 +/- 0.0074

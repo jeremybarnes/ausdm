@@ -69,6 +69,7 @@ train_model(int model, const Data & training_data)
 
         correct[i] = (margin >= 0.0);
         //correct[i] = training_data.targets[i] > 0.0;
+        //correct[i] = (margin * 0.5) + 0.5;
 
         distribution<float> model_outputs(training_data.models.size());
         for (unsigned j = 0;  j < training_data.models.size();  ++j)
@@ -91,7 +92,37 @@ train_model(int model, const Data & training_data)
     distribution<float> parameters
         = irls_logit(correct, outputs, w);
     
-    cerr << "parameters for model " << model << ": " << parameters << endl;
+    //cerr << "parameters for model " << model << ": " << parameters << endl;
+
+    Model_Output before, after;
+    before.resize(training_data.targets.size());
+    after.resize(training_data.targets.size());
+
+    // Test the original model and the weighted version for AUC
+    for (unsigned i = 0;  i < training_data.targets.size();  ++i) {
+
+        distribution<float> features(nv);
+        for (unsigned j = 0;  j < nv;  ++j)
+            features[j] = outputs[j][i];
+
+        float result = apply_link_inverse(features.dotprod(parameters), LOGIT);
+
+        before[i] = features[0];
+        after[i] = result;
+    }
+
+    float auc_before1 = before.calc_auc(training_data.targets);
+    float auc_after1  = after.calc_auc(training_data.targets);
+    float auc_before2 = before.calc_auc(correct * 2.0 - 1.0);
+    float auc_after2  = after.calc_auc(correct * 2.0 - 1.0);
+
+
+    static Lock lock;
+    Guard guard(lock);
+    
+    cerr << "model " << model
+         << ": before " << auc_before1 << "/" << auc_before2
+         << " after " << auc_after1 << "/" << auc_after2 << endl;
 
     model_coefficients[model] = parameters;
 }

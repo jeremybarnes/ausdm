@@ -184,15 +184,13 @@ int main(int argc, char ** argv)
         Data data_train;
         data_train.load("download/S_" + targ_type_uc + "_Train.csv", target);
 
-        data_train.decompose();
-
         Data data_test;
         if (hold_out_data > 0.0)
             data_train.hold_out(data_test, hold_out_data, rand_seed);
         else data_test.load("download/S_" + targ_type_uc + "_Score.csv", target);
-        
         // Calculate the scores necessary for the job
         data_train.calc_scores();
+        data_train.decompose();
         
         boost::shared_ptr<Blender> blender
             = get_blender(config, blender_name, data_train, rand_seed);
