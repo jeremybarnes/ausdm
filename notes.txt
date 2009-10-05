@@ -195,3 +195,11 @@ Same scheme but with some extra features (including those necessary to emulate t
 
 0.8808 +/- 0.0087
 
+
+
+-------------
+
+RMSE with numeric problems fixed up (I think!):
+
+0.8683 +/- 0.0133
+
