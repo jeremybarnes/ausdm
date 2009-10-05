@@ -39,7 +39,7 @@ struct Gated_Blender : public Blender {
     
     virtual float predict(const ML::distribution<float> & models) const;
 
-    void train_model(int model, const Data & training_data);
+    void train_conf(int model, const Data & training_data);
 
     distribution<float>
     get_model_features(int model,
@@ -47,10 +47,15 @@ struct Gated_Blender : public Blender {
                        const distribution<double> & target_singular,
                        const Target_Stats & stats) const;
 
+    distribution<float>
+    get_blend_features(const distribution<float> & model_outputs,
+                       const distribution<float> & model_conf) const;
+
     ML::Link_Function link_function;
 
     const Data * data;
     std::vector<ML::distribution<float> > model_coefficients;
+    distribution<float> blend_coefficients;
     Target target;
 
     bool debug_predict;

@@ -343,7 +343,10 @@ decompose()
         for (unsigned j = 0;  j < nvalues;  ++j)
             lvectors[i][j] = lvectorsT[j][i];
 
-    singular_values = svalues;
+    int nwanted = std::min(nvalues, 200);
+
+    singular_values
+        = distribution<float>(svalues.begin(), svalues.begin() + nwanted);
 
     //cerr << "singular_values = " << singular_values << endl;
 
@@ -352,7 +355,7 @@ decompose()
     for (unsigned i = 0;  i < models.size();  ++i)
         singular_models[i]
             = distribution<float>(&lvectors[i][0],
-                                  &lvectors[i][nvalues - 1] + 1);
+                                  &lvectors[i][nwanted - 1] + 1);
 
     //cerr << "singular_models[0] = " << singular_models[0] << endl;
     //cerr << "singular_models[1] = " << singular_models[1] << endl;
@@ -361,7 +364,8 @@ decompose()
 
     for (unsigned i = 0;  i < targets.size();  ++i)
         singular_targets[i]
-            = distribution<float>(&rvectors[i][0], &rvectors[i][nvalues - 1] + 1);
+            = distribution<float>(&rvectors[i][0],
+                                  &rvectors[i][nwanted - 1] + 1);
 
     //cerr << "singular_targets[0] = " << singular_targets[0] << endl;
     //cerr << "singular_targets[1] = " << singular_targets[1] << endl;

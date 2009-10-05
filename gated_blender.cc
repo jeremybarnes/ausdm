@@ -49,7 +49,7 @@ configure(const ML::Configuration & config_,
 
 void
 Gated_Blender::
-train_model(int model, const Data & training_data)
+train_conf(int model, const Data & training_data)
 {
     // Generate a matrix with the predictions
     typedef float Float;
@@ -152,16 +152,23 @@ train_model(int model, const Data & training_data)
 
 void
 Gated_Blender::
-init(const Data & training_data)
+init(const Data & training_data_in)
 {
-    this->data = &training_data;
+    this->data = &training_data_in;
+
+    Data conf_training_data = training_data_in;
+    Data blend_training_data;
+
+    conf_training_data.hold_out(blend_training_data, 0.50);
+
+    conf_training_data.stats();
 
     // Now to train.  For each of the models, we go through the training
     // data and create a data file; we then do an IRLS on the model.
 
     int num_models_to_train = 10;
 
-    model_coefficients.resize(training_data.models.size());
+    model_coefficients.resize(conf_training_data.models.size());
 
 
     static Worker_Task & worker = Worker_Task::instance(num_threads() - 1);
@@ -178,11 +185,12 @@ init(const Data & training_data)
                                      boost::ref(worker),
                                      group));
 
-        for (unsigned i = 0;  i < training_data.models.size();  ++i) {
-            if (training_data.models[i].rank >= num_models_to_train) continue;
+        for (unsigned i = 0;  i < conf_training_data.models.size();  ++i) {
+            if (training_data_in.models[i].rank >= num_models_to_train)
+                continue;
 
-            worker.add(boost::bind(&Gated_Blender::train_model,
-                                   this, i, boost::cref(training_data)),
+            worker.add(boost::bind(&Gated_Blender::train_conf,
+                                   this, i, boost::cref(conf_training_data)),
                        "train model job",
                        group);
         }
@@ -190,6 +198,58 @@ init(const Data & training_data)
 
     // Add this thread to the thread pool until we're ready
     worker.run_until_finished(group);
+
+
+    int nx = blend_training_data.targets.size();
+
+    int nv = get_blend_features
+        (distribution<float>(blend_training_data.models.size()),
+         distribution<float>(blend_training_data.models.size()))
+        .size();
+
+
+    cerr << "generating blend data" << endl;
+
+    // Assemble the labels
+    distribution<float> correct(nx);
+    boost::multi_array<float, 2> outputs(boost::extents[nv][nx]);
+    distribution<float> w(nx, 1.0 / nx);
+
+    for (unsigned i = 0;  i < blend_training_data.targets.size();  ++i) {
+
+        if (target == AUC)
+            correct[i] = blend_training_data.targets[i] > 0.0;
+        else
+            correct[i] = blend_training_data.targets[i];
+
+        distribution<float> model_outputs(blend_training_data.models.size());
+        for (unsigned j = 0;  j < blend_training_data.models.size();  ++j)
+            model_outputs[j] = blend_training_data.models[j][i];
+        
+        distribution<double> target_singular
+            (blend_training_data.singular_targets[i].begin(),
+             blend_training_data.singular_targets[i].end());
+
+        distribution<float> conf = this->conf(model_outputs);
+
+        distribution<float> features
+            = get_blend_features(model_outputs, conf);
+
+        if (features.size() != nv)
+            throw Exception("nv is wrong");
+
+        for (unsigned j = 0;  j < nv;  ++j)
+            outputs[j][i] = features[j];
+    }
+
+    cerr << "training blender" << endl;
+
+    distribution<float> parameters
+        = run_irls(correct, outputs, w, link_function);
+
+    cerr << "blend coefficients: " << parameters << endl;
+
+    blend_coefficients = parameters;
 }
 
 boost::shared_ptr<Dense_Feature_Space>
@@ -236,8 +296,10 @@ get_model_features(int model,
     distribution<float> result;
 
     result.push_back(real_prediction);
+    result.insert(result.end(),
+                  target_singular.begin(), target_singular.end());
     //result.insert(result.end(),
-    //              target_singular.begin(), target_singular.end());
+    //              model_outputs.begin(), model_outputs.end());
     result.push_back(model_prediction_10 - real_prediction);
     result.push_back(fabs(result.back()));
     result.push_back(model_prediction_50 - real_prediction);
@@ -308,6 +370,33 @@ conf(const ML::distribution<float> & models) const
     return result;
 }
 
+distribution<float>
+Gated_Blender::
+get_blend_features(const distribution<float> & model_outputs,
+                   const distribution<float> & model_conf) const
+{
+    distribution<float> result;
+
+    result.push_back(model_outputs.min());
+    result.push_back(model_outputs.max());
+    result.push_back(model_outputs.total() / (model_conf != 0.0).count());
+
+    distribution<float> weighted = model_outputs * model_conf;
+    result.push_back(weighted.min());
+    result.push_back(weighted.max());
+    result.push_back(weighted.total() / (model_conf != 0.0).count());
+    result.push_back(weighted.total() / model_conf.total());
+
+    for (unsigned i = 0;  i < model_outputs.size();  ++i) {
+        if (model_coefficients[i].empty()) continue;
+        result.push_back(model_outputs[i]);
+        result.push_back(model_conf[i]);
+        result.push_back(weighted[i]);
+    }
+
+    return result;
+}
+
 float
 Gated_Blender::
 predict(const ML::distribution<float> & models) const
@@ -323,21 +412,28 @@ predict(const ML::distribution<float> & models) const
 
     distribution<float> conf = this->conf(models);
     
-    for (unsigned i = 0;  i < models.size() && debug;  ++i) {
-        if (conf[i] == 0.0) continue;
-        cerr << "model " << i << ": pred " << models[i] << " conf "
-             << conf[i] << endl;
-    }
-
     distribution<float> model_preds(models.size());
     for (unsigned i = 0;  i < models.size();  ++i)
         model_preds[i] = (models[i] > 3.0 ? 1.0 : -1.0);
 
     //float result = model_preds.dotprod(conf) / conf.total();
 
-    float result = models.dotprod(conf) / conf.total();
+    //float result = models.dotprod(conf) / conf.total();
 
     //float result = conf.total() * 0.1 * 4.0 + 1.0;
+   
+    for (unsigned i = 0;  i < models.size() && debug;  ++i) {
+        if (conf[i] == 0.0) continue;
+        cerr << "model " << i << ": pred " << models[i] << " conf "
+             << conf[i] << endl;
+    }
+
+    distribution<float> blend_features
+        = get_blend_features(models, conf);
+
+    float result
+        = apply_link_inverse(blend_features.dotprod(blend_coefficients),
+                             link_function);
 
     if (debug) cerr << "result = " << result << endl;
 

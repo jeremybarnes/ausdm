@@ -183,3 +183,15 @@ model 167: before 0.87121/0.260366 after 0.563316/0.308776
 model 150: before 0.871441/0.23935 after 0.516603/0.288806
 
 
+
+--------------
+
+Attempt to use a simple linear blending scheme:
+
+0.8802 +/- 0.0086
+
+
+Same scheme but with some extra features (including those necessary to emulate the previous system):
+
+0.8808 +/- 0.0087
+
