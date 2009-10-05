@@ -145,3 +145,41 @@ Added a few extra along the same lines:
 
 0.8807 +/- 0.0075
 
+Removed decomposition features:
+
+0.8805 +/- 0.0074
+
+But this is in spite of the fact that the confidence functions got much, much worse:
+
+Before:
+
+trial 9
+200 models... 15000 rows... n = 12000 m = 200 nvalues = 200
+model 123: before 0.873762/0.256815 after 0.366578/0.535418
+model 71: before 0.870887/0.24351 after 0.340936/0.541159
+model 81: before 0.870203/0.24804 after 0.35414/0.536658
+model 7: before 0.870063/0.260856 after 0.380631/0.544828
+model 65: before 0.86898/0.25535 after 0.372716/0.547804
+model 46: before 0.868584/0.261021 after 0.384278/0.541895
+model 140: before 0.871122/0.25586 after 0.379631/0.533441
+model 88: before 0.871134/0.252219 after 0.374164/0.532919
+model 150: before 0.871441/0.23935 after 0.339959/0.533688
+model 167: before 0.87121/0.260366 after 0.383654/0.540394
+
+
+After:
+
+trial 9
+200 models... 15000 rows... n = 12000 m = 200 nvalues = 200
+model 88: before 0.871134/0.252219 after 0.539543/0.308744
+model 71: before 0.870887/0.24351 after 0.47926/0.326779
+model 123: before 0.873762/0.256815 after 0.534246/0.299965
+model 140: before 0.871122/0.25586 after 0.544026/0.309047
+model 7: before 0.870063/0.260856 after 0.537814/0.337856
+model 81: before 0.870203/0.24804 after 0.515196/0.318835
+model 65: before 0.86898/0.25535 after 0.52039/0.337979
+model 46: before 0.868584/0.261021 after 0.541253/0.335966
+model 167: before 0.87121/0.260366 after 0.563316/0.308776
+model 150: before 0.871441/0.23935 after 0.516603/0.288806
+
+

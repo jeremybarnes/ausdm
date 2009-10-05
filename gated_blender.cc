@@ -236,8 +236,8 @@ get_model_features(int model,
     distribution<float> result;
 
     result.push_back(real_prediction);
-    result.insert(result.end(),
-                  target_singular.begin(), target_singular.end());
+    //result.insert(result.end(),
+    //              target_singular.begin(), target_singular.end());
     result.push_back(model_prediction_10 - real_prediction);
     result.push_back(fabs(result.back()));
     result.push_back(model_prediction_50 - real_prediction);
@@ -248,7 +248,7 @@ get_model_features(int model,
     // 7.  Target min output
     // 8.  Target max output
     // 9.  Distance from an integer
-    // 10
+    // ...
 
     result.push_back(target_stats.mean);
     result.push_back(target_stats.std);
