@@ -65,6 +65,8 @@ struct Predict_Job {
                 model_inputs[i] = data.models[i][j];
             }
 
+            correct_prediction = data.targets[j];
+
             float val = blender.predict(model_inputs);
             result.at(j) = val;
 
@@ -98,6 +100,9 @@ int main(int argc, char ** argv)
     // How many cross-validation trials do we perform?
     int num_trials = 1;
 
+    // Do we train on testing data?
+    bool train_on_test = false;
+
     {
         using namespace boost::program_options;
 
@@ -120,6 +125,8 @@ int main(int argc, char ** argv)
              "select target type: auc or rmse")
             ("num-trials,r", value<int>(&num_trials),
              "select number of trials to perform")
+            ("train-on-test", value<bool>(&train_on_test)->zero_tokens(),
+             "train on testing data as well (to test biasing, etc)" )
             ("output-file,o",
              value<string>(&output_file),
              "dump output file to the given filename");
@@ -190,18 +197,29 @@ int main(int argc, char ** argv)
         data_train.load("download/S_" + targ_type_uc + "_Train.csv", target);
 
         Data data_test;
-        if (hold_out_data > 0.0)
-            data_train.hold_out(data_test, hold_out_data, rand_seed);
-        else data_test.load("download/S_" + targ_type_uc + "_Score.csv", target);
+        if (!train_on_test) {
+            if (hold_out_data > 0.0)
+                data_train.hold_out(data_test, hold_out_data, rand_seed);
+            else data_test.load("download/S_"
+                                + targ_type_uc + "_Score.csv", target);
+        }
+
         // Calculate the scores necessary for the job
         data_train.calc_scores();
         data_train.decompose();
         data_train.stats();
+
         data_test.stats();
 
         boost::shared_ptr<Blender> blender
             = get_blender(config, blender_name, data_train, rand_seed, target);
         
+
+        if (train_on_test && hold_out_data > 0.0) {
+            data_train.hold_out(data_test, hold_out_data, rand_seed);
+            data_test.stats();
+        }
+
         int np = data_test.targets.size();
         
         // Now run the model

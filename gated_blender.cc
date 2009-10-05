@@ -44,6 +44,8 @@ configure(const ML::Configuration & config_,
     debug_predict = false;
     config.find(debug_predict, "debug_predict");
 
+    config.require(num_models_to_train, "num_models_to_train");
+
     this->target = target;
 }
 
@@ -52,8 +54,6 @@ Gated_Blender::
 train_conf(int model, const Data & training_data)
 {
     // Generate a matrix with the predictions
-    typedef float Float;
-
     int nx = training_data.targets.size();
     int nv = get_model_features
         (model,
@@ -63,10 +63,12 @@ train_conf(int model, const Data & training_data)
         .size();
 
 
+    typedef double Float;
+
     // Assemble the labels
-    distribution<float> correct(nx);
-    boost::multi_array<float, 2> outputs(boost::extents[nv][nx]);
-    distribution<float> w(nx, 1.0 / nx);
+    distribution<Float> correct(nx);
+    boost::multi_array<Float, 2> outputs(boost::extents[nv][nx]);
+    distribution<Float> w(nx, 1.0 / nx);
 
     for (unsigned i = 0;  i < training_data.targets.size();  ++i) {
 
@@ -109,7 +111,7 @@ train_conf(int model, const Data & training_data)
             outputs[j][i] = features[j];
     }
 
-    distribution<float> parameters
+    distribution<Float> parameters
         = run_irls(correct, outputs, w, link_function);
     
     //cerr << "parameters for model " << model << ": " << parameters << endl;
@@ -147,6 +149,10 @@ train_conf(int model, const Data & training_data)
          << ": before " << auc_before1 << "/" << auc_before2
          << " after " << auc_after1 << "/" << auc_after2 << endl;
 
+
+    if (auc_after2 == 1.0)
+        throw Exception("something wrong on AUC 2");
+
     model_coefficients[model] = parameters;
 }
 
@@ -165,8 +171,6 @@ init(const Data & training_data_in)
 
     // Now to train.  For each of the models, we go through the training
     // data and create a data file; we then do an IRLS on the model.
-
-    int num_models_to_train = 10;
 
     model_coefficients.resize(conf_training_data.models.size());
 
@@ -210,10 +214,12 @@ init(const Data & training_data_in)
 
     cerr << "generating blend data" << endl;
 
+    typedef double BlendFloat;
+
     // Assemble the labels
-    distribution<float> correct(nx);
-    boost::multi_array<float, 2> outputs(boost::extents[nv][nx]);
-    distribution<float> w(nx, 1.0 / nx);
+    distribution<BlendFloat> correct(nx);
+    boost::multi_array<BlendFloat, 2> outputs(boost::extents[nv][nx]);
+    distribution<BlendFloat> w(nx, 1.0 / nx);
 
     for (unsigned i = 0;  i < blend_training_data.targets.size();  ++i) {
 
@@ -221,6 +227,8 @@ init(const Data & training_data_in)
             correct[i] = blend_training_data.targets[i] > 0.0;
         else
             correct[i] = blend_training_data.targets[i];
+
+        correct_prediction = correct[i];
 
         distribution<float> model_outputs(blend_training_data.models.size());
         for (unsigned j = 0;  j < blend_training_data.models.size();  ++j)
@@ -244,8 +252,11 @@ init(const Data & training_data_in)
 
     cerr << "training blender" << endl;
 
-    distribution<float> parameters
-        = run_irls(correct, outputs, w, link_function);
+    Link_Function blend_link_function
+        = (target == AUC ? LOGIT : LINEAR);
+
+    distribution<BlendFloat> parameters
+        = run_irls(correct, outputs, w, blend_link_function);
 
     cerr << "blend coefficients: " << parameters << endl;
 
@@ -387,12 +398,29 @@ get_blend_features(const distribution<float> & model_outputs,
     result.push_back(weighted.total() / (model_conf != 0.0).count());
     result.push_back(weighted.total() / model_conf.total());
 
+    distribution<float> dense_model, dense_conf;
+
     for (unsigned i = 0;  i < model_outputs.size();  ++i) {
         if (model_coefficients[i].empty()) continue;
         result.push_back(model_outputs[i]);
         result.push_back(model_conf[i]);
         result.push_back(weighted[i]);
+        dense_model.push_back(model_outputs[i]);
+        dense_conf.push_back(model_conf[i]);
     }
+
+    result.push_back(dense_conf.min());
+    result.push_back(dense_conf.max());
+    result.push_back(dense_conf.total() / dense_conf.size());
+
+    distribution<bool> ismax = dense_conf == dense_conf.max();
+
+    result.push_back((dense_model * ismax).total() / (ismax.count()));
+    result.push_back((dense_model * dense_conf * ismax).total()
+                     / (ismax.count()));
+
+    result.push_back(model_outputs.total() / model_outputs.size());
+    result.push_back(dense_model.total() / dense_model.size());
 
     return result;
 }
@@ -431,11 +459,15 @@ predict(const ML::distribution<float> & models) const
     distribution<float> blend_features
         = get_blend_features(models, conf);
 
+    Link_Function blend_link_function
+        = (target == AUC ? LOGIT : LINEAR);
+
     float result
         = apply_link_inverse(blend_features.dotprod(blend_coefficients),
-                             link_function);
+                             blend_link_function);
 
-    if (debug) cerr << "result = " << result << endl;
+    if (debug) cerr << "result = " << result << " correct = "
+                    << correct_prediction << endl;
 
     return result;
 }

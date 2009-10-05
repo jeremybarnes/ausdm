@@ -14,6 +14,8 @@
 using namespace ML;
 using namespace std;
 
+__thread float correct_prediction = 0.0;
+
 
 /*****************************************************************************/
 /* BLENDER                                                                   */

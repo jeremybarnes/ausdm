@@ -52,13 +52,13 @@ struct Gated_Blender : public Blender {
                        const distribution<float> & model_conf) const;
 
     ML::Link_Function link_function;
+    int num_models_to_train;
+    bool debug_predict;
 
     const Data * data;
     std::vector<ML::distribution<float> > model_coefficients;
     distribution<float> blend_coefficients;
     Target target;
-
-    bool debug_predict;
 };
 
 #endif /* __ausdm__gated_blender_h__ */

@@ -3,9 +3,11 @@
 auc {
     type=gated;
     link_function=logit;
+    num_models_to_train=10;
 }
 
 rmse {
     type=gated;
     link_function=logit;
+    num_models_to_train=20;
 }
