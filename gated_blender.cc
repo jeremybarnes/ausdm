@@ -11,6 +11,7 @@
 #include "boosting/worker_task.h"
 #include "utils/guard.h"
 #include <boost/bind.hpp>
+#include "algebra/lapack.h"
 
 
 using namespace ML;
@@ -111,8 +112,33 @@ train_conf(int model, const Data & training_data)
             outputs[j][i] = features[j];
     }
 
-    distribution<Float> parameters
+    distribution<double> svalues1
+        (std::min(outputs.shape()[0], outputs.shape()[1]));
+
+    int result = LAPack::gesdd("N", outputs.shape()[1], outputs.shape()[0],
+                               outputs.data(), outputs.shape()[1], 
+                               &svalues1[0], 0, 1, 0, 1);
+
+    if (result != 0)
+        throw Exception("error in SVD");
+
+#if 0
+    cerr << "result of svd = " << result << endl;
+    
+    cerr << "svalues = " << svalues << endl;
+#endif
+
+
+    // Remove linearly dependent columns.  Returns a vector saying in which
+    // entry of the new matrix the current column really is
+    vector<int> new_loc = remove_dependent(outputs);
+
+    distribution<Float> trained
         = run_irls(correct, outputs, w, link_function);
+
+    distribution<float> parameters(nv);
+    for (unsigned v = 0;  v < nv;  ++v)
+        if (new_loc[v] != -1) parameters[v] = trained[new_loc[v]];
     
     //cerr << "parameters for model " << model << ": " << parameters << endl;
 
@@ -125,7 +151,8 @@ train_conf(int model, const Data & training_data)
 
         distribution<float> features(nv);
         for (unsigned j = 0;  j < nv;  ++j)
-            features[j] = outputs[j][i];
+            if (new_loc[j] != -1)
+                features[j] = outputs[new_loc[j]][i];
 
         float result = apply_link_inverse(features.dotprod(parameters),
                                           link_function);
@@ -150,8 +177,27 @@ train_conf(int model, const Data & training_data)
          << " after " << auc_after1 << "/" << auc_after2 << endl;
 
 
-    if (auc_after2 == 1.0)
+    if (auc_after2 == 1.0) {
+        cerr << "new_loc = " << new_loc << endl;
+        cerr << "parameters = " << parameters << endl;
+        cerr << "trained = " << trained << endl;
+        //cerr << "after = " << after << endl;
+
+        distribution<double> svalues
+            (std::min(outputs.shape()[0], outputs.shape()[1]));
+
+        int result = LAPack::gesdd("N", outputs.shape()[1], outputs.shape()[0],
+                                   outputs.data(), outputs.shape()[1], 
+                                   &svalues[0], 0, 1, 0, 1);
+
+        cerr << "result of svd = " << result << endl;
+
+        cerr << "svalues = " << svalues << endl;
+        cerr << "svalues1 = " << svalues1 << endl;
+        
+
         throw Exception("something wrong on AUC 2");
+    }
 
     model_coefficients[model] = parameters;
 }
@@ -250,13 +296,24 @@ init(const Data & training_data_in)
             outputs[j][i] = features[j];
     }
 
-    cerr << "training blender" << endl;
+    cerr << "removing linearly dependent columns" << endl;
+
+    // Remove linearly dependent columns.  Returns a vector saying in which
+    // entry of the new matrix the current column really is
+    vector<int> new_loc = remove_dependent(outputs);
+    
 
     Link_Function blend_link_function
         = (target == AUC ? LOGIT : LINEAR);
 
-    distribution<BlendFloat> parameters
+    cerr << "training blender" << endl;
+
+    distribution<BlendFloat> trained
         = run_irls(correct, outputs, w, blend_link_function);
+
+    distribution<float> parameters(nv);
+    for (unsigned v = 0;  v < nv;  ++v)
+        if (new_loc[v] != -1) parameters[v] = trained[new_loc[v]];
 
     cerr << "blend coefficients: " << parameters << endl;
 
