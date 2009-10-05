@@ -84,7 +84,7 @@ int main(int argc, char ** argv)
     string config_file = "config.txt";
 
     // Name of blender in config file
-    string blender_name = "blender";
+    string blender_name;
 
     // Extra configuration options
     vector<string> extra_config_options;
@@ -154,6 +154,9 @@ int main(int argc, char ** argv)
     else if (target_type == "rmse") target = RMSE;
     else throw Exception("target type " + target_type + " not known");
 
+    if (blender_name == "")
+        blender_name = target_type;
+
     // Load up configuration
     Configuration config;
     if (config_file != "") config.load(config_file);
@@ -176,6 +179,8 @@ int main(int argc, char ** argv)
     if (hold_out_data == 0.0 && num_trials > 1)
         throw Exception("need to hold out data for multiple trials");
 
+    Model_Output result;
+
     for (unsigned trial = 0;  trial < num_trials;  ++trial) {
         if (num_trials > 1) cerr << "trial " << trial << endl;
 
@@ -191,14 +196,15 @@ int main(int argc, char ** argv)
         // Calculate the scores necessary for the job
         data_train.calc_scores();
         data_train.decompose();
-        
+        data_train.stats();
+        data_test.stats();
+
         boost::shared_ptr<Blender> blender
-            = get_blender(config, blender_name, data_train, rand_seed);
+            = get_blender(config, blender_name, data_train, rand_seed, target);
         
         int np = data_test.targets.size();
         
         // Now run the model
-        Model_Output result;
         result.resize(np);
         
         static Worker_Task & worker = Worker_Task::instance(num_threads() - 1);
@@ -255,5 +261,11 @@ int main(int argc, char ** argv)
                                     mean);
         
         cout << format("%6.4f +/- %6.4f", mean, std) << endl;
+    }
+
+    if (output_file != "" && num_trials == 1) {
+        filter_ostream out(output_file);
+        for (unsigned i = 0;  i < result.size();  ++i)
+            out << format("%.6f", result[i] * 1000.0) << endl;
     }
 }

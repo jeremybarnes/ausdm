@@ -137,3 +137,11 @@ Predicting actual margin (but using logit) (removed)
 
 0.8798 +/- 0.0076
 
+Back to 10 inputs, with extra statistical features:
+
+0.8807 +/- 0.0075
+
+Added a few extra along the same lines:
+
+0.8807 +/- 0.0075
+

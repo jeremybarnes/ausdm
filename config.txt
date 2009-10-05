@@ -1,5 +1,11 @@
-# -* awk -*-
+# -*- Awk -*-
 
-blender {
+auc {
     type=gated;
+    link_function=logit;
+}
+
+rmse {
+    type=gated;
+    link_function=logit;
 }

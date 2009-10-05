@@ -24,7 +24,8 @@ struct Boosting_Blender : public Linear_Blender {
     
     virtual void configure(const ML::Configuration & config,
                            const std::string & name,
-                           int random_seed);
+                           int random_seed,
+                           Target target);
     
     virtual void init(const Data & training_data);
 };

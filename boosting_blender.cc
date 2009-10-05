@@ -30,9 +30,10 @@ void
 Boosting_Blender::
 configure(const ML::Configuration & config,
           const std::string & name,
-          int random_seed)
+          int random_seed,
+          Target target)
 {
-    Linear_Blender::configure(config, name, random_seed);
+    Linear_Blender::configure(config, name, random_seed, target);
 }
     
 void

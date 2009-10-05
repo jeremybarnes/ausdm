@@ -179,6 +179,7 @@ clear()
     singular_values.clear();
     singular_models.clear();
     singular_targets.clear();
+    target_stats.clear();
 }
 
 void
@@ -194,6 +195,7 @@ swap(Data & other)
     singular_values.swap(other.singular_values);
     singular_models.swap(other.singular_models);
     singular_targets.swap(other.singular_targets);
+    target_stats.swap(other.target_stats);
 }
 
 void
@@ -293,6 +295,9 @@ hold_out(Data & remove_to, float proportion,
         }
     }
 
+    remove_to.stats();
+    new_me.stats();
+
     swap(new_me);
 }
 
@@ -360,4 +365,19 @@ decompose()
 
     //cerr << "singular_targets[0] = " << singular_targets[0] << endl;
     //cerr << "singular_targets[1] = " << singular_targets[1] << endl;
+}
+
+void
+Data::
+stats()
+{
+    target_stats.resize(targets.size());
+
+    distribution<float> model_vals(models.size());
+
+    for (unsigned i = 0;  i < targets.size();  ++i) {
+        for (unsigned j = 0;  j < models.size();  ++j)
+            model_vals[j] = models[j][i];
+        target_stats[i] = Target_Stats(model_vals.begin(), model_vals.end());
+    }
 }

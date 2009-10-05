@@ -22,7 +22,7 @@ using namespace std;
 /*****************************************************************************/
 
 Gated_Blender::Gated_Blender()
-    : data(0)
+    : link_function(LOGIT), data(0)
 {
 }
 
@@ -32,10 +32,19 @@ Gated_Blender::~Gated_Blender()
     
 void
 Gated_Blender::
-configure(const ML::Configuration & config,
+configure(const ML::Configuration & config_,
           const std::string & name,
-          int random_seed)
+          int random_seed,
+          Target target)
 {
+    Configuration config(config_, name, Configuration::PREFIX_APPEND);
+    
+    config.require(link_function, "link_function");
+
+    debug_predict = false;
+    config.find(debug_predict, "debug_predict");
+
+    this->target = target;
 }
 
 void
@@ -49,7 +58,8 @@ train_model(int model, const Data & training_data)
     int nv = get_model_features
         (model,
          distribution<float>(training_data.models.size()),
-         distribution<double>(training_data.singular_values.size()))
+         distribution<double>(training_data.singular_values.size()),
+         Target_Stats())
         .size();
 
 
@@ -60,16 +70,25 @@ train_model(int model, const Data & training_data)
 
     for (unsigned i = 0;  i < training_data.targets.size();  ++i) {
 
-        // For now, we will try to predict if the margin > 0.  This only
-        // works for AUC; for RMSE we will need something different.
-        // Eventually, we might want to predict the margin directly or
-        // take a threshold for the margin, eg 0.5
-        float pred = (training_data.models[model][i] - 3.0) / 2.0;
-        float margin = pred * training_data.targets[i];
-
-        correct[i] = (margin >= 0.0);
-        //correct[i] = training_data.targets[i] > 0.0;
-        //correct[i] = (margin * 0.5) + 0.5;
+        if (target == AUC) {
+            // For now, we will try to predict if the margin > 0.  This only
+            // works for AUC; for RMSE we will need something different.
+            // Eventually, we might want to predict the margin directly or
+            // take a threshold for the margin, eg 0.5
+            float pred = (training_data.models[model][i] - 3.0) / 2.0;
+            float margin = pred * training_data.targets[i];
+            
+            correct[i] = (margin >= 0.0);
+            //correct[i] = training_data.targets[i] > 0.0;
+            //correct[i] = (margin * 0.5) + 0.5;
+        }
+        else {
+            // Try to predict the probability that it's within 0.5 either side
+            // of the correct answer
+            correct[i]
+                = abs(training_data.models[model][i]
+                      - training_data.targets[i]) <= 0.5;
+        }
 
         distribution<float> model_outputs(training_data.models.size());
         for (unsigned j = 0;  j < training_data.models.size();  ++j)
@@ -80,7 +99,8 @@ train_model(int model, const Data & training_data)
              training_data.singular_targets[i].end());
 
         distribution<float> features
-            = get_model_features(model, model_outputs, target_singular);
+            = get_model_features(model, model_outputs, target_singular,
+                                 training_data.target_stats[i]);
 
         if (features.size() != nv)
             throw Exception("nv is wrong");
@@ -90,7 +110,7 @@ train_model(int model, const Data & training_data)
     }
 
     distribution<float> parameters
-        = irls_logit(correct, outputs, w);
+        = run_irls(correct, outputs, w, link_function);
     
     //cerr << "parameters for model " << model << ": " << parameters << endl;
 
@@ -105,14 +125,17 @@ train_model(int model, const Data & training_data)
         for (unsigned j = 0;  j < nv;  ++j)
             features[j] = outputs[j][i];
 
-        float result = apply_link_inverse(features.dotprod(parameters), LOGIT);
+        float result = apply_link_inverse(features.dotprod(parameters),
+                                          link_function);
 
         before[i] = features[0];
         after[i] = result;
     }
 
-    float auc_before1 = before.calc_auc(training_data.targets);
-    float auc_after1  = after.calc_auc(training_data.targets);
+    //cerr << "before = " << before << endl;
+
+    float auc_before1 = before.calc_score(training_data.targets, target);
+    float auc_after1  = after.calc_score(training_data.targets, target);
     float auc_before2 = before.calc_auc(correct * 2.0 - 1.0);
     float auc_after2  = after.calc_auc(correct * 2.0 - 1.0);
 
@@ -136,7 +159,7 @@ init(const Data & training_data)
     // Now to train.  For each of the models, we go through the training
     // data and create a data file; we then do an IRLS on the model.
 
-    int num_models_to_train = 20;
+    int num_models_to_train = 10;
 
     model_coefficients.resize(training_data.models.size());
 
@@ -159,9 +182,7 @@ init(const Data & training_data)
             if (training_data.models[i].rank >= num_models_to_train) continue;
 
             worker.add(boost::bind(&Gated_Blender::train_model,
-                                   this,
-                                   i,
-                                   boost::cref(training_data)),
+                                   this, i, boost::cref(training_data)),
                        "train model job",
                        group);
         }
@@ -186,7 +207,8 @@ distribution<float>
 Gated_Blender::
 get_model_features(int model,
                    const distribution<float> & model_outputs,
-                   const distribution<double> & target_singular) const
+                   const distribution<double> & target_singular,
+                   const Target_Stats & target_stats) const
 {
     // Features:
     // 1.  The current model's output
@@ -221,6 +243,29 @@ get_model_features(int model,
     result.push_back(model_prediction_50 - real_prediction);
     result.push_back(fabs(result.back()));
 
+    // 5.  Target Mean output
+    // 6.  Target standard deviation of output
+    // 7.  Target min output
+    // 8.  Target max output
+    // 9.  Distance from an integer
+    // 10
+
+    result.push_back(target_stats.mean);
+    result.push_back(target_stats.std);
+    result.push_back(target_stats.min);
+    result.push_back(target_stats.max);
+
+    result.push_back((real_prediction - target_stats.mean) / target_stats.std);
+    result.push_back((real_prediction - target_stats.min) / target_stats.std);
+    result.push_back((real_prediction - target_stats.max) / target_stats.std);
+
+    result.push_back(std::min(fabs(real_prediction - ceil(real_prediction)),
+                              fabs(real_prediction - floor(real_prediction))));
+
+    result.push_back(target_stats.max - target_stats.min);
+    result.push_back((target_stats.max - target_stats.mean) / target_stats.std);
+    result.push_back((target_stats.mean - target_stats.min) / target_stats.std);
+
     return result;
 }
                    
@@ -240,6 +285,8 @@ conf(const ML::distribution<float> & models) const
     // For each model, calculate a confidence
     distribution<float> result(models.size());
 
+    Target_Stats target_stats(models.begin(), models.end());
+
     for (unsigned i = 0;  i < models.size();  ++i) {
         // Skip untrained models
         if (model_coefficients[i].empty()) continue;
@@ -247,13 +294,13 @@ conf(const ML::distribution<float> & models) const
         // What would we have predicted for this model?
 
         distribution<float> model_features
-            = get_model_features(i, models, target_singular);
+            = get_model_features(i, models, target_singular, target_stats);
 
         // Perform linear regression (in prediction mode)
         float output = model_features.dotprod(model_coefficients[i]);
 
         // Link function to change into a probability
-        float prob = apply_link_inverse(output, LOGIT);
+        float prob = apply_link_inverse(output, link_function);
 
         result[i] = prob;
     }
@@ -265,11 +312,13 @@ float
 Gated_Blender::
 predict(const ML::distribution<float> & models) const
 {
-    bool debug = false;
+    bool debug = debug_predict;
+
+    auto_ptr<Guard> guard;
 
     if (debug) {
         static Lock lock;
-        Guard guard(lock);
+        guard.reset(new Guard(lock));
     }
 
     distribution<float> conf = this->conf(models);

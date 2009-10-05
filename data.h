@@ -52,6 +52,51 @@ struct Model_Output : public distribution<float> {
 
 
 /*****************************************************************************/
+/* TARGET_STATS                                                              */
+/*****************************************************************************/
+
+/** The statistics for a given target output */
+
+struct Target_Stats {
+
+    Target_Stats()
+        : mean(0.0), std(0.0), min(0.0), max(0.0)
+    {
+    }
+
+    template<class Iterator>
+    Target_Stats(Iterator first, const Iterator & last)
+    {
+        int n = std::distance(first, last);
+
+        double total = 0.0;
+        float tmin = INFINITY, tmax = -INFINITY;
+
+        for (Iterator it = first; it != last;  ++it) {
+            total += *it;
+            tmin = std::min(tmin, *it);
+            tmax = std::max(tmax, *it);
+        }
+
+        double mean = total / n;
+        total = 0.0;
+        for (Iterator it = first; it != last;  ++it)
+            total += pow(*it - mean, 2);
+
+        this->mean = mean;
+        this->std = sqrt(total);
+        this->min = tmin;
+        this->max = tmax;
+    }
+
+    float mean;
+    float std;
+    float min;
+    float max;
+
+};
+
+/*****************************************************************************/
 /* DATA                                                                      */
 /*****************************************************************************/
 
@@ -70,6 +115,8 @@ struct Data {
     void swap(Data & other);
 
     void decompose();
+
+    void stats();
 
     Target target;
 
@@ -95,6 +142,9 @@ struct Data {
 
     /// Singular representation of each target
     std::vector<distribution<float> > singular_targets;
+
+    /// Statistics about models for each target
+    std::vector<Target_Stats> target_stats;
 };
 
 #endif /* __ausdm__data_h__ */

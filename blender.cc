@@ -48,7 +48,8 @@ void
 Linear_Blender::
 configure(const ML::Configuration & config_,
           const std::string & name,
-          int random_seed)
+          int random_seed,
+          Target target)
 {
     Configuration config(config_, name, Configuration::PREFIX_APPEND);
     
@@ -98,7 +99,8 @@ boost::shared_ptr<Blender>
 get_blender(const ML::Configuration & config_,
             const std::string & name,
             const Data & data,
-            int random_seed)
+            int random_seed,
+            Target target)
 {
     Configuration config(config_, name, Configuration::PREFIX_APPEND);
 
@@ -115,7 +117,7 @@ get_blender(const ML::Configuration & config_,
         result.reset(new Gated_Blender());
     else throw Exception("Blender of type " + type + " doesn't exist");
 
-    result->configure(config_, name, random_seed);
+    result->configure(config_, name, random_seed, target);
     result->init(data);
     
     return result;

@@ -11,7 +11,7 @@
 
 #include "blender.h"
 #include "boosting/dense_features.h"
-
+#include "algebra/irls.h"
 
 
 /*****************************************************************************/
@@ -29,7 +29,8 @@ struct Gated_Blender : public Blender {
     
     virtual void configure(const ML::Configuration & config,
                            const std::string & name,
-                           int random_seed);
+                           int random_seed,
+                           Target target);
     
     virtual void init(const Data & training_data);
 
@@ -43,10 +44,16 @@ struct Gated_Blender : public Blender {
     distribution<float>
     get_model_features(int model,
                        const distribution<float> & model_outputs,
-                       const distribution<double> & target_singular) const;
+                       const distribution<double> & target_singular,
+                       const Target_Stats & stats) const;
+
+    ML::Link_Function link_function;
 
     const Data * data;
     std::vector<ML::distribution<float> > model_coefficients;
+    Target target;
+
+    bool debug_predict;
 };
 
 #endif /* __ausdm__gated_blender_h__ */
