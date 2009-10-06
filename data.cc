@@ -13,6 +13,7 @@
 #include "utils/pair_utils.h"
 #include "algebra/lapack.h"
 #include "arch/timers.h"
+#include "arch/threads.h"
 
 using namespace std;
 using namespace ML;
@@ -238,6 +239,9 @@ Data::
 hold_out(Data & remove_to, float proportion,
          int random_seed)
 {
+    static Lock lock;
+    Guard guard(lock);
+
     srand(random_seed);
 
     vector<int> to_remove;

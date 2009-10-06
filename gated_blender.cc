@@ -12,9 +12,13 @@
 #include "utils/guard.h"
 #include <boost/bind.hpp>
 #include "algebra/lapack.h"
+#include "algebra/least_squares.h"
+#include "stats/distribution_ops.h"
+#include "utils/filter_streams.h"
 
 
 using namespace ML;
+using namespace ML::Stats;
 using namespace std;
 
 
@@ -50,13 +54,156 @@ configure(const ML::Configuration & config_,
     this->target = target;
 }
 
+template<class Float>
+distribution<Float>
+perform_irls(const distribution<Float> & correct,
+             const boost::multi_array<Float, 2> & outputs,
+             const distribution<Float> & w,
+             Link_Function link)
+{
+    int nx = correct.size();
+    int nv = outputs.shape()[0];
+
+    if (outputs.shape()[1] != nx)
+        throw Exception("wrong shape for outputs");
+
+    bool verify = true;
+
+    distribution<Float> svalues1
+        (std::min(outputs.shape()[0], outputs.shape()[1]) + 1);
+
+    if (verify) {
+        boost::multi_array<Float, 2> outputs2 = outputs;
+
+        svalues1.push_back(0.0);
+
+        int result = LAPack::gesdd("N",
+                                   outputs2.shape()[1],
+                                   outputs2.shape()[0],
+                                   outputs2.data(), outputs2.shape()[1], 
+                                   &svalues1[0], 0, 1, 0, 1);
+    
+        if (result != 0)
+            throw Exception("error in SVD");
+    }
+    
+    boost::multi_array<Float, 2> outputs3 = outputs;
+
+    /* Factorize the matrix with partial pivoting.  This allows us to find the
+       largest number of linearly independent columns possible. */
+    
+    distribution<Float> tau(nv, 0.0);
+    distribution<int> permutations(nv, 0);
+    
+    int res = LAPack::geqp3(outputs3.shape()[1],
+                            outputs3.shape()[0],
+                            outputs3.data(), outputs3.shape()[1],
+                            &permutations[0],
+                            &tau[0]);
+    
+    if (res != 0)
+        throw Exception(format("geqp3: error in parameter %d", -res));
+
+    // Convert back to c indexes
+    permutations -= 1;
+
+    //cerr << "permutations = " << permutations << endl;
+    //cerr << "tau = " << tau << endl;
+
+    distribution<Float> diag(nv);
+    for (unsigned i = 0;  i < nv;  ++i)
+        diag[i] = outputs3[i][i];
+
+    //cerr << "diag = " << diag << endl;
+    
+    int nkeep = nv;
+    while (nkeep > 0 && fabs(diag[nkeep - 1]) < 0.01) --nkeep;
+    
+    //cerr << "keeping " << nkeep << " of " << nv << endl;
+    
+    vector<int> new_loc(nv, -1);
+    for (unsigned i = 0;  i < nkeep;  ++i)
+        new_loc[permutations[i]] = i;
+
+    boost::multi_array<Float, 2> outputs_reduced(boost::extents[nkeep][nx]);
+    for (unsigned i = 0;  i < nx;  ++i)
+        for (unsigned j = 0;  j < nv;  ++j)
+            if (new_loc[j] != -1)
+                outputs_reduced[new_loc[j]][i] = outputs[j][i];
+    
+    double svreduced = svalues1[nkeep - 1];
+
+    if (verify && svreduced < 0.001)
+        throw Exception("not all linearly dependent columns were removed");
+
+    distribution<Float> trained
+        = run_irls(correct, outputs_reduced, w, link_function);
+
+    distribution<float> parameters(nv);
+    for (unsigned v = 0;  v < nv;  ++v)
+        if (new_loc[v] != -1)
+            parameters[v] = trained[new_loc[v]];
+    
+
+    if (abs(parameters).max() > 1000.0 || true) {
+
+        distribution<Float> svalues_reduced
+            (std::min(outputs_reduced.shape()[0],
+                      outputs_reduced.shape()[1]));
+        
+#if 0
+        filter_ostream out(format("good.model.%d.txt.gz", model));
+
+        out << "model " << model << endl;
+        out << "trained " << trained << endl;
+        out << "svalues_reduced " << svalues_reduced << endl;
+        out << "parameters " << parameters << endl;
+        out << "permuations " << permutations << endl;
+        out << "svalues1 " << svalues1 << endl;
+        out << "correct " << correct << endl;
+        out << "outputs_reduced: " << outputs_reduced.shape()[0] << "x"
+            << outputs_reduced.shape()[1] << endl;
+        
+        for (unsigned i = 0;  i < nx;  ++i) {
+            out << "example " << i << ": ";
+            for (unsigned j = 0;  j < nkeep;  ++j)
+                out << " " << outputs_reduced[j][i];
+            out << endl;
+        }
+#endif
+
+        int result = LAPack::gesdd("N", outputs_reduced.shape()[1],
+                                   outputs_reduced.shape()[0],
+                                   outputs_reduced.data(),
+                                   outputs_reduced.shape()[1], 
+                                   &svalues_reduced[0], 0, 1, 0, 1);
+
+        cerr << "model = " << model << endl;
+        cerr << "trained = " << trained << endl;
+        cerr << "svalues_reduced = " << svalues_reduced << endl;
+
+        if (result != 0)
+            throw Exception("gesdd returned error");
+        
+        if (svalues_reduced.back() <= 0.001) {
+            throw Exception("didn't remove all linearly dependent");
+        }
+
+        if (abs(parameters).max() > 1000.0) {
+            throw Exception("IRLS returned inplausibly high weights");
+        }
+    }
+
+    return parameters;
+}
+
 void
 Gated_Blender::
 train_conf(int model, const Data & training_data)
 {
     // Generate a matrix with the predictions
     int nx = training_data.targets.size();
-    int nv = get_model_features
+    int nv = get_conf_features
         (model,
          distribution<float>(training_data.models.size()),
          distribution<double>(training_data.singular_values.size()),
@@ -102,7 +249,7 @@ train_conf(int model, const Data & training_data)
              training_data.singular_targets[i].end());
 
         distribution<float> features
-            = get_model_features(model, model_outputs, target_singular,
+            = get_conf_features(model, model_outputs, target_singular,
                                  training_data.target_stats[i]);
 
         if (features.size() != nv)
@@ -115,30 +262,166 @@ train_conf(int model, const Data & training_data)
     distribution<double> svalues1
         (std::min(outputs.shape()[0], outputs.shape()[1]));
 
-    int result = LAPack::gesdd("N", outputs.shape()[1], outputs.shape()[0],
-                               outputs.data(), outputs.shape()[1], 
-                               &svalues1[0], 0, 1, 0, 1);
+    boost::multi_array<Float, 2> outputs2
+        = outputs;
 
+    svalues1.push_back(0.0);
+
+    int result = LAPack::gesdd("N", outputs2.shape()[1], outputs2.shape()[0],
+                               outputs2.data(), outputs2.shape()[1], 
+                               &svalues1[0], 0, 1, 0, 1);
+    
     if (result != 0)
         throw Exception("error in SVD");
+    
+    //cerr << "result of svd = " << result << endl;
+    
+    //cerr << "svalues1 = " << svalues1 << endl;
+
+
+    boost::multi_array<Float, 2> outputs3 = outputs;
+
+    /* Factorize the matrix with partial pivoting.  This allows us to find the
+       largest number of linearly independent columns possible. */
+
+    distribution<Float> tau(nv, 0.0);
+    distribution<int> permutations(nv, 0);
+
+    int res = LAPack::geqp3(outputs3.shape()[1],
+                            outputs3.shape()[0],
+                            outputs3.data(), outputs3.shape()[1],
+                            &permutations[0],
+                            &tau[0]);
+    
+    if (res != 0)
+        throw Exception(format("geqp3: error in parameter %d", -res));
+
+    // Convert back to c indexes
+    permutations -= 1;
+
+    //cerr << "permutations = " << permutations << endl;
+    //cerr << "tau = " << tau << endl;
+
+    distribution<Float> diag(nv);
+    for (unsigned i = 0;  i < nv;  ++i)
+        diag[i] = outputs3[i][i];
+
+    //cerr << "diag = " << diag << endl;
+
+    int nkeep = nv;
+    while (nkeep > 0 && fabs(diag[nkeep - 1]) < 0.01) --nkeep;
+
+    //cerr << "keeping " << nkeep << " of " << nv << endl;
+
 
 #if 0
-    cerr << "result of svd = " << result << endl;
+    vector<int> new_loc(nv, -1);
+    for (unsigned i = 0, n = 0;  i < nv;  ++i)
+        if (permutations[i] < nkeep)
+            new_loc[i] = n++;
     
-    cerr << "svalues = " << svalues << endl;
+#else
+    vector<int> new_loc(nv, -1);
+    for (unsigned i = 0;  i < nkeep;  ++i)
+        new_loc[permutations[i]] = i;
 #endif
 
+    //cerr << "new_loc = " << new_loc << endl;
+
+    boost::multi_array<Float, 2> outputs_reduced(boost::extents[nkeep][nx]);
+    for (unsigned i = 0;  i < nx;  ++i)
+        for (unsigned j = 0;  j < nv;  ++j)
+            if (new_loc[j] != -1)
+                outputs_reduced[new_loc[j]][i] = outputs[j][i];
+
+#if 0
 
     // Remove linearly dependent columns.  Returns a vector saying in which
     // entry of the new matrix the current column really is
-    vector<int> new_loc = remove_dependent(outputs);
+    vector<distribution<Float> > y;
+    vector<int> new_loc = remove_dependent_impl(outputs, y, 1e-2);
 
-    distribution<Float> trained
-        = run_irls(correct, outputs, w, link_function);
+    cerr << "new_loc = " << new_loc << endl;
+
+    int nvreduced = outputs.shape()[0];
+
+    double svreduced = svalues1[nvreduced];
+
+#endif
+
+    double svreduced = svalues1[nkeep - 1];
+
+    //cerr << "svreduced = " << svreduced << endl;
+
+    if (svreduced < 0.001)
+        throw Exception("not all linearly dependent columns were removed");
+
+    distribution<Float> trained;
+
+    {
+        filter_ostream irls_log(format("irls.model.%d.txt.gz", model));
+        
+        debug_irls = &irls_log;
+
+        trained = run_irls(correct, outputs_reduced, w, link_function);
+        
+        debug_irls = 0;
+    }
 
     distribution<float> parameters(nv);
     for (unsigned v = 0;  v < nv;  ++v)
-        if (new_loc[v] != -1) parameters[v] = trained[new_loc[v]];
+        if (new_loc[v] != -1)
+            parameters[v] = trained[new_loc[v]];
+    
+    distribution<double> svalues_reduced
+        (std::min(outputs_reduced.shape()[0],
+                  outputs_reduced.shape()[1]));
+
+    if (abs(parameters).max() > 1000.0 || model == 25) {
+
+        filter_ostream out(format("good.model.%d.txt.gz", model));
+
+        out << "model " << model << endl;
+        out << "trained " << trained << endl;
+        out << "svalues_reduced " << svalues_reduced << endl;
+        out << "parameters " << parameters << endl;
+        out << "permuations " << permutations << endl;
+        out << "svalues1 " << svalues1 << endl;
+        out << "correct " << correct << endl;
+        out << "outputs_reduced: " << outputs_reduced.shape()[0] << "x"
+            << outputs_reduced.shape()[1] << endl;
+        
+        for (unsigned i = 0;  i < nx;  ++i) {
+            out << "example " << i << ": ";
+            for (unsigned j = 0;  j < nkeep;  ++j)
+                out << " " << outputs_reduced[j][i];
+            out << endl;
+        }
+
+        int result = LAPack::gesdd("N", outputs_reduced.shape()[1],
+                                   outputs_reduced.shape()[0],
+                                   outputs_reduced.data(),
+                                   outputs_reduced.shape()[1], 
+                                   &svalues_reduced[0], 0, 1, 0, 1);
+
+        cerr << "model = " << model << endl;
+        cerr << "trained = " << trained << endl;
+        cerr << "svalues_reduced = " << svalues_reduced << endl;
+
+        if (result != 0)
+            throw Exception("gesdd returned error");
+        
+        if (svalues_reduced.back() <= 0.001) {
+            throw Exception("didn't remove all linearly dependent");
+        }
+
+        if (abs(parameters).max() > 1000.0) {
+            throw Exception("IRLS returned inplausibly high weights");
+        }
+    }
+
+    distribution<Float> parameters
+        = perform_irls(correct, outputs, w, link_function);
     
     //cerr << "parameters for model " << model << ": " << parameters << endl;
 
@@ -151,13 +434,12 @@ train_conf(int model, const Data & training_data)
 
         distribution<float> features(nv);
         for (unsigned j = 0;  j < nv;  ++j)
-            if (new_loc[j] != -1)
-                features[j] = outputs[new_loc[j]][i];
-
+            features[j] = outputs[j][i];
+        
         float result = apply_link_inverse(features.dotprod(parameters),
                                           link_function);
 
-        before[i] = features[0];
+        before[i] = outputs[0][i];
         after[i] = result;
     }
 
@@ -168,7 +450,6 @@ train_conf(int model, const Data & training_data)
     float auc_before2 = before.calc_auc(correct * 2.0 - 1.0);
     float auc_after2  = after.calc_auc(correct * 2.0 - 1.0);
 
-
     static Lock lock;
     Guard guard(lock);
     
@@ -176,27 +457,46 @@ train_conf(int model, const Data & training_data)
          << ": before " << auc_before1 << "/" << auc_before2
          << " after " << auc_after1 << "/" << auc_after2 << endl;
 
-
-    if (auc_after2 == 1.0) {
+    if (auc_after2 > 0.99) {
+        cerr << "error on auc_after2" << endl;
         cerr << "new_loc = " << new_loc << endl;
         cerr << "parameters = " << parameters << endl;
         cerr << "trained = " << trained << endl;
-        //cerr << "after = " << after << endl;
-
-        distribution<double> svalues
-            (std::min(outputs.shape()[0], outputs.shape()[1]));
-
-        int result = LAPack::gesdd("N", outputs.shape()[1], outputs.shape()[0],
-                                   outputs.data(), outputs.shape()[1], 
-                                   &svalues[0], 0, 1, 0, 1);
-
-        cerr << "result of svd = " << result << endl;
-
-        cerr << "svalues = " << svalues << endl;
-        cerr << "svalues1 = " << svalues1 << endl;
+        cerr << "svalues_reduced = " << svalues_reduced << endl;
         
+        cerr << "after = " << distribution<float>(after.begin(),
+                                                  after.begin() + 100)
+             << endl;
 
-        throw Exception("something wrong on AUC 2");
+        for (unsigned i = 0;  i < 10;  ++i) {
+            cerr << "example " << i << ":" << endl;
+
+            distribution<float> features(nv);
+            for (unsigned j = 0;  j < nv;  ++j)
+                features[j] = outputs[j][i];
+
+            //cerr << "  features = " << features << endl;
+            //cerr << "  mult = " << features * parameters << endl;
+            cerr << "  dotprod = " << features.dotprod(parameters)
+                 << endl;
+
+            float result = apply_link_inverse(features.dotprod(parameters),
+                                              link_function);
+
+            distribution<float> reduced(nkeep);
+            for (unsigned j = 0;  j < nv;  ++j)
+                if (new_loc[j] != -1)
+                    reduced[new_loc[j]] = outputs[j][i];
+            
+            cerr << "  dotprod2 = " << reduced.dotprod(trained) << endl;
+            float result2 = apply_link_inverse(reduced.dotprod(trained),
+                                               link_function);
+            cerr << "  result  = " << result << endl;
+            cerr << "  result2 = " << result2 << endl;
+
+        }
+
+        throw Exception("error on auc_after2");
     }
 
     model_coefficients[model] = parameters;
@@ -296,25 +596,14 @@ init(const Data & training_data_in)
             outputs[j][i] = features[j];
     }
 
-    cerr << "removing linearly dependent columns" << endl;
-
-    // Remove linearly dependent columns.  Returns a vector saying in which
-    // entry of the new matrix the current column really is
-    vector<int> new_loc = remove_dependent(outputs);
-    
+    cerr << "training blender" << endl;
 
     Link_Function blend_link_function
         = (target == AUC ? LOGIT : LINEAR);
 
-    cerr << "training blender" << endl;
-
-    distribution<BlendFloat> trained
-        = run_irls(correct, outputs, w, blend_link_function);
-
-    distribution<float> parameters(nv);
-    for (unsigned v = 0;  v < nv;  ++v)
-        if (new_loc[v] != -1) parameters[v] = trained[new_loc[v]];
-
+    distribution<BlendFloat> params
+        = perform_irls(correct, outputs, w, blend_link_function);
+    
     cerr << "blend coefficients: " << parameters << endl;
 
     blend_coefficients = parameters;
@@ -333,10 +622,10 @@ conf_feature_space() const
 
 distribution<float>
 Gated_Blender::
-get_model_features(int model,
-                   const distribution<float> & model_outputs,
-                   const distribution<double> & target_singular,
-                   const Target_Stats & target_stats) const
+get_conf_features(int model,
+                  const distribution<float> & model_outputs,
+                  const distribution<double> & target_singular,
+                  const Target_Stats & target_stats) const
 {
     // Features:
     // 1.  The current model's output
@@ -424,7 +713,7 @@ conf(const ML::distribution<float> & models) const
         // What would we have predicted for this model?
 
         distribution<float> model_features
-            = get_model_features(i, models, target_singular, target_stats);
+            = get_conf_features(i, models, target_singular, target_stats);
 
         // Perform linear regression (in prediction mode)
         float output = model_features.dotprod(model_coefficients[i]);

@@ -42,10 +42,10 @@ struct Gated_Blender : public Blender {
     void train_conf(int model, const Data & training_data);
 
     distribution<float>
-    get_model_features(int model,
-                       const distribution<float> & model_outputs,
-                       const distribution<double> & target_singular,
-                       const Target_Stats & stats) const;
+    get_conf_features(int model,
+                      const distribution<float> & model_outputs,
+                      const distribution<double> & target_singular,
+                      const Target_Stats & stats) const;
 
     distribution<float>
     get_blend_features(const distribution<float> & model_outputs,
