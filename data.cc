@@ -377,6 +377,42 @@ decompose()
 
 void
 Data::
+apply_decomposition(const Data & decomposed)
+{
+    singular_targets.resize(targets.size());
+
+    for (unsigned i = 0;  i < targets.size();  ++i) {
+        distribution<float> mvalues(models.size());
+        for (unsigned j = 0;  j < models.size();  ++j)
+            mvalues[j] = models[j][i];
+
+        singular_targets[i] = decomposed.apply_decomposition(mvalues);
+    }
+
+    singular_values = decomposed.singular_values;
+    singular_models = decomposed.singular_models;
+}
+
+distribution<float>
+Data::
+apply_decomposition(const distribution<float> & models) const
+{
+    if (singular_values.empty())
+        throw Exception("apply_decomposition(): no decomposition was done");
+
+    // First, get the singular vector for the model
+    distribution<double> target_singular(singular_values.size());
+
+    for (unsigned i = 0;  i < models.size();  ++i)
+        target_singular += singular_models[i] * models[i];
+    
+    target_singular /= singular_values;
+
+    return distribution<float>(target_singular.begin(), target_singular.end());
+}
+
+void
+Data::
 stats()
 {
     target_stats.resize(targets.size());

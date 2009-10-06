@@ -13,6 +13,7 @@
 #include "boosting/dense_features.h"
 #include "boosting/classifier.h"
 #include "algebra/irls.h"
+#include "utils/filter_streams.h"
 
 
 /*****************************************************************************/
@@ -61,12 +62,17 @@ struct Gated_Blender : public Blender {
     int num_models_to_train;
     bool debug_predict;
 
-    const Data * data;
     std::vector<ML::distribution<float> > model_coefficients;
     distribution<float> blend_coefficients;
     boost::shared_ptr<ML::Dense_Feature_Space> blender_fs;
     boost::shared_ptr<ML::Classifier_Impl> blender;
     Target target;
+
+    Data decompose_training_data;
+
+    std::string dump_predict_features, dump_training_features;
+    mutable ML::filter_ostream predict_feature_file, training_feature_file;
+    mutable Lock predict_feature_lock;
 };
 
 #endif /* __ausdm__gated_blender_h__ */

@@ -116,6 +116,11 @@ struct Data {
 
     void decompose();
 
+    void apply_decomposition(const Data & decomposed);
+
+    distribution<float>
+    apply_decomposition(const distribution<float> & models) const;
+
     void stats();
 
     Target target;

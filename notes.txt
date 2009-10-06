@@ -248,3 +248,14 @@ And with a GLZ:
 
 0.8794 +/- 0.0083
 
+With decomposition trained on 1/3 of the data:
+
+auc: 0.8738 +/- 0.0087
+
+Ouch!
+
+Fixed up to use the correct decomposition (I think):
+
+0.8763 +/- 0.0088
+
+Still not great...

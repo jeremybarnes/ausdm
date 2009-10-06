@@ -28,7 +28,7 @@ using namespace std;
 /*****************************************************************************/
 
 Gated_Blender::Gated_Blender()
-    : link_function(LOGIT), data(0)
+    : link_function(LOGIT)
 {
 }
 
@@ -51,6 +51,9 @@ configure(const ML::Configuration & config_,
     config.find(debug_predict, "debug_predict");
 
     config.require(num_models_to_train, "num_models_to_train");
+
+    config.find(dump_training_features, "dump_training_features");
+    config.find(dump_predict_features, "dump_predict_features");
 
     this->target = target;
 }
@@ -251,7 +254,7 @@ train_conf(int model, const Data & training_data)
 
         distribution<float> features
             = get_conf_features(model, model_outputs, target_singular,
-                                 training_data.target_stats[i]);
+                                training_data.target_stats[i]);
 
         if (features.size() != nv)
             throw Exception("nv is wrong");
@@ -348,20 +351,42 @@ void
 Gated_Blender::
 init(const Data & training_data_in)
 {
-    this->data = &training_data_in;
+    if (dump_predict_features != "")
+        predict_feature_file.open(dump_predict_features);
 
-    Data conf_training_data = training_data_in;
+    if (dump_training_features != "")
+        training_feature_file.open(dump_training_features);
+
+
+    decompose_training_data = training_data_in;
+    Data conf_training_data;
     Data blend_training_data;
 
-    conf_training_data.hold_out(blend_training_data, 0.50);
+    // One third for the decomposition, one third for the confidence, one third
+    // for the blender
 
+    decompose_training_data.hold_out(conf_training_data, 2.0 / 3.0);
+    conf_training_data.hold_out(blend_training_data, 0.5);
+
+    cerr << "training decomposition" << endl;
+    decompose_training_data.decompose();
+    conf_training_data.apply_decomposition(decompose_training_data);
+    blend_training_data.apply_decomposition(decompose_training_data);
+
+    decompose_training_data.stats();
     conf_training_data.stats();
     blend_training_data.stats();
+
+    decompose_training_data.calc_scores();
+    conf_training_data.calc_scores();
+    blend_training_data.calc_scores();
+
+    int nm = conf_training_data.models.size();
 
     // Now to train.  For each of the models, we go through the training
     // data and create a data file; we then do an IRLS on the model.
 
-    model_coefficients.resize(conf_training_data.models.size());
+    model_coefficients.resize(nm);
 
 
     static Worker_Task & worker = Worker_Task::instance(num_threads() - 1);
@@ -378,8 +403,8 @@ init(const Data & training_data_in)
                                      boost::ref(worker),
                                      group));
 
-        for (unsigned i = 0;  i < conf_training_data.models.size();  ++i) {
-            if (training_data_in.models[i].rank >= num_models_to_train)
+        for (unsigned i = 0;  i < nm;  ++i) {
+            if (decompose_training_data.models[i].rank >= num_models_to_train)
                 continue;
 
             worker.add(boost::bind(&Gated_Blender::train_conf,
@@ -396,8 +421,8 @@ init(const Data & training_data_in)
     int nx = blend_training_data.targets.size();
 
     int nv = get_blend_features
-        (distribution<float>(blend_training_data.models.size()),
-         distribution<float>(blend_training_data.models.size()),
+        (distribution<float>(nm),
+         distribution<float>(nm),
          Target_Stats())
         .size();
 
@@ -424,8 +449,11 @@ init(const Data & training_data_in)
 
     blender_fs = fs;
 
-    filter_ostream out("blender.fv.txt.gz");
-    out << fs->print() << endl;
+    if (dump_training_features != "")
+        training_feature_file << fs->print() << endl;
+
+    if (dump_predict_features != "")
+        predict_feature_file << fs->print() << endl;
 
     Training_Data training_data(fs);
 
@@ -438,8 +466,8 @@ init(const Data & training_data_in)
 
         correct_prediction = correct[i];
 
-        distribution<float> model_outputs(blend_training_data.models.size());
-        for (unsigned j = 0;  j < blend_training_data.models.size();  ++j)
+        distribution<float> model_outputs(nm);
+        for (unsigned j = 0;  j < nm;  ++j)
             model_outputs[j] = blend_training_data.models[j][i];
 
         const Target_Stats & target_stats
@@ -454,11 +482,6 @@ init(const Data & training_data_in)
         distribution<float> features
             = get_blend_features(model_outputs, conf, target_stats);
 
-        out << correct_prediction;
-        for (unsigned j = 0;  j < nv;  ++j)
-            out << " " << features[j];
-        out << endl;
-
         if (features.size() != nv)
             throw Exception("nv is wrong");
 
@@ -469,6 +492,9 @@ init(const Data & training_data_in)
         
         boost::shared_ptr<Mutable_Feature_Set> fset
             = fs->encode(features);
+
+        if (dump_training_features != "")
+            training_feature_file << fs->print(*fset) << endl;
 
         training_data.add_example(fset);
 
@@ -492,7 +518,7 @@ init(const Data & training_data_in)
     config.load("classifier-config.txt");
 
     boost::shared_ptr<Classifier_Generator> trainer
-        = get_trainer("glz", config);
+        = get_trainer("bbdt", config);
 
     trainer->init(fs, Feature(nv));
 
@@ -501,10 +527,9 @@ init(const Data & training_data_in)
     distribution<float> weights(nx, 1.0 / nx);
     distribution<float> weights0(nx);
 
-    blender
-        = trainer->generate(context, training_data, training_data,
-                            weights, weights0,
-                            training_data.all_features());
+    blender = trainer->generate(context, training_data, training_data,
+                                weights, weights0,
+                                training_data.all_features());
 
 }
 
@@ -517,7 +542,7 @@ conf_feature_space() const
 
     result->add_feature("model_pred", REAL);
 
-    for (unsigned i = 0;  i < data->models.size();  ++i)
+    for (unsigned i = 0;  i < decompose_training_data.models.size();  ++i)
         result->add_feature(format("pc%03d", i), REAL);
 
     result->add_feature("error_10", REAL);
@@ -557,21 +582,21 @@ get_conf_features(int model,
 
     float real_prediction = model_outputs[model];
     
-    distribution<float> weights(data->singular_values.size(), 0.0);
+    distribution<float> weights(decompose_training_data.singular_values.size());
     for (unsigned j = 0;  j < 10;  ++j)
         weights[j] = 1.0;
     
     float model_prediction_10
-        = (target_singular * data->singular_values)
-        .dotprod(data->singular_models[model] * weights);
+        = (target_singular * decompose_training_data.singular_values)
+        .dotprod(decompose_training_data.singular_models[model] * weights);
     
     for (unsigned j = 10;  j < 50;  ++j)
         weights[j] = 1.0;
     
     float model_prediction_50
-        = (target_singular * data->singular_values)
-        .dotprod(data->singular_models[model] * weights);
-
+        = (target_singular * decompose_training_data.singular_values)
+        .dotprod(decompose_training_data.singular_models[model] * weights);
+    
     distribution<float> result;
 
     result.push_back(real_prediction);
@@ -617,12 +642,8 @@ conf(const ML::distribution<float> & models,
      const Target_Stats & target_stats) const
 {
     // First, get the singular vector for the model
-    distribution<double> target_singular(data->singular_values.size());
-
-    for (unsigned i = 0;  i < models.size();  ++i)
-        target_singular += data->singular_models[i] * models[i];
-    
-    target_singular /= data->singular_values;
+    distribution<float> target_singular
+        = decompose_training_data.apply_decomposition(models);
 
     // For each model, calculate a confidence
     distribution<float> result(models.size());
@@ -664,9 +685,10 @@ blend_feature_space() const
     result->add_feature("avg_weighted", REAL);
     result->add_feature("weighted_avg", REAL);
 
-    for (unsigned i = 0;  i < data->models.size();  ++i) {
-        if (data->models[i].rank >= num_models_to_train) continue;
-        string s = data->model_names[i];
+    for (unsigned i = 0;  i < decompose_training_data.models.size();  ++i) {
+        if (decompose_training_data.models[i].rank >= num_models_to_train)
+            continue;
+        string s = decompose_training_data.model_names[i];
         result->add_feature(s + "_output", REAL);
         result->add_feature(s + "_conf", REAL);
         result->add_feature(s + "_weighted", REAL);
@@ -800,10 +822,15 @@ predict(const ML::distribution<float> & models) const
                              blend_link_function);
 #endif
 
-    blend_features.push_back(0.0);
+    blend_features.push_back(correct_prediction);
 
     boost::shared_ptr<Mutable_Feature_Set> features
         = blender_fs->encode(blend_features);
+
+    if (dump_predict_features != "") {
+        Guard guard(predict_feature_lock);
+        predict_feature_file << blender_fs->print(*features) << endl;
+    }
 
     float result = blender->predict(1, *features);
 
