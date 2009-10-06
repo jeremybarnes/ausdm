@@ -11,6 +11,7 @@
 
 #include "blender.h"
 #include "boosting/dense_features.h"
+#include "boosting/classifier.h"
 #include "algebra/irls.h"
 
 
@@ -27,6 +28,9 @@ struct Gated_Blender : public Blender {
     virtual boost::shared_ptr<ML::Dense_Feature_Space>
     conf_feature_space() const;
     
+    virtual boost::shared_ptr<ML::Dense_Feature_Space>
+    blend_feature_space() const;
+    
     virtual void configure(const ML::Configuration & config,
                            const std::string & name,
                            int random_seed,
@@ -35,7 +39,8 @@ struct Gated_Blender : public Blender {
     virtual void init(const Data & training_data);
 
     virtual distribution<float>
-    conf(const ML::distribution<float> & models) const;
+    conf(const ML::distribution<float> & models,
+         const Target_Stats & stats) const;
     
     virtual float predict(const ML::distribution<float> & models) const;
 
@@ -49,7 +54,8 @@ struct Gated_Blender : public Blender {
 
     distribution<float>
     get_blend_features(const distribution<float> & model_outputs,
-                       const distribution<float> & model_conf) const;
+                       const distribution<float> & model_conf,
+                       const Target_Stats & stats) const;
 
     ML::Link_Function link_function;
     int num_models_to_train;
@@ -58,6 +64,8 @@ struct Gated_Blender : public Blender {
     const Data * data;
     std::vector<ML::distribution<float> > model_coefficients;
     distribution<float> blend_coefficients;
+    boost::shared_ptr<ML::Dense_Feature_Space> blender_fs;
+    boost::shared_ptr<ML::Classifier_Impl> blender;
     Target target;
 };
 

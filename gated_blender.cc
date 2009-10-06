@@ -15,6 +15,7 @@
 #include "algebra/least_squares.h"
 #include "stats/distribution_ops.h"
 #include "utils/filter_streams.h"
+#include "boosting/classifier_generator.h"
 
 
 using namespace ML;
@@ -355,6 +356,7 @@ init(const Data & training_data_in)
     conf_training_data.hold_out(blend_training_data, 0.50);
 
     conf_training_data.stats();
+    blend_training_data.stats();
 
     // Now to train.  For each of the models, we go through the training
     // data and create a data file; we then do an IRLS on the model.
@@ -395,7 +397,8 @@ init(const Data & training_data_in)
 
     int nv = get_blend_features
         (distribution<float>(blend_training_data.models.size()),
-         distribution<float>(blend_training_data.models.size()))
+         distribution<float>(blend_training_data.models.size()),
+         Target_Stats())
         .size();
 
 
@@ -407,6 +410,24 @@ init(const Data & training_data_in)
     distribution<BlendFloat> correct(nx);
     boost::multi_array<BlendFloat, 2> outputs(boost::extents[nv][nx]);
     distribution<BlendFloat> w(nx, 1.0 / nx);
+
+    boost::shared_ptr<ML::Dense_Feature_Space> fs
+        = blend_feature_space();
+
+    if (fs->features().size() != nv) {
+        cerr << "fs: " << fs->features().size() << endl;
+        cerr << "nv: " << nv << endl;
+        throw Exception("blend feature space has wrong number of features");
+    }
+
+    fs->add_feature("LABEL", BOOLEAN);
+
+    blender_fs = fs;
+
+    filter_ostream out("blender.fv.txt.gz");
+    out << fs->print() << endl;
+
+    Training_Data training_data(fs);
 
     for (unsigned i = 0;  i < blend_training_data.targets.size();  ++i) {
 
@@ -420,23 +441,40 @@ init(const Data & training_data_in)
         distribution<float> model_outputs(blend_training_data.models.size());
         for (unsigned j = 0;  j < blend_training_data.models.size();  ++j)
             model_outputs[j] = blend_training_data.models[j][i];
+
+        const Target_Stats & target_stats
+            = blend_training_data.target_stats[i];
         
         distribution<double> target_singular
             (blend_training_data.singular_targets[i].begin(),
              blend_training_data.singular_targets[i].end());
 
-        distribution<float> conf = this->conf(model_outputs);
+        distribution<float> conf = this->conf(model_outputs, target_stats);
 
         distribution<float> features
-            = get_blend_features(model_outputs, conf);
+            = get_blend_features(model_outputs, conf, target_stats);
+
+        out << correct_prediction;
+        for (unsigned j = 0;  j < nv;  ++j)
+            out << " " << features[j];
+        out << endl;
 
         if (features.size() != nv)
             throw Exception("nv is wrong");
 
         for (unsigned j = 0;  j < nv;  ++j)
             outputs[j][i] = features[j];
+
+        features.push_back(correct[i]);
+        
+        boost::shared_ptr<Mutable_Feature_Set> fset
+            = fs->encode(features);
+
+        training_data.add_example(fset);
+
     }
 
+#if 0
     cerr << "training blender" << endl;
 
     Link_Function blend_link_function
@@ -448,6 +486,26 @@ init(const Data & training_data_in)
     cerr << "blend coefficients: " << parameters << endl;
 
     blend_coefficients = parameters;
+#endif
+
+    Configuration config;
+    config.load("classifier-config.txt");
+
+    boost::shared_ptr<Classifier_Generator> trainer
+        = get_trainer("glz", config);
+
+    trainer->init(fs, Feature(nv));
+
+    Thread_Context context;
+
+    distribution<float> weights(nx, 1.0 / nx);
+    distribution<float> weights0(nx);
+
+    blender
+        = trainer->generate(context, training_data, training_data,
+                            weights, weights0,
+                            training_data.all_features());
+
 }
 
 boost::shared_ptr<Dense_Feature_Space>
@@ -457,8 +515,31 @@ conf_feature_space() const
     boost::shared_ptr<Dense_Feature_Space> result
         (new Dense_Feature_Space());
 
+    result->add_feature("model_pred", REAL);
+
+    for (unsigned i = 0;  i < data->models.size();  ++i)
+        result->add_feature(format("pc%03d", i), REAL);
+
+    result->add_feature("error_10", REAL);
+    result->add_feature("error_10_abs", REAL);
+    result->add_feature("error_50", REAL);
+    result->add_feature("error_50_abs", REAL);
+
+    result->add_feature("models_mean", REAL);
+    result->add_feature("models_std", REAL);
+    result->add_feature("models_min", REAL);
+    result->add_feature("models_max", REAL);
+
+    result->add_feature("model_dev_from_mean", REAL);
+    result->add_feature("model_dev_from_min", REAL);
+    result->add_feature("model_dev_from_max", REAL);
+
+    result->add_feature("model_diff_from_int", REAL);
+    result->add_feature("models_range", REAL);
+    result->add_feature("models_range_dev_high", REAL);
+    result->add_feature("models_range_dev_low", REAL);
+
     return result;
-    // Features: output, nmodels principal components
 }
 
 distribution<float>
@@ -532,7 +613,8 @@ get_conf_features(int model,
 
 distribution<float>
 Gated_Blender::
-conf(const ML::distribution<float> & models) const
+conf(const ML::distribution<float> & models,
+     const Target_Stats & target_stats) const
 {
     // First, get the singular vector for the model
     distribution<double> target_singular(data->singular_values.size());
@@ -544,8 +626,6 @@ conf(const ML::distribution<float> & models) const
 
     // For each model, calculate a confidence
     distribution<float> result(models.size());
-
-    Target_Stats target_stats(models.begin(), models.end());
 
     for (unsigned i = 0;  i < models.size();  ++i) {
         // Skip untrained models
@@ -568,10 +648,58 @@ conf(const ML::distribution<float> & models) const
     return result;
 }
 
+boost::shared_ptr<Dense_Feature_Space>
+Gated_Blender::
+blend_feature_space() const
+{
+    boost::shared_ptr<Dense_Feature_Space> result
+        (new Dense_Feature_Space());
+
+    result->add_feature("min_model", REAL);
+    result->add_feature("max_model", REAL);
+    result->add_feature("avg_model_chosen", REAL);
+
+    result->add_feature("min_weighted", REAL);
+    result->add_feature("max_weighted", REAL);
+    result->add_feature("avg_weighted", REAL);
+    result->add_feature("weighted_avg", REAL);
+
+    for (unsigned i = 0;  i < data->models.size();  ++i) {
+        if (data->models[i].rank >= num_models_to_train) continue;
+        string s = data->model_names[i];
+        result->add_feature(s + "_output", REAL);
+        result->add_feature(s + "_conf", REAL);
+        result->add_feature(s + "_weighted", REAL);
+        result->add_feature(s + "_dev_from_mean", REAL);
+        result->add_feature(s + "_diff_from_int", REAL);
+    }
+
+    result->add_feature("chosen_conf_min", REAL);
+    result->add_feature("chosen_conf_max", REAL);
+    result->add_feature("chosen_conf_avg", REAL);
+    result->add_feature("highest_chosen_output", REAL);
+    result->add_feature("highest_chosen_weighted", REAL);
+
+    result->add_feature("model_avg", REAL);
+    result->add_feature("chosen_model_avg", REAL);
+
+    result->add_feature("models_mean", REAL);
+    result->add_feature("models_std", REAL);
+    result->add_feature("models_min", REAL);
+    result->add_feature("models_max", REAL);
+
+    result->add_feature("models_range", REAL);
+    result->add_feature("models_range_dev_high", REAL);
+    result->add_feature("models_range_dev_low", REAL);
+
+    return result;
+}
+
 distribution<float>
 Gated_Blender::
 get_blend_features(const distribution<float> & model_outputs,
-                   const distribution<float> & model_conf) const
+                   const distribution<float> & model_conf,
+                   const Target_Stats & target_stats) const
 {
     distribution<float> result;
 
@@ -594,6 +722,12 @@ get_blend_features(const distribution<float> & model_outputs,
         result.push_back(weighted[i]);
         dense_model.push_back(model_outputs[i]);
         dense_conf.push_back(model_conf[i]);
+
+        float real_prediction = model_outputs[i];
+
+        result.push_back((real_prediction - target_stats.mean) / target_stats.std);
+        result.push_back(std::min(fabs(real_prediction - ceil(real_prediction)),
+                                  fabs(real_prediction - floor(real_prediction))));
     }
 
     result.push_back(dense_conf.min());
@@ -608,6 +742,15 @@ get_blend_features(const distribution<float> & model_outputs,
 
     result.push_back(model_outputs.total() / model_outputs.size());
     result.push_back(dense_model.total() / dense_model.size());
+
+    result.push_back(target_stats.mean);
+    result.push_back(target_stats.std);
+    result.push_back(target_stats.min);
+    result.push_back(target_stats.max);
+
+    result.push_back(target_stats.max - target_stats.min);
+    result.push_back((target_stats.max - target_stats.mean) / target_stats.std);
+    result.push_back((target_stats.mean - target_stats.min) / target_stats.std);
 
     return result;
 }
@@ -625,7 +768,9 @@ predict(const ML::distribution<float> & models) const
         guard.reset(new Guard(lock));
     }
 
-    distribution<float> conf = this->conf(models);
+    Target_Stats target_stats(models.begin(), models.end());
+    
+    distribution<float> conf = this->conf(models, target_stats);
     
     distribution<float> model_preds(models.size());
     for (unsigned i = 0;  i < models.size();  ++i)
@@ -644,14 +789,23 @@ predict(const ML::distribution<float> & models) const
     }
 
     distribution<float> blend_features
-        = get_blend_features(models, conf);
+        = get_blend_features(models, conf, target_stats);
 
+#if 0
     Link_Function blend_link_function
         = (target == AUC ? LOGIT : LINEAR);
 
     float result
         = apply_link_inverse(blend_features.dotprod(blend_coefficients),
                              blend_link_function);
+#endif
+
+    blend_features.push_back(0.0);
+
+    boost::shared_ptr<Mutable_Feature_Set> features
+        = blender_fs->encode(blend_features);
+
+    float result = blender->predict(1, *features);
 
     if (debug) cerr << "result = " << result << " correct = "
                     << correct_prediction << endl;
