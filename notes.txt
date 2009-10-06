@@ -203,3 +203,24 @@ RMSE with numeric problems fixed up (I think!):
 
 0.8683 +/- 0.0133
 
+With them really fixed up:
+
+0.8689 +/- 0.0139
+
+Very disappointing!
+
+Same for AUC:
+
+0.8807 +/- 0.0081
+
+With 20 weak learners:
+
+0.8785 +/- 0.0073
+
+So still not there yet...
+
+Submission: (gated top 10 (fixed))
+
+Gini = 0.8755559356638
+Success - rmse = 882.36039813249
+
