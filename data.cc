@@ -120,8 +120,12 @@ calc_score(const distribution<float> & targets,
 
 void
 Data::
-load(const std::string & filename, Target target)
+load(const std::string & filename, Target target, bool clear_first)
 {
+    if (clear_first) clear();
+    else if (target != this->target)
+        throw Exception("Data::load(): target loaded on top isn't same");
+
     this->target = target;
 
     Parse_Context c(filename);
@@ -129,18 +133,28 @@ load(const std::string & filename, Target target)
     // First row: header.
     c.expect_literal("RowID,Target");
 
+    int m = 0;
     while (!c.match_eol()) {
         c.expect_literal(',');
         string model_name = c.expect_text(",\n\r");
-        model_names.push_back(model_name);
+
+        if (clear_first)
+            model_names.push_back(model_name);
+        else if (model_name != model_names.at(m++))
+            throw Exception("model names don't match");
     }
+
+    if (!clear_first && model_names.size() != m)
+        throw Exception("wrong number of models");
 
     // Create the data structures
     cerr << model_names.size() << " models... ";
     
-    models.resize(model_names.size());
-    for (unsigned i = 0;  i < models.size();  ++i) {
-        models[i].reserve(50000);
+    if (clear_first) {
+        models.resize(model_names.size());
+        for (unsigned i = 0;  i < models.size();  ++i) {
+            models[i].reserve(50000);
+        }
     }
     
     int num_rows = 0;
@@ -352,7 +366,7 @@ decompose()
     singular_values
         = distribution<float>(svalues.begin(), svalues.begin() + nwanted);
 
-    //cerr << "singular_values = " << singular_values << endl;
+    cerr << "singular_values = " << singular_values << endl;
 
     singular_models.resize(models.size());
     

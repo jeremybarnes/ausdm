@@ -259,3 +259,28 @@ Fixed up to use the correct decomposition (I think):
 0.8763 +/- 0.0088
 
 Still not great...
+
+And back to using full data for the decomposition:
+
+0.8792 +/- 0.0086
+
+Using the full, full, full set of data for the decomposition:
+
+0.8797 +/- 0.0091
+
+
+---------------------
+
+
+Using a neural network to perform blending:
+
+0.8814 +/- 0.0079
+
+Now we're talking!
+
+Submitted:
+
+
+Success
+Gini = 0.87422844737031
+AUC = 0.93711422368515

@@ -103,7 +103,8 @@ struct Target_Stats {
 /** Data structure to contain the dataset that we are working on. */
 
 struct Data {
-    void load(const std::string & filename, Target target);
+    void load(const std::string & filename, Target target,
+              bool clear_first = true);
 
     void calc_scores();
 

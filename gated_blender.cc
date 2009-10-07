@@ -357,15 +357,30 @@ init(const Data & training_data_in)
     if (dump_training_features != "")
         training_feature_file.open(dump_training_features);
 
+    // Perform the decomposition, one time, on all training+testing
+    // data (we don't look at the labels, so this is OK).
 
-    decompose_training_data = training_data_in;
-    Data conf_training_data;
+    string targ_type_uc;
+    if (target == AUC) targ_type_uc = "AUC";
+    else if (target == RMSE) targ_type_uc = "RMSE";
+    else throw Exception("unknown target type");
+
+    decompose_training_data.load("download/S_"
+                                 + targ_type_uc + "_Train.csv", target);
+
+    decompose_training_data.calc_scores();
+
+    decompose_training_data.load("download/S_"
+                                 + targ_type_uc + "_Score.csv", target,
+                                 false);
+
+    Data conf_training_data = training_data_in;
     Data blend_training_data;
 
     // One third for the decomposition, one third for the confidence, one third
     // for the blender
 
-    decompose_training_data.hold_out(conf_training_data, 2.0 / 3.0);
+    //decompose_training_data.hold_out(conf_training_data, 2.0 / 3.0);
     conf_training_data.hold_out(blend_training_data, 0.5);
 
     cerr << "training decomposition" << endl;
@@ -373,11 +388,11 @@ init(const Data & training_data_in)
     conf_training_data.apply_decomposition(decompose_training_data);
     blend_training_data.apply_decomposition(decompose_training_data);
 
-    decompose_training_data.stats();
+    //decompose_training_data.stats();
     conf_training_data.stats();
     blend_training_data.stats();
 
-    decompose_training_data.calc_scores();
+    //decompose_training_data.calc_scores();
     conf_training_data.calc_scores();
     blend_training_data.calc_scores();
 
@@ -518,7 +533,7 @@ init(const Data & training_data_in)
     config.load("classifier-config.txt");
 
     boost::shared_ptr<Classifier_Generator> trainer
-        = get_trainer("bbdt", config);
+        = get_trainer("blender", config);
 
     trainer->init(fs, Feature(nv));
 
