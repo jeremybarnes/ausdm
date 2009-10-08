@@ -37,7 +37,8 @@ struct Gated_Blender : public Blender {
                            int random_seed,
                            Target target);
     
-    virtual void init(const Data & training_data);
+    virtual void init(const Data & training_data,
+                      const ML::distribution<float> & example_weights);
 
     virtual distribution<float>
     conf(const ML::distribution<float> & models,
@@ -45,7 +46,8 @@ struct Gated_Blender : public Blender {
     
     virtual float predict(const ML::distribution<float> & models) const;
 
-    void train_conf(int model, const Data & training_data);
+    void train_conf(int model, const Data & training_data,
+                    const ML::distribution<float> & example_weights);
 
     distribution<float>
     get_conf_features(int model,
@@ -68,7 +70,7 @@ struct Gated_Blender : public Blender {
     boost::shared_ptr<ML::Classifier_Impl> blender;
     Target target;
 
-    Data decompose_training_data;
+    const Data * data;
 
     std::string dump_predict_features, dump_training_features;
     mutable ML::filter_ostream predict_feature_file, training_feature_file;

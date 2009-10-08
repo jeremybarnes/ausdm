@@ -1,9 +1,17 @@
 # -*- Awk -*-
 
-auc {
+
+gated {
     type=gated;
     link_function=logit;
     num_models_to_train=10;
+}
+
+auc {
+    type=boosting;
+    weaklearner : gated {
+    }
+    num_iter=4;
 }
 
 rmse {

@@ -8,9 +8,12 @@
 #include "boosting_blender.h"
 #include "utils/vector_utils.h"
 #include "boosting/boosting_core.h"
+#include "stats/distribution_ops.h"
+#include "algebra/glz.h"
 
 
 using namespace ML;
+using namespace ML::Stats;
 using namespace std;
 
 
@@ -28,275 +31,146 @@ Boosting_Blender::~Boosting_Blender()
     
 void
 Boosting_Blender::
-configure(const ML::Configuration & config,
+configure(const ML::Configuration & config_,
           const std::string & name,
           int random_seed,
           Target target)
 {
-    Linear_Blender::configure(config, name, random_seed, target);
+    Configuration config(config_, name, Configuration::PREFIX_APPEND);
+
+    this->config = config;
+
+    weaklearner_name = "weaklearner";
+
+    this->target = target;
+    this->random_seed = random_seed;
+    
+    config.require(num_iter, "num_iter");
 }
     
 void
 Boosting_Blender::
-init(const Data & training_data)
+init(const Data & training_data,
+     const ML::distribution<float> & example_weights_)
 {
-    // Things to do:
-    // 1.  Split off a validation set for early stopping
-    // 2.  Get example weights
-    // 3.  Make the weak learner simply choose the best submodel according to
-    //     the current weights
-    // 4.  Calculate residuals at each iteration to choose weight and updates
+    // We dispense with early stopping...
 
-    //ML::Boosting_Loss loss;
+    distribution<float> example_weights = example_weights_;
 
-    Data training_set = training_data;
-    Data validate_set;
-    training_set.hold_out(validate_set, 0.2);
+    int nx = training_data.targets.size();
+    int nm = training_data.models.size();
 
-    training_set.calc_scores();
-    validate_set.calc_scores();
-
-    distribution<double> example_weights(training_set.targets.size(), 1.0);
+    if (example_weights.size() != nx)
+        throw Exception("invalid nx");
     
-    distribution<double> training_predictions(training_set.targets.size(), 0.0);
-    distribution<double> validate_predictions(validate_set.targets.size(), 0.0);
-    Target target = training_set.target;
+    // Scores for the entire model
+    Model_Output blended_predictions;
+    blended_predictions.resize(nx);
 
-    int max_iter = 100;
+    for (unsigned i = 0;  i < num_iter;  ++i) {
 
-    model_weights.clear();
-    model_weights.resize(training_set.models.size(), 0.0);
+        // Get this weak learner
 
-    int num_possible = 0, num_impossible = 0;
+        boost::shared_ptr<Blender> weak
+            = get_blender(config, weaklearner_name, training_data,
+                          example_weights, random_seed, target);
 
-    vector<int> possible(training_set.targets.size(), false);
+        submodels.push_back(weak);
 
-    for (unsigned x = 0;  x < training_set.targets.size();  ++x) {
-        float label = training_set.targets[x];
-        int & is_possible = possible[x];
-        for (unsigned m = 0;  m < training_set.models.size() && !is_possible;
-             ++m) {
+        // Run it over the training set
+        Model_Output weak_predictions;
+        weak_predictions.resize(nx);
 
-            float pred = (training_set.models[m][x] - 3.0) / 2.0;
-            float margin = pred * label;
-            if (margin > 0.0) is_possible = true;
-        }
-
-        if (!is_possible) {
-            num_impossible += 1;
-            example_weights[x] = 0.0;
-        }
-        else num_possible += 1;
-    }
-
-    cerr << "examples: possible " << num_possible << " impossible "
-         << num_impossible << endl;
-
-    example_weights.normalize();
-
-    distribution<double> best_model_weights = model_weights;
-    float best_validate_score = 0.0;
-    int best_iter = -1;
-
-
-    for (int iter = 0;  iter < max_iter;  ++iter) {
-        // Calculate the (weighted) score for each of the weak learners
-        vector<pair<int, float> > weak_scores;
+        for (unsigned x = 0;  x < nx;  ++x) {
 
 #if 0
-        cerr << "example weights: "
-             << distribution<double>(example_weights.begin(),
-                                     example_weights.begin() + 20)
-                 * example_weights.size()
-             << endl;
-#endif
-        
-        for (unsigned m = 0;  m < training_set.models.size();  ++m) {
-            // Calculate the model score
-            double error;
-            double score;
-            if (target == RMSE)
-                error = score
-                    = 1.0 - training_set.models[m]
-                                .calc_rmse_weighted(training_set.targets,
-                                                    example_weights);
-            else {
-                // AUC calculation; we want a normal weighted accuracy thing
-                // A weighted, real AUC doesn't make much sense really
-                error = 0.0;
-
-                double correct = 0.0, incorrect = 0.0;
-                double total_margin = 0.0;
-
-                for (unsigned x = 0;  x < training_set.targets.size();  ++x) {
-                    // scores are between 1.000 and 5.000, so we say that it
-                    // is correct if it is on the right side of 3
-                    // Might need something a bit more clever here, though
-                    float pred = (training_set.models[m][x] - 3.0) / 2.0;
-                    float label = training_set.targets[x];
-                    float margin = pred * label;
-
-                    //cerr << "pred = " << pred << " correct = " << correct
-                    //     << " margin = " << margin << " weight "
-                    //     << example_weights[x] << endl;
-
-                    if (margin < 0.0) incorrect += example_weights[x];
-                    else correct += example_weights[x];
-
-                    total_margin += example_weights[x] * margin;
-                }
-
-                error = incorrect / (correct + incorrect);
-
-#if 0
-                //cerr << "correct = " << correct << " incorrect = "
-                //     << incorrect << " error " << error << endl;
-                cerr << "model " << m
-                     << " error = " << error << " avg_margin = "
-                     << total_margin << " rank " << training_set.models[m].rank
-                     << " model score " << training_set.models[m].score
-                     << endl;
-#endif
-
-                score = total_margin;
-            }
-
-            weak_scores.push_back(make_pair(m, score));
-        }
-
-        sort_on_second_descending(weak_scores);
-
-        int weak_model = weak_scores[0].first;
-        double score = weak_scores[0].second;
-
-        cerr << "score = " << score << " model " << weak_model
-             << " rank " << training_set.models[weak_model].rank << endl;
-
-        //if (score < 0.0) break;
-        
-        //cerr << "error = " << error << endl;
-
-        //if (error >= 0.5) break;
-
-        double weight = exp(score);
-
-        //cerr << "weight is " << weight << endl;
-
-        // Update training weights
-
-        double total_ex_weight = 0.0;
-        double min_weight = INFINITY, max_weight = -INFINITY;
-
-        double total_weight_correct = 0.0, total_weight_incorrect = 0.0;
-
-        for (unsigned x = 0;  x < training_set.targets.size();  ++x) {
-            if (!possible[x]) {
-                if (example_weights[x] != 0.0)
-                    throw Exception("impossible example not ignored");
-                continue;
-            }
-
-            double margin;
-
-            if (target == RMSE)
-                margin = -fabs(training_set.models[weak_model][x]
-                               - training_set.targets[x]);
-            else {
-                float pred = (training_set.models[weak_model][x] - 3.0) / 2.0;
-                float correct = training_set.targets[x];
-                margin = pred * correct;
+            float label = training_data.targets[x];
+            int & is_possible = possible[x];
+            for (unsigned m = 0;  m < training_data.models.size() && !is_possible;
+                 ++m) {
                 
-                if (x < 20 && false)
-                    cerr << "x = " << x << " pred " << pred << " correct "
-                         << correct << " margin " << margin
-                         << " oldwt "
-                         << example_weights[x] * example_weights.size()
-                         << " newwt "
-                         << (example_weights[x] * example_weights.size()
-                                 * exp(-weight * margin))
-                         << endl;
+                float pred = (training_data.models[m][x] - 3.0) / 2.0;
+                float margin = pred * label;
+                if (margin > 0.0) is_possible = true;
             }
-
-            example_weights[x] *= exp(-margin * 0.5);
- 
-            min_weight = std::min(example_weights[x], min_weight);
-            max_weight = std::max(example_weights[x], max_weight);
-
-            total_ex_weight += example_weights[x];
-
-            if (margin > 0.0)
-                total_weight_correct += example_weights[x];
-            else total_weight_incorrect += example_weights[x];
-        }
-        
-        //cerr << "min_weight = " << (min_weight / total_ex_weight * example_weights.size()) << endl;
-        //cerr << "max_weight = " << (max_weight / total_ex_weight * example_weights.size()) << endl;
-
-        //cerr << "total_ex_weight = " << total_ex_weight << endl;
-
-        cerr << "total_weight_correct = " << total_weight_correct << endl;
-        cerr << "total_weight_incorrect = " << total_weight_incorrect << endl;
-
-        example_weights /= total_ex_weight;
-
-        model_weights[weak_model] += weight;
-        // TODO: how to normalize the model weights?
-
-
-        // Now score accuracy of training and validate examples
-        for (unsigned x = 0;  x < training_set.targets.size();  ++x) {
-            float pred = training_set.models[weak_model][x];
-            if (target == AUC)
-                pred = (pred - 3.0) / 2.0;
-
-            training_predictions[x] += weight * pred;
-        }
-
-        for (unsigned x = 0;  x < validate_set.targets.size();  ++x) {
-            float pred = validate_set.models[weak_model][x];
-            if (target == AUC)
-                pred = (pred - 3.0) / 2.0;
-
-            validate_predictions[x] += weight * pred;
-        }
-
-        Model_Output training_output, validate_output;
-        training_output.insert(training_output.end(),
-                               training_predictions.begin(),
-                               training_predictions.end());
-
-        validate_output.insert(validate_output.end(),
-                               validate_predictions.begin(),
-                               validate_predictions.end());
-        
-        double training_score
-            = training_output.calc_score(training_set.targets, target);
-        
-        double validate_score
-            = validate_output.calc_score(validate_set.targets, target);
-
-        if (validate_score >= best_validate_score) {
-            best_validate_score = validate_score;
-            best_model_weights = model_weights;
-            best_iter = iter;
-        }
             
+            if (!is_possible) {
+                num_impossible += 1;
+                example_weights[x] = 0.0;
+            }
+            else num_possible += 1;
+#endif
+            
+            distribution<float> models(nm);
+
+            for (unsigned m = 0;  m < nm;  ++m)
+                models[m] = training_data.models[m][x];
+
+            weak_predictions[x] = weak->predict(models);
+        }
+
+        // Calculate the score (over the training data)
+        float weak_score
+            = weak_predictions.calc_score(training_data.targets, target);
+        float weak_score_weighted
+            = weak_predictions.calc_score(training_data.targets,
+                                          example_weights,
+                                          target);
         
-        //cerr << "iter " << iter << " chose model " << weak_model << " ("
-        //     << training_set.model_names[weak_model] << ") with error "
-        //     << weak_scores[0].second << endl;
+        // Calculate the weight
+        float weight = 1.0 - weak_score_weighted;
+        
+        // Calculate the blended outputs
+        weights.push_back(weight);
 
-        //cerr << "error = " << error << endl;
-        //cerr << "training score: " << training_score << endl;
-        //cerr << "validate score: " << validate_score << endl;
+        blended_predictions += weak_predictions * weight;
 
-        cerr << format("iter %4d model %5d score %6.4f train %6.4f val %6.4f wt %6.4f",
-                       iter, weak_model,
-                       training_set.model_names[weak_model].c_str(),
-                       score, training_score, validate_score,
-                       weight) << endl;
+        double factor = weights.total();
+
+        Model_Output norm_blended_predictions = blended_predictions;
+        norm_blended_predictions /= factor;
+
+        float blended_score
+            = norm_blended_predictions
+            .calc_score(training_data.targets, target);
+        
+        cerr << "weight = " << weight << " weak_score = " << weak_score
+             << " weighted = " << weak_score_weighted
+             << " blended_score = " << blended_score << endl;
+        
+        // Update the example weights
+        distribution<float> margins
+            = norm_blended_predictions * training_data.targets;
+
+        Logit_Link<float> link;
+        distribution<float> lmargin = (link.inverse(margins) - 0.5) * 2.0;
+        
+        for (unsigned i = 0;  i < 100;  ++i) {
+            cerr << "example " << i << ": label " << training_data.targets[i]
+                 << " weight " << example_weights[i] * nx << " new pred "
+                 << weak_predictions[i] << " combined pred "
+                 << norm_blended_predictions[i] << " margin "
+                 << margins[i] << " lmargin "
+                 << lmargin[i] << " new weight "
+                 << example_weights[i] * std::exp(-lmargin[i]) * nx << endl;
+        }
+
+
+        example_weights *= exp(-lmargin);
+
+        cerr << "example_weights.total() = " << example_weights.total()
+             << endl;
+
+        example_weights.normalize();
     }
+}
 
-    cerr << "best was on iter " << best_iter << endl;
-    model_weights = best_model_weights;
+float
+Boosting_Blender::
+predict(const ML::distribution<float> & models) const
+{
+    distribution<float> submodel_predictions(submodels.size());
+    for (unsigned i = 0;  i < submodels.size();  ++i)
+        submodel_predictions[i] = submodels[i]->predict(models);
+    return weights.dotprod(submodel_predictions);
 }

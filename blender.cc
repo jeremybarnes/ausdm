@@ -61,7 +61,8 @@ configure(const ML::Configuration & config_,
 
 void
 Linear_Blender::
-init(const Data & data)
+init(const Data & data,
+     const ML::distribution<float> & example_weights)
 {
     model_weights.clear();
     model_weights.resize(data.models.size(), 0.0);
@@ -101,6 +102,7 @@ boost::shared_ptr<Blender>
 get_blender(const ML::Configuration & config_,
             const std::string & name,
             const Data & data,
+            const ML::distribution<float> & example_weights,
             int random_seed,
             Target target)
 {
@@ -120,7 +122,7 @@ get_blender(const ML::Configuration & config_,
     else throw Exception("Blender of type " + type + " doesn't exist");
 
     result->configure(config_, name, random_seed, target);
-    result->init(data);
+    result->init(data, example_weights);
     
     return result;
 }

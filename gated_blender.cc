@@ -140,6 +140,10 @@ perform_irls(const distribution<Float> & correct,
     if (verify && svreduced < 0.001)
         throw Exception("not all linearly dependent columns were removed");
 
+    //cerr << "v.size() = " << w.size() << endl;
+    //cerr << "correct.size() = " << correct.size() << endl;
+    //cerr << "w.total() = " << w.total() << endl;
+
     distribution<Float> trained
         = run_irls(correct, outputs_reduced, w, link_function);
 
@@ -203,7 +207,8 @@ perform_irls(const distribution<Float> & correct,
 
 void
 Gated_Blender::
-train_conf(int model, const Data & training_data)
+train_conf(int model, const Data & training_data,
+           const ML::distribution<float> & example_weights)
 {
     // Generate a matrix with the predictions
     int nx = training_data.targets.size();
@@ -220,7 +225,7 @@ train_conf(int model, const Data & training_data)
     // Assemble the labels
     distribution<Float> correct(nx);
     boost::multi_array<Float, 2> outputs(boost::extents[nv][nx]);
-    distribution<Float> w(nx, 1.0 / nx);
+    distribution<Float> w(example_weights.begin(), example_weights.end());
 
     for (unsigned i = 0;  i < training_data.targets.size();  ++i) {
 
@@ -300,7 +305,7 @@ train_conf(int model, const Data & training_data)
          << ": before " << auc_before1 << "/" << auc_before2
          << " after " << auc_after1 << "/" << auc_after2 << endl;
 
-    if (auc_after2 > 0.99) {
+    if (auc_after2 < 0.01) {
         cerr << "error on auc_after2" << endl;
         //cerr << "new_loc = " << new_loc << endl;
         cerr << "parameters = " << parameters << endl;
@@ -349,7 +354,8 @@ train_conf(int model, const Data & training_data)
 
 void
 Gated_Blender::
-init(const Data & training_data_in)
+init(const Data & training_data_in,
+     const ML::distribution<float> & example_weights)
 {
     if (dump_predict_features != "")
         predict_feature_file.open(dump_predict_features);
@@ -365,28 +371,34 @@ init(const Data & training_data_in)
     else if (target == RMSE) targ_type_uc = "RMSE";
     else throw Exception("unknown target type");
 
-    decompose_training_data.load("download/S_"
-                                 + targ_type_uc + "_Train.csv", target);
+    this->data = &training_data_in;
 
-    decompose_training_data.calc_scores();
+    //decompose_training_data.load("download/S_"
+    //                             + targ_type_uc + "_Train.csv", target);
 
-    decompose_training_data.load("download/S_"
-                                 + targ_type_uc + "_Score.csv", target,
-                                 false);
+    //decompose_training_data.calc_scores();
+
+    //decompose_training_data.load("download/S_"
+    //                             + targ_type_uc + "_Score.csv", target,
+    //                             false);
 
     Data conf_training_data = training_data_in;
     Data blend_training_data;
+
+    distribution<float> conf_example_weights = example_weights,
+        blend_example_weights;
 
     // One third for the decomposition, one third for the confidence, one third
     // for the blender
 
     //decompose_training_data.hold_out(conf_training_data, 2.0 / 3.0);
-    conf_training_data.hold_out(blend_training_data, 0.5);
+    conf_training_data.hold_out(blend_training_data, 0.5,
+                                conf_example_weights, blend_example_weights);
 
-    cerr << "training decomposition" << endl;
-    decompose_training_data.decompose();
-    conf_training_data.apply_decomposition(decompose_training_data);
-    blend_training_data.apply_decomposition(decompose_training_data);
+    //cerr << "training decomposition" << endl;
+    //decompose_training_data.decompose();
+    //conf_training_data.apply_decomposition(decompose_training_data);
+    //blend_training_data.apply_decomposition(decompose_training_data);
 
     //decompose_training_data.stats();
     conf_training_data.stats();
@@ -419,11 +431,12 @@ init(const Data & training_data_in)
                                      group));
 
         for (unsigned i = 0;  i < nm;  ++i) {
-            if (decompose_training_data.models[i].rank >= num_models_to_train)
+            if (training_data_in.models[i].rank >= num_models_to_train)
                 continue;
 
             worker.add(boost::bind(&Gated_Blender::train_conf,
-                                   this, i, boost::cref(conf_training_data)),
+                                   this, i, boost::cref(conf_training_data),
+                                   boost::cref(conf_example_weights)),
                        "train model job",
                        group);
         }
@@ -449,10 +462,11 @@ init(const Data & training_data_in)
     // Assemble the labels
     distribution<BlendFloat> correct(nx);
     boost::multi_array<BlendFloat, 2> outputs(boost::extents[nv][nx]);
-    distribution<BlendFloat> w(nx, 1.0 / nx);
+    distribution<BlendFloat> w(blend_example_weights.begin(),
+                               blend_example_weights.end());
+    w.normalize();
 
-    boost::shared_ptr<ML::Dense_Feature_Space> fs
-        = blend_feature_space();
+    boost::shared_ptr<ML::Dense_Feature_Space> fs = blend_feature_space();
 
     if (fs->features().size() != nv) {
         cerr << "fs: " << fs->features().size() << endl;
@@ -541,9 +555,7 @@ init(const Data & training_data_in)
 
     Thread_Context context;
 
-    distribution<float> weights(nx, 1.0 / nx);
-
-    blender = trainer->generate(context, training_data, weights,
+    blender = trainer->generate(context, training_data, blend_example_weights,
                                 training_data.all_features());
 }
 
@@ -558,7 +570,7 @@ conf_feature_space() const
 
     result->add_feature("model_pred", REAL);
 
-    for (unsigned i = 0;  i < decompose_training_data.models.size();  ++i)
+    for (unsigned i = 0;  i < data->singular_values.size();  ++i)
         result->add_feature(format("pc%03d", i), REAL);
 
     result->add_feature("error_10", REAL);
@@ -598,20 +610,20 @@ get_conf_features(int model,
 
     float real_prediction = model_outputs[model];
     
-    distribution<float> weights(decompose_training_data.singular_values.size());
+    distribution<float> weights(data->singular_values.size());
     for (unsigned j = 0;  j < 10;  ++j)
         weights[j] = 1.0;
     
     float model_prediction_10
-        = (target_singular * decompose_training_data.singular_values)
-        .dotprod(decompose_training_data.singular_models[model] * weights);
+        = (target_singular * data->singular_values)
+        .dotprod(data->singular_models[model] * weights);
     
     for (unsigned j = 10;  j < 50;  ++j)
         weights[j] = 1.0;
     
     float model_prediction_50
-        = (target_singular * decompose_training_data.singular_values)
-        .dotprod(decompose_training_data.singular_models[model] * weights);
+        = (target_singular * data->singular_values)
+        .dotprod(data->singular_models[model] * weights);
     
     distribution<float> result;
 
@@ -661,7 +673,7 @@ conf(const ML::distribution<float> & models,
 {
     // First, get the singular vector for the model
     distribution<float> target_singular
-        = decompose_training_data.apply_decomposition(models);
+        = data->apply_decomposition(models);
 
     // For each model, calculate a confidence
     distribution<float> result(models.size());
@@ -705,10 +717,10 @@ blend_feature_space() const
     result->add_feature("avg_weighted", REAL);
     result->add_feature("weighted_avg", REAL);
 
-    for (unsigned i = 0;  i < decompose_training_data.models.size();  ++i) {
-        if (decompose_training_data.models[i].rank >= num_models_to_train)
+    for (unsigned i = 0;  i < data->models.size();  ++i) {
+        if (data->models[i].rank >= num_models_to_train)
             continue;
-        string s = decompose_training_data.model_names[i];
+        string s = data->model_names[i];
         result->add_feature(s + "_output", REAL);
         result->add_feature(s + "_conf", REAL);
         result->add_feature(s + "_weighted", REAL);

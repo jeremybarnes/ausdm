@@ -284,3 +284,17 @@ Submitted:
 Success
 Gini = 0.87422844737031
 AUC = 0.93711422368515
+
+
+-----------------------
+
+Before using boosting around everything else:
+
+scores: [ 0.117628 0.126624 0.123454 0.134264 0.135271 0.131286 0.131046 0.137431 0.110226 0.119526 ]
+0.1267 +/- 0.0088
+
+With boosting (same as before, on top of boosted bagged decision trees):
+
+scores: [ 0.119883 0.122842 0.124331 0.129082 0.136901 0.134772 0.134071 0.136432 0.108208 0.122468 ]
+0.1269 +/- 0.0091
+

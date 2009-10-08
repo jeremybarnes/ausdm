@@ -31,18 +31,29 @@ struct Model_Output : public distribution<float> {
     
     /// Calculate the RMSE over the given set of targets
     double calc_rmse(const distribution<float> & targets) const;
+
+    /// Same, but taking into account weights
+    double calc_rmse(const distribution<float> & targets,
+                     const distribution<float> & weights) const;
     
     /// Calculate the AUC over the given set of targets
     double calc_auc(const distribution<float> & targets) const;
 
+    /// Same, but with weights.  Not sure that it makes much sense
+    /// mathematically...
+    double calc_auc(const distribution<float> & targets,
+                    const distribution<float> & weights) const;
+
+    /// Calculate the score based upon the target
     double calc_score(const distribution<float> & targets,
+                      Target target) const;
+
+    /// Calculate the weighted score based upon the target
+    double calc_score(const distribution<float> & targets,
+                      const distribution<float> & weights,
                       Target target) const;
     
 
-    /// Calculate the RMSE over the given set of targets
-    double calc_rmse_weighted(const distribution<float> & targets,
-                              const distribution<double> & weights) const;
-    
     /// Score over whatever target we are trying to calculate
     double score;
     
@@ -109,6 +120,11 @@ struct Data {
     void calc_scores();
 
     void hold_out(Data & remove_to, float proportion,
+                  int random_seed = 1);
+
+    void hold_out(Data & remove_to, float proportion,
+                  distribution<float> & example_weights,
+                  distribution<float> & remove_to_example_weights,
                   int random_seed = 1);
 
     void clear();

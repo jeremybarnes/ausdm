@@ -15,6 +15,7 @@
 #include "arch/timers.h"
 #include "arch/threads.h"
 
+
 using namespace std;
 using namespace ML;
 using ML::Stats::sqr;
@@ -36,70 +37,11 @@ calc_rmse(const distribution<float> & targets) const
 
     return sqrt(sqr(targets - *this).total() * (1.0 / size()));
 }
-        
-double
-Model_Output::
-calc_auc(const distribution<float> & targets) const
-{
-    if (targets.size() != size())
-        throw Exception("targets and predictions don't match");
-    
-
-    // 1.  Sort the predictions
-    int num_neg = 0, num_pos = 0;
-
-    vector<pair<float, float> > sorted;
-    for (unsigned i = 0;  i < size();  ++i) {
-        sorted.push_back(make_pair((*this)[i], targets[i]));
-        if (targets[i] == -1) ++num_neg;
-        else ++num_pos;
-    }
-
-    //cerr << "num_pos = " << num_pos << " num_neg = " << num_neg << endl;
-
-    std::sort(sorted.begin(), sorted.end());
-    
-    // 2.  Get (x,y) points and calculate the AUC
-    int total_pos = 0, total_neg = 0;
-
-    float prevx = 0.0, prevy = 0.0;
-
-    double total_area1 = 0.0, total_area2 = 0.0;
-
-    for (unsigned i = 0;  i < sorted.size();  ++i) {
-        if (sorted[i].second == -1) ++total_neg;
-        else ++total_pos;
-        
-        if (i != sorted.size() - 1 && sorted[i].first == sorted[i + 1].first)
-            continue;
-
-        float x = total_pos * 1.0 / num_pos;
-        float y = total_neg * 1.0 / num_neg;
-
-        double area1 = (x - prevx) * (y + prevy) * 0.5;
-        double area2 = (x + prevx) * (y - prevy) * 0.5;
-
-        total_area1 += area1;
-        total_area2 += area2;
-
-        prevx = x;
-        prevy = y;
-    }
-
-    if (total_pos != num_pos || total_neg != num_neg)
-        throw Exception("bad total pos or total neg");
-
-    // 4.  Convert to gini
-    double gini = 2.0 * (total_area1 - 0.5);
-
-    // 5.  Final score is absolute value
-    return fabs(gini);
-}
 
 double
 Model_Output::
-calc_rmse_weighted(const distribution<float> & targets,
-                   const distribution<double> & weights) const
+calc_rmse(const distribution<float> & targets,
+          const distribution<float> & weights) const
 {
     if (targets.size() != size())
         throw Exception("targets and predictions don't match");
@@ -110,10 +52,134 @@ calc_rmse_weighted(const distribution<float> & targets,
     return sqrt((sqr(targets - *this) * weights).total() / weights.total());
 }
 
+
+namespace {
+        
+struct AUC_Entry {
+    AUC_Entry(float model = 0.0, float target = 0.0, float weight = 1.0)
+        : model(model), target(target), weight(weight)
+    {
+    }
+
+    float model;
+    float target;
+    float weight;
+
+    bool operator < (const AUC_Entry & other) const
+    {
+        return model < other.model;
+    }
+};
+
+double do_calc_auc(std::vector<AUC_Entry> & entries)
+{
+    // 1.  Total number of positive and negative
+    int num_neg = 0, num_pos = 0;
+
+    for (unsigned i = 0;  i < entries.size();  ++i) {
+        if (entries[i].target == -1) ++num_neg;
+        else ++num_pos;
+    }
+
+    // 2.  Sort
+    std::sort(entries.begin(), entries.end());
+    
+    // 3.  Get (x,y) points and calculate the AUC
+    int total_pos = 0, total_neg = 0;
+
+    float prevx = 0.0, prevy = 0.0;
+
+    double total_area = 0.0, total_weight = 0.0, current_weight = 0.0;
+
+    for (unsigned i = 0;  i < entries.size();  ++i) {
+        if (entries[i].target == -1) ++total_neg;
+        else ++total_pos;
+        
+        current_weight += entries[i].weight;
+        total_weight += entries[i].weight;
+
+        if (i != entries.size() - 1
+            && entries[i].model == entries[i + 1].model)
+            continue;
+        
+        float x = total_pos * 1.0 / num_pos;
+        float y = total_neg * 1.0 / num_neg;
+
+        double area = (x - prevx) * (y + prevy) * 0.5;
+
+        total_area += /* current_weight * */ area;
+
+        prevx = x;
+        prevy = y;
+        current_weight = 0.0;
+    }
+
+    // TODO: get weighted working properly...
+
+    //cerr << "total_area = " << total_area << " total_weight = "
+    //     << total_weight << endl;
+
+    if (total_pos != num_pos || total_neg != num_neg)
+        throw Exception("bad total pos or total neg");
+
+    // 4.  Convert to gini
+    double gini = 2.0 * (total_area /* / total_weight*/ - 0.5);
+
+    // 5.  Final score is absolute value.  Since we want an error, we take
+    //     1.0 - the gini
+    return 1.0 - fabs(gini);
+}
+
+} // file scope
+
+double
+Model_Output::
+calc_auc(const distribution<float> & targets) const
+{
+    if (targets.size() != size())
+        throw Exception("targets and predictions don't match");
+    
+    vector<AUC_Entry> entries;
+    entries.reserve(size());
+    for (unsigned i = 0;  i < size();  ++i)
+        entries.push_back(AUC_Entry((*this)[i], targets[i]));
+    
+    return do_calc_auc(entries);
+}
+
+double
+Model_Output::
+calc_auc(const distribution<float> & targets,
+         const distribution<float> & weights) const
+{
+    if (targets.size() != size())
+        throw Exception("targets and predictions don't match");
+    if (weights.size() != size())
+        throw Exception("targets and weights don't match");
+    
+    vector<AUC_Entry> entries;
+    entries.reserve(size());
+    for (unsigned i = 0;  i < size();  ++i)
+        entries.push_back(AUC_Entry((*this)[i], targets[i], weights[i]));
+    
+    return do_calc_auc(entries);
+}
+
 double
 Model_Output::
 calc_score(const distribution<float> & targets,
          Target target) const
+{
+    if (target == AUC) return calc_auc(targets);
+    else if (target == RMSE) return calc_rmse(targets);
+    else throw Exception("unknown target");
+}
+
+double
+Model_Output::
+calc_score(const distribution<float> & targets,
+           const distribution<float> & weights,
+           Target target) const
 {
     if (target == AUC) return calc_auc(targets);
     else if (target == RMSE) return calc_rmse(targets);
@@ -172,14 +238,17 @@ load(const std::string & filename, Target target, bool clear_first)
 
         float target_val = c.expect_int();
 
-        if (target == RMSE) target_val /= 1000.0;
+        if (target == RMSE) {
+            // Convert into range (-1, 1)
+            target_val = (target_val - 3000.0) / 2000.0;
+        }
 
         targets.push_back(target_val);
 
         for (unsigned i = 0;  i < models.size();  ++i) {
             c.expect_literal(',');
             int score = c.expect_int();
-            models[i].push_back(score / 1000.0);
+            models[i].push_back((score - 3000)/ 1000.0);
         }
 
         c.skip_whitespace();
@@ -234,9 +303,7 @@ calc_scores()
         model_scores.push_back(make_pair(models[i].score, i));
     }
 
-    if (target == RMSE)
-        sort_on_first_ascending(model_scores);
-    else sort_on_first_descending(model_scores);
+    sort_on_first_ascending(model_scores);
 
     for (unsigned i = 0;  i < models.size();  ++i)
         models[model_scores[i].second].rank = i;
@@ -258,6 +325,20 @@ calc_scores()
 void
 Data::
 hold_out(Data & remove_to, float proportion,
+         int random_seed)
+{
+    distribution<float> example_weights(targets.size());
+    distribution<float> remove_to_example_weights;
+
+    hold_out(remove_to, proportion, example_weights,
+             remove_to_example_weights, random_seed);
+}
+
+void
+Data::
+hold_out(Data & remove_to, float proportion,
+         distribution<float> & example_weights,
+         distribution<float> & remove_to_example_weights,
          int random_seed)
 {
     static Lock lock;
@@ -294,6 +375,12 @@ hold_out(Data & remove_to, float proportion,
     new_me.models.resize(model_names.size());
     remove_to.models.resize(model_names.size());
 
+    distribution<float> new_example_weights;
+    new_example_weights.reserve(targets.size() - to_remove.size());
+
+    remove_to_example_weights.clear();
+    remove_to_example_weights.reserve(to_remove.size());
+
     bool has_st = !singular_targets.empty();
 
     for (unsigned i = 0;  i < model_names.size();  ++i) {
@@ -308,8 +395,11 @@ hold_out(Data & remove_to, float proportion,
 
     for (unsigned i = 0;  i < targets.size();  ++i) {
         Data & add_to = remove_me[i] ? remove_to : new_me;
+        distribution<float> & weights
+            = remove_me[i] ? remove_to_example_weights : new_example_weights;
         add_to.targets.push_back(targets[i]);
         add_to.model_ids.push_back(model_ids[i]);
+        weights.push_back(example_weights[i]);
 
         for (unsigned j = 0;  j < model_names.size();  ++j)
             add_to.models[j].push_back(models[j][i]);
@@ -324,6 +414,7 @@ hold_out(Data & remove_to, float proportion,
     new_me.stats();
 
     swap(new_me);
+    example_weights.swap(new_example_weights);
 }
 
 void
@@ -374,7 +465,7 @@ decompose()
     singular_values
         = distribution<float>(svalues.begin(), svalues.begin() + nwanted);
 
-    cerr << "singular_values = " << singular_values << endl;
+    //cerr << "singular_values = " << singular_values << endl;
 
     singular_models.resize(models.size());
     

@@ -32,7 +32,8 @@ struct Blender {
                            int random_seed,
                            Target target) = 0;
     
-    virtual void init(const Data & training_data) = 0;
+    virtual void init(const Data & training_data,
+                      const ML::distribution<float> & example_weights) = 0;
 
     virtual float predict(const ML::distribution<float> & models) const = 0;
 };
@@ -52,7 +53,8 @@ struct Linear_Blender : public Blender {
                            int random_seed,
                            Target target);
     
-    virtual void init(const Data & training_data);
+    virtual void init(const Data & training_data,
+                      const ML::distribution<float> & example_weights);
 
     virtual float predict(const ML::distribution<float> & models) const;
 
@@ -71,6 +73,7 @@ boost::shared_ptr<Blender>
 get_blender(const ML::Configuration & config,
             const std::string & name,
             const Data & data,
+            const ML::distribution<float> & example_weights,
             int random_seed,
             Target target);
 

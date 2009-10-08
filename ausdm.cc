@@ -194,6 +194,19 @@ int main(int argc, char ** argv)
     else if (target == RMSE) targ_type_uc = "RMSE";
     else throw Exception("unknown target type");
 
+
+    Data decompose_training_data;
+    decompose_training_data.load("download/S_"
+                                 + targ_type_uc + "_Train.csv", target);
+    decompose_training_data.load("download/S_"
+                                 + targ_type_uc + "_Score.csv", target,
+                                 false);
+
+    cerr << "training decomposition" << endl;
+    decompose_training_data.decompose();
+    cerr << "done" << endl;
+
+
     vector<double> trial_scores;
 
     if (hold_out_data == 0.0 && num_trials > 1)
@@ -219,13 +232,17 @@ int main(int argc, char ** argv)
 
         // Calculate the scores necessary for the job
         data_train.calc_scores();
-        data_train.decompose();
+        data_train.apply_decomposition(decompose_training_data);
         data_train.stats();
-
+        
         data_test.stats();
 
+        distribution<float> example_weights(data_train.targets.size(),
+                                            1.0 / data_train.targets.size());
+
         boost::shared_ptr<Blender> blender
-            = get_blender(config, blender_name, data_train, rand_seed, target);
+            = get_blender(config, blender_name, data_train,
+                          example_weights, rand_seed, target);
         
 
         if (train_on_test && hold_out_data > 0.0) {
