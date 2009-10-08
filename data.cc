@@ -64,26 +64,33 @@ calc_auc(const distribution<float> & targets) const
 
     float prevx = 0.0, prevy = 0.0;
 
-    double total_area = 0.0;
+    double total_area1 = 0.0, total_area2 = 0.0;
 
     for (unsigned i = 0;  i < sorted.size();  ++i) {
         if (sorted[i].second == -1) ++total_neg;
         else ++total_pos;
         
+        if (i != sorted.size() - 1 && sorted[i].first == sorted[i + 1].first)
+            continue;
+
         float x = total_pos * 1.0 / num_pos;
         float y = total_neg * 1.0 / num_neg;
-        
-        double area = (x - prevx) * (y + prevy) * 0.5;
 
-        total_area += area;
+        double area1 = (x - prevx) * (y + prevy) * 0.5;
+        double area2 = (x + prevx) * (y - prevy) * 0.5;
+
+        total_area1 += area1;
+        total_area2 += area2;
 
         prevx = x;
         prevy = y;
     }
 
+    if (total_pos != num_pos || total_neg != num_neg)
+        throw Exception("bad total pos or total neg");
 
     // 4.  Convert to gini
-    double gini = 2.0 * (total_area - 0.5);
+    double gini = 2.0 * (total_area1 - 0.5);
 
     // 5.  Final score is absolute value
     return fabs(gini);
@@ -362,6 +369,7 @@ decompose()
             lvectors[i][j] = lvectorsT[j][i];
 
     int nwanted = std::min(nvalues, 200);
+    //nwanted = 50;
 
     singular_values
         = distribution<float>(svalues.begin(), svalues.begin() + nwanted);

@@ -282,7 +282,7 @@ train_conf(int model, const Data & training_data)
         float result = apply_link_inverse(features.dotprod(parameters),
                                           link_function);
 
-        before[i] = outputs[0][i];
+        before[i] = training_data.models[model][i];
         after[i] = result;
     }
 
@@ -460,7 +460,7 @@ init(const Data & training_data_in)
         throw Exception("blend feature space has wrong number of features");
     }
 
-    fs->add_feature("LABEL", BOOLEAN);
+    fs->add_feature("LABEL", (target == AUC ? BOOLEAN : REAL));
 
     blender_fs = fs;
 
@@ -477,9 +477,11 @@ init(const Data & training_data_in)
         if (target == AUC)
             correct[i] = blend_training_data.targets[i] > 0.0;
         else
-            correct[i] = blend_training_data.targets[i];
+            correct[i] = (blend_training_data.targets[i] - 3.0) / 2.5;
 
         correct_prediction = correct[i];
+
+        //cerr << "correct_prediction = " << correct_prediction << endl;
 
         distribution<float> model_outputs(nm);
         for (unsigned j = 0;  j < nm;  ++j)
@@ -540,12 +542,9 @@ init(const Data & training_data_in)
     Thread_Context context;
 
     distribution<float> weights(nx, 1.0 / nx);
-    distribution<float> weights0(nx);
 
-    blender = trainer->generate(context, training_data, training_data,
-                                weights, weights0,
+    blender = trainer->generate(context, training_data, weights,
                                 training_data.all_features());
-
 }
 
 boost::shared_ptr<Dense_Feature_Space>
@@ -554,6 +553,8 @@ conf_feature_space() const
 {
     boost::shared_ptr<Dense_Feature_Space> result
         (new Dense_Feature_Space());
+
+    result->add_feature("bias", REAL);
 
     result->add_feature("model_pred", REAL);
 
@@ -613,6 +614,8 @@ get_conf_features(int model,
         .dotprod(decompose_training_data.singular_models[model] * weights);
     
     distribution<float> result;
+
+    result.push_back(1.0);  // bias
 
     result.push_back(real_prediction);
     result.insert(result.end(),
@@ -691,6 +694,8 @@ blend_feature_space() const
     boost::shared_ptr<Dense_Feature_Space> result
         (new Dense_Feature_Space());
 
+    result->add_feature("bias", REAL);
+
     result->add_feature("min_model", REAL);
     result->add_feature("max_model", REAL);
     result->add_feature("avg_model_chosen", REAL);
@@ -739,6 +744,8 @@ get_blend_features(const distribution<float> & model_outputs,
                    const Target_Stats & target_stats) const
 {
     distribution<float> result;
+
+    result.push_back(1.0);  // bias
 
     result.push_back(model_outputs.min());
     result.push_back(model_outputs.max());
@@ -847,7 +854,16 @@ predict(const ML::distribution<float> & models) const
         predict_feature_file << blender_fs->print(*features) << endl;
     }
 
-    float result = blender->predict(1, *features);
+    float result;
+    if (target == AUC)
+        result = blender->predict(1, *features);
+    else result = blender->predict(0, *features);
+
+    if (target == RMSE) {
+        result = result * 2.5 + 3.0;
+        if (result < 1.0) result = 1.0;
+        if (result > 5.0) result = 5.0;
+    }
 
     if (debug) cerr << "result = " << result << " correct = "
                     << correct_prediction << endl;

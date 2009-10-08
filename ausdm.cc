@@ -79,6 +79,19 @@ struct Predict_Job {
 
 int main(int argc, char ** argv)
 {
+#if 0
+    Model_Output outputs;
+    distribution<float> correct;
+    for (unsigned i = 0;  i < 10000;  ++i) {
+        outputs.push_back(1.0);
+        correct.push_back(i % 2 ? 1.0 : -1.0);
+    }
+
+    cerr << "auc = " << outputs.calc_auc(correct) << endl;
+    return 0;
+#endif
+    
+
     // Filename to dump output data to
     string output_file;
 
@@ -278,6 +291,7 @@ int main(int argc, char ** argv)
         double std = Stats::std_dev(trial_scores.begin(), trial_scores.end(),
                                     mean);
         
+        cout << "scores: " << trial_scores << endl;
         cout << format("%6.4f +/- %6.4f", mean, std) << endl;
     }
 
