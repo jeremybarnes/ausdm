@@ -116,6 +116,9 @@ int main(int argc, char ** argv)
     // Do we train on testing data?
     bool train_on_test = false;
 
+    // Do we avoid decomposigion?
+    bool no_decomposition = false;
+
     {
         using namespace boost::program_options;
 
@@ -140,6 +143,8 @@ int main(int argc, char ** argv)
              "select number of trials to perform")
             ("train-on-test", value<bool>(&train_on_test)->zero_tokens(),
              "train on testing data as well (to test biasing, etc)" )
+            ("no-decomposition", value<bool>(&no_decomposition)->zero_tokens(),
+             "don't perform a decomposition")
             ("output-file,o",
              value<string>(&output_file),
              "dump output file to the given filename");
@@ -196,16 +201,17 @@ int main(int argc, char ** argv)
 
 
     Data decompose_training_data;
-    decompose_training_data.load("download/S_"
-                                 + targ_type_uc + "_Train.csv", target);
-    decompose_training_data.load("download/S_"
-                                 + targ_type_uc + "_Score.csv", target,
-                                 false);
-
-    cerr << "training decomposition" << endl;
-    decompose_training_data.decompose();
-    cerr << "done" << endl;
-
+    if (!no_decomposition) {
+        decompose_training_data.load("download/S_"
+                                     + targ_type_uc + "_Train.csv", target);
+        decompose_training_data.load("download/S_"
+                                     + targ_type_uc + "_Score.csv", target,
+                                     false);
+        
+        cerr << "training decomposition" << endl;
+        decompose_training_data.decompose();
+        cerr << "done" << endl;
+    }
 
     vector<double> trial_scores;
 
@@ -232,7 +238,9 @@ int main(int argc, char ** argv)
 
         // Calculate the scores necessary for the job
         data_train.calc_scores();
-        data_train.apply_decomposition(decompose_training_data);
+
+        if (!no_decomposition)
+            data_train.apply_decomposition(decompose_training_data);
         data_train.stats();
         
         data_test.stats();

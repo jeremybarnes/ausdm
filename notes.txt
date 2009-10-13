@@ -298,3 +298,32 @@ With boosting (same as before, on top of boosted bagged decision trees):
 scores: [ 0.119883 0.122842 0.124331 0.129082 0.136901 0.134772 0.134071 0.136432 0.108208 0.122468 ]
 0.1269 +/- 0.0091
 
+Success
+Gini = 0.87000892970578
+AUC = 0.93500446485289
+
+With GLZ:
+
+scores: [ 0.117289 0.113771 0.113929 0.125466 0.127324 0.130649 0.124218 0.124263 0.105995 0.116004 ]
+0.1199 +/- 0.0077
+
+for n in 1 2 3 4 5 7 10 12 15 17 20 25 30 40 50; do echo -n "$n "; ./build/x86_64/bin/ausdm --no-decomposition -T 0.20 -t auc auc.type=linear auc.mode=best_n auc.num_models=$n 2>/dev/null | tail -n1; done
+1 0.1218 +/-    nan
+2 0.1200 +/-    nan
+3 0.1215 +/-    nan
+4 0.1200 +/-    nan
+5 0.1211 +/-    nan
+7 0.1201 +/-    nan
+10 0.1193 +/-    nan
+12 0.1194 +/-    nan
+15 0.1195 +/-    nan
+17 0.1199 +/-    nan
+20 0.1206 +/-    nan
+25 0.1205 +/-    nan
+30 0.1208 +/-    nan
+40 0.1206 +/-    nan
+50 0.1212 +/-    nan
+
+
+
+

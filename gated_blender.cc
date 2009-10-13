@@ -866,6 +866,10 @@ predict(const ML::distribution<float> & models) const
         predict_feature_file << blender_fs->print(*features) << endl;
     }
 
+    ML::Output_Encoding encoding
+        = blender->output_encoding();
+    cerr << "output encoding is " << encoding << endl;
+
     float result;
     if (target == AUC)
         result = blender->predict(1, *features);
