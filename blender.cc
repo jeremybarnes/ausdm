@@ -31,6 +31,13 @@ Blender::
 {
 }
 
+std::string
+Blender::
+explain(const ML::distribution<float> & models) const
+{
+    return "";
+}
+
 
 /*****************************************************************************/
 /* LINEAR_BLENDER                                                            */

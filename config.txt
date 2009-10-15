@@ -1,17 +1,32 @@
 # -*- Awk -*-
 
 
+topn {
+    type=linear;
+    mode=best_n;
+    num_models=10;
+}
+
+baseline_auc : topn {
+}
+
+baseline_rmse : topn {
+}
+
 gated {
     type=gated;
     link_function=logit;
     num_models_to_train=10;
 }
 
-auc {
+auc2 {
     type=boosting;
     weaklearner : gated {
     }
     num_iter=4;
+}
+
+auc: gated {
 }
 
 rmse {
@@ -19,3 +34,4 @@ rmse {
     link_function=logit;
     num_models_to_train=20;
 }
+

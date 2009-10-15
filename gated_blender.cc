@@ -147,7 +147,7 @@ perform_irls(const distribution<Float> & correct,
     distribution<Float> trained
         = run_irls(correct, outputs_reduced, w, link_function);
 
-    distribution<float> parameters(nv);
+    distribution<Float> parameters(nv);
     for (unsigned v = 0;  v < nv;  ++v)
         if (new_loc[v] != -1)
             parameters[v] = trained[new_loc[v]];
@@ -295,8 +295,8 @@ train_conf(int model, const Data & training_data,
 
     float auc_before1 = before.calc_score(training_data.targets, target);
     float auc_after1  = after.calc_score(training_data.targets, target);
-    float auc_before2 = before.calc_auc(correct * 2.0 - 1.0);
-    float auc_after2  = after.calc_auc(correct * 2.0 - 1.0);
+    float auc_before2 = before.calc_auc(correct.cast<float>() * 2.0f - 1.0f);
+    float auc_after2  = after.calc_auc(correct.cast<float>() * 2.0f - 1.0f);
 
     static Lock lock;
     Guard guard(lock);
@@ -685,7 +685,8 @@ conf(const ML::distribution<float> & models,
         // What would we have predicted for this model?
 
         distribution<float> model_features
-            = get_conf_features(i, models, target_singular, target_stats);
+            = get_conf_features(i, models, target_singular.cast<double>(),
+                                target_stats);
 
         // Perform linear regression (in prediction mode)
         float output = model_features.dotprod(model_coefficients[i]);
@@ -746,6 +747,9 @@ blend_feature_space() const
     result->add_feature("models_range_dev_high", REAL);
     result->add_feature("models_range_dev_low", REAL);
 
+    result->add_feature("diff_mean_10_all", REAL);
+    result->add_feature("abs_diff_mean_10_all", REAL);
+
     return result;
 }
 
@@ -761,7 +765,12 @@ get_blend_features(const distribution<float> & model_outputs,
 
     result.push_back(model_outputs.min());
     result.push_back(model_outputs.max());
-    result.push_back(model_outputs.total() / (model_conf != 0.0).count());
+
+    float avg_model_chosen
+        = model_outputs.dotprod(model_conf != 0.0)
+        / (model_conf != 0.0).count();
+
+    result.push_back(avg_model_chosen);
 
     distribution<float> weighted = model_outputs * model_conf;
     result.push_back(weighted.min());
@@ -807,6 +816,10 @@ get_blend_features(const distribution<float> & model_outputs,
     result.push_back(target_stats.max - target_stats.min);
     result.push_back((target_stats.max - target_stats.mean) / target_stats.std);
     result.push_back((target_stats.mean - target_stats.min) / target_stats.std);
+
+    result.push_back(target_stats.mean - avg_model_chosen);
+    result.push_back(abs(target_stats.mean - avg_model_chosen));
+
 
     return result;
 }
@@ -866,9 +879,9 @@ predict(const ML::distribution<float> & models) const
         predict_feature_file << blender_fs->print(*features) << endl;
     }
 
-    ML::Output_Encoding encoding
-        = blender->output_encoding();
-    cerr << "output encoding is " << encoding << endl;
+    //ML::Output_Encoding encoding
+    //    = blender->output_encoding();
+    //cerr << "output encoding is " << encoding << endl;
 
     float result;
     if (target == AUC)
@@ -885,4 +898,26 @@ predict(const ML::distribution<float> & models) const
                     << correct_prediction << endl;
 
     return result;
+}
+
+std::string
+Gated_Blender::
+explain(const ML::distribution<float> & models) const
+{
+    Target_Stats target_stats(models.begin(), models.end());
+    
+    distribution<float> conf = this->conf(models, target_stats);
+    
+    distribution<float> blend_features
+        = get_blend_features(models, conf, target_stats);
+
+    blend_features.push_back(correct_prediction);
+
+    boost::shared_ptr<Mutable_Feature_Set> features
+        = blender_fs->encode(blend_features);
+
+    ML::Explanation explanation
+        = blender->explain(*features, target == AUC);
+
+    return explanation.print();
 }

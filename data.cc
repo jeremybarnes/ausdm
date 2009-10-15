@@ -22,6 +22,81 @@ using ML::Stats::sqr;
 
 
 /*****************************************************************************/
+/* DIFFICULTY                                                                */
+/*****************************************************************************/
+
+std::string print(const Difficulty_Category & cat)
+{
+    switch (cat) {
+    case DIF_UNKNOWN:    return "UNKNOWN";
+    case DIF_AUTOMATIC:  return "AUTO";
+    case DIF_POSSIBLE:   return "POSS";
+    case DIF_IMPOSSIBLE: return "IMP";
+    default: return format("Difficulty_Category(%d)", cat);
+    }
+}
+
+std::ostream & operator << (std::ostream & stream, Difficulty_Category cat)
+{
+    return stream << print(cat);
+}
+
+Difficulty::
+Difficulty()
+    : category(DIF_UNKNOWN), difficulty(0.0)
+{
+}
+
+Difficulty::
+Difficulty(const ML::distribution<float> & model_outputs,
+           float label, Target target)
+{
+    // If label is zero, then the example was unlabeled
+    if ((target == RMSE && label == -1.5)
+        || (target == AUC && label == 0.0)) {
+        difficulty = 0.0;
+        category = DIF_UNKNOWN;
+        return;
+    }
+
+    if (target == AUC) {
+        int ncorr = (model_outputs * label >= 0.0f).count();
+        int nincorr = (model_outputs.size() - ncorr);
+
+        if (ncorr == 0) {
+            category = DIF_IMPOSSIBLE;
+            difficulty = model_outputs.mean() * target;
+        }
+        else if (nincorr == 0) {
+            category = DIF_AUTOMATIC;
+            difficulty = model_outputs.mean() * target;
+        }
+        else {
+            category = DIF_POSSIBLE;
+            difficulty = model_outputs.mean() * target;
+        }
+    } else {
+        int ncorr = (abs(model_outputs - label) < 0.5).count();
+        int nincorr = (model_outputs.size() - ncorr);
+
+        if (ncorr == 0) {
+            category = DIF_IMPOSSIBLE;
+            difficulty = abs(model_outputs.mean() - target);
+        }
+        else if (nincorr == 0) {
+            category = DIF_AUTOMATIC;
+            difficulty = abs(model_outputs.mean() - target);
+        }
+        else {
+            category = DIF_POSSIBLE;
+            difficulty = abs(model_outputs.mean() - target);
+        }
+
+    }
+}
+
+
+/*****************************************************************************/
 /* MODEL_OUTPUT                                                              */
 /*****************************************************************************/
 
@@ -35,7 +110,7 @@ calc_rmse(const distribution<float> & targets) const
     //cerr << "targets[0] = " << targets[0] << endl;
     //cerr << "this[0] = " << (*this)[0] << endl;
 
-    return sqrt(sqr(targets - *this).total() * (1.0 / size()));
+    return sqrt(sqr((targets - *this) * 2.0).total() * (1.0 / size()));
 }
 
 double
@@ -49,7 +124,7 @@ calc_rmse(const distribution<float> & targets,
     if (weights.size() != size())
         throw Exception("weights and predictions don't match");
 
-    return sqrt((sqr(targets - *this) * weights).total() / weights.total());
+    return sqrt((sqr((targets - *this) * 2.0) * weights).total() / weights.total());
 }
 
 
@@ -77,6 +152,7 @@ double do_calc_auc(std::vector<AUC_Entry> & entries)
     int num_neg = 0, num_pos = 0;
 
     for (unsigned i = 0;  i < entries.size();  ++i) {
+        if (entries[i].weight == 0.0) continue;
         if (entries[i].target == -1) ++num_neg;
         else ++num_pos;
     }
@@ -92,8 +168,10 @@ double do_calc_auc(std::vector<AUC_Entry> & entries)
     double total_area = 0.0, total_weight = 0.0, current_weight = 0.0;
 
     for (unsigned i = 0;  i < entries.size();  ++i) {
-        if (entries[i].target == -1) ++total_neg;
-        else ++total_pos;
+        if (entries[i].weight > 0.0) {
+            if (entries[i].target == -1) ++total_neg;
+            else ++total_pos;
+        }
         
         current_weight += entries[i].weight;
         total_weight += entries[i].weight;
@@ -102,6 +180,8 @@ double do_calc_auc(std::vector<AUC_Entry> & entries)
             && entries[i].model == entries[i + 1].model)
             continue;
         
+        if (entries[i].weight == 0.0) continue;
+
         float x = total_pos * 1.0 / num_pos;
         float y = total_neg * 1.0 / num_neg;
 
@@ -123,11 +203,12 @@ double do_calc_auc(std::vector<AUC_Entry> & entries)
         throw Exception("bad total pos or total neg");
 
     // 4.  Convert to gini
-    double gini = 2.0 * (total_area /* / total_weight*/ - 0.5);
+    //double gini = 2.0 * (total_area - 0.5);
 
     // 5.  Final score is absolute value.  Since we want an error, we take
     //     1.0 - the gini
-    return 1.0 - fabs(gini);
+    //return 1.0 - fabs(gini);
+    return 1.0 - total_area;
 }
 
 } // file scope
@@ -181,8 +262,8 @@ calc_score(const distribution<float> & targets,
            const distribution<float> & weights,
            Target target) const
 {
-    if (target == AUC) return calc_auc(targets);
-    else if (target == RMSE) return calc_rmse(targets);
+    if (target == AUC) return calc_auc(targets, weights);
+    else if (target == RMSE) return calc_rmse(targets, weights);
     else throw Exception("unknown target");
 }
 
@@ -248,7 +329,7 @@ load(const std::string & filename, Target target, bool clear_first)
         for (unsigned i = 0;  i < models.size();  ++i) {
             c.expect_literal(',');
             int score = c.expect_int();
-            models[i].push_back((score - 3000)/ 1000.0);
+            models[i].push_back((score - 3000)/ 2000.0);
         }
 
         c.skip_whitespace();
@@ -529,12 +610,47 @@ Data::
 stats()
 {
     target_stats.resize(targets.size());
+    target_difficulty.resize(targets.size());
 
     distribution<float> model_vals(models.size());
+
+    double total_mean_neg = 0.0, total_mean_pos = 0.0;
+    double num_neg = 0.0, num_pos = 0.0;
+    double minval = INFINITY, maxval = -INFINITY;
+
+    int nimpossible = 0, nautomatic = 0, npossible = 0, nunknown = 0;
 
     for (unsigned i = 0;  i < targets.size();  ++i) {
         for (unsigned j = 0;  j < models.size();  ++j)
             model_vals[j] = models[j][i];
         target_stats[i] = Target_Stats(model_vals.begin(), model_vals.end());
+        target_difficulty[i] = Difficulty(model_vals, targets[i], target);
+
+        if (targets[i] < 0.0) {
+            total_mean_neg += model_vals.mean();
+            num_neg += 1.0;
+        }
+        else if (targets[i] > 0.0) {
+            total_mean_pos += model_vals.mean();
+            num_pos += 1.0;
+        }
+
+        minval = std::min<double>(minval, model_vals.min());
+        maxval = std::max<double>(maxval, model_vals.max());
+
+        switch (target_difficulty[i].category) {
+        case DIF_IMPOSSIBLE: ++nimpossible;  break;
+        case DIF_AUTOMATIC: ++nautomatic;  break;
+        case DIF_POSSIBLE: ++npossible;  break;
+        default: ++nunknown;
+        }
     }
+
+    cerr << "mean_neg = " << total_mean_neg / num_neg
+         << " mean_pos = " << total_mean_pos / num_pos
+         << " min = " << minval << " max = " << maxval
+         << endl;
+
+    cerr << "auto " << nautomatic << " imp " << nimpossible << " poss "
+         << npossible << endl;
 }

@@ -36,6 +36,8 @@ struct Blender {
                       const ML::distribution<float> & example_weights) = 0;
 
     virtual float predict(const ML::distribution<float> & models) const = 0;
+
+    virtual std::string explain(const ML::distribution<float> & models) const;
 };
 
 

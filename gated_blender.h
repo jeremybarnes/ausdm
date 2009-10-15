@@ -46,6 +46,8 @@ struct Gated_Blender : public Blender {
     
     virtual float predict(const ML::distribution<float> & models) const;
 
+    virtual std::string explain(const ML::distribution<float> & models) const;
+
     void train_conf(int model, const Data & training_data,
                     const ML::distribution<float> & example_weights);
 

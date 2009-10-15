@@ -23,6 +23,46 @@ using ML::distribution;
 
 
 /*****************************************************************************/
+/* DIFFICULTY                                                                */
+/*****************************************************************************/
+
+enum Difficulty_Category {
+    DIF_UNKNOWN,        ///< Label is unknown so difficulty is unknown
+    DIF_AUTOMATIC,      ///< Automatically correct (all models are correct)
+    DIF_POSSIBLE,       ///< At least one is correct
+    DIF_IMPOSSIBLE      ///< All models have misclassified it
+};
+
+std::string print(const Difficulty_Category & cat);
+
+std::ostream & operator << (std::ostream & stream, Difficulty_Category cat);
+
+struct Difficulty {
+    Difficulty();
+    Difficulty(const ML::distribution<float> & model_outputs,
+               float label,
+               Target target);
+
+    Difficulty_Category category;
+    float difficulty;
+};
+
+
+/*****************************************************************************/
+/* SCORES                                                                    */
+/*****************************************************************************/
+
+struct Scores {
+    distribution<float> target_values;
+    operator double() const { return score; }
+
+    double category_scores[4];  // one for each difficulty category
+    double category_averages[4];
+    double score;
+};
+
+
+/*****************************************************************************/
 /* MODEL_OUTPUT                                                              */
 /*****************************************************************************/
 
@@ -167,6 +207,9 @@ struct Data {
 
     /// Statistics about models for each target
     std::vector<Target_Stats> target_stats;
+
+    /// Information about how difficult each one is
+    std::vector<Difficulty> target_difficulty;
 };
 
 #endif /* __ausdm__data_h__ */

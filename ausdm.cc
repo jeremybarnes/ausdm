@@ -21,6 +21,7 @@
 #include "arch/timers.h"
 #include "utils/guard.h"
 #include "arch/threads.h"
+#include "stats/distribution_ops.h"
 
 #include "boosting/worker_task.h"
 
@@ -37,22 +38,29 @@
 
 using namespace std;
 using namespace ML;
+using namespace ML::Stats;
 
 struct Predict_Job {
     Model_Output & result;
+    Model_Output & baseline_result;
     int first, last;
     const Blender & blender;
+    boost::shared_ptr<Blender> baseline_blender;
     const Data & data;
     boost::progress_display & progress;
     Lock & progress_lock;
 
     Predict_Job(Model_Output & result,
+                Model_Output & baseline_result,
                 int first, int last,
                 const Blender & blender,
+                boost::shared_ptr<Blender> baseline_blender,
                 const Data & data,
                 boost::progress_display & progress,
                 Lock & progress_lock)
-        : result(result), first(first), last(last), blender(blender),
+        : result(result), baseline_result(baseline_result),
+          first(first), last(last), blender(blender),
+          baseline_blender(baseline_blender),
           data(data), progress(progress), progress_lock(progress_lock)
     {
     }
@@ -61,14 +69,17 @@ struct Predict_Job {
     {
         for (int j = first;  j < last;  ++j) {
             distribution<float> model_inputs(data.models.size());
-            for (unsigned i = 0;  i < data.models.size();  ++i) {
+            for (unsigned i = 0;  i < data.models.size();  ++i)
                 model_inputs[i] = data.models[i][j];
-            }
 
             correct_prediction = data.targets[j];
 
             float val = blender.predict(model_inputs);
             result.at(j) = val;
+
+            if (baseline_blender)
+                baseline_result.at(j)
+                    = baseline_blender->predict(model_inputs);
 
             Guard guard(progress_lock);
             ++progress;
@@ -76,22 +87,14 @@ struct Predict_Job {
     }
 };
 
+template<typename T>
+T sqr(T val)
+{
+    return val * val;
+}
 
 int main(int argc, char ** argv)
 {
-#if 0
-    Model_Output outputs;
-    distribution<float> correct;
-    for (unsigned i = 0;  i < 10000;  ++i) {
-        outputs.push_back(1.0);
-        correct.push_back(i % 2 ? 1.0 : -1.0);
-    }
-
-    cerr << "auc = " << outputs.calc_auc(correct) << endl;
-    return 0;
-#endif
-    
-
     // Filename to dump output data to
     string output_file;
 
@@ -100,6 +103,9 @@ int main(int argc, char ** argv)
 
     // Name of blender in config file
     string blender_name;
+
+    // Name of baseline in config file
+    string baseline_name;
 
     // Extra configuration options
     vector<string> extra_config_options;
@@ -129,6 +135,8 @@ int main(int argc, char ** argv)
              "configuration file to read configuration options from")
             ("blender-name,n", value<string>(&blender_name),
              "name of blender in configuration file")
+            ("baseline-name", value<string>(&baseline_name),
+             "name of baseline blender in configuration file")
             ("extra-config-option", value<vector<string> >(&extra_config_options),
              "extra configuration option=value (can go directly on command line)");
 
@@ -182,6 +190,9 @@ int main(int argc, char ** argv)
     if (blender_name == "")
         blender_name = target_type;
 
+    if (baseline_name == "")
+        baseline_name = "baseline_" + target_type;
+
     // Load up configuration
     Configuration config;
     if (config_file != "") config.load(config_file);
@@ -218,7 +229,7 @@ int main(int argc, char ** argv)
     if (hold_out_data == 0.0 && num_trials > 1)
         throw Exception("need to hold out data for multiple trials");
 
-    Model_Output result;
+    Model_Output result, baseline_result;
 
     for (unsigned trial = 0;  trial < num_trials;  ++trial) {
         if (num_trials > 1) cerr << "trial " << trial << endl;
@@ -253,6 +264,11 @@ int main(int argc, char ** argv)
                           example_weights, rand_seed, target);
         
 
+        boost::shared_ptr<Blender> baseline_blender;
+        if (baseline_name != "")
+            baseline_blender = get_blender(config, baseline_name, data_train,
+                                           example_weights, rand_seed, target);
+        
         if (train_on_test && hold_out_data > 0.0) {
             data_train.hold_out(data_test, hold_out_data, rand_seed);
             data_test.stats();
@@ -262,6 +278,7 @@ int main(int argc, char ** argv)
         
         // Now run the model
         result.resize(np);
+        baseline_result.resize(np);
         
         static Worker_Task & worker = Worker_Task::instance(num_threads() - 1);
         
@@ -287,9 +304,10 @@ int main(int argc, char ** argv)
                 int last = std::min<int>(np, i + 100);
                 
                 // Create the job
-                Predict_Job job(result,
+                Predict_Job job(result, baseline_result,
                                 i, last,
-                                *blender, data_test, progress, progress_lock);
+                                *blender, baseline_blender,
+                                data_test, progress, progress_lock);
                 
                 // Send it to a thread to be processed
                 worker.add(job, "blend job", group);
@@ -303,11 +321,247 @@ int main(int argc, char ** argv)
         
         cerr << timer.elapsed() << endl;
 
-
         if (hold_out_data > 0.0) {
+            int npt = data_test.targets.size();
+
             double score = result.calc_score(data_test.targets, target);
-            cerr << format("%0.4f", score) << endl;
+            cerr << format("score: %0.4f", score);
+            if (baseline_blender) {
+                double baseline_score
+                    = baseline_result.calc_score(data_test.targets, target);
+                cerr << format("  baseline: %0.4f  diff: %0.5f",
+                               baseline_score, score - baseline_score);
+
+                vector<pair<float, float> > ranked_targets, baseline_ranked_targets;
+                for (unsigned i = 0;  i < npt;  ++i) {
+                    ranked_targets.push_back(make_pair(result[i],
+                                                       data_test.targets[i]));
+                    baseline_ranked_targets.push_back
+                        (make_pair(baseline_result[i], data_test.targets[i]));
+                }
+
+                sort_on_first_ascending(ranked_targets);
+                sort_on_first_ascending(baseline_ranked_targets);
+
+                distribution<float> pos_scores, neg_scores, bl_pos_scores, bl_neg_scores;
+                int pos_total = 0, neg_total = 0;
+                pos_scores.push_back(0);  neg_scores.push_back(0);
+                for (unsigned i = 0;  i < npt;  ++i) {
+                    if (ranked_targets[i].second == -1.0)
+                        ++neg_total;
+                    else ++pos_total;
+                    pos_scores.push_back(pos_total);
+                    neg_scores.push_back(neg_total);
+                }
+
+                pos_scores /= pos_scores.max();
+                neg_scores = (1.0f - (neg_scores / neg_scores.max()));
+
+                pos_total = 0; neg_total = 0;
+                bl_pos_scores.push_back(0);  bl_neg_scores.push_back(0);
+                for (unsigned i = 0;  i < npt;  ++i) {
+                    if (baseline_ranked_targets[i].second == -1.0)
+                        ++neg_total;
+                    else ++pos_total;
+                    bl_pos_scores.push_back(pos_total);
+                    bl_neg_scores.push_back(neg_total);
+                }
+
+                bl_pos_scores /= bl_pos_scores.max();
+                bl_neg_scores = (1.0f - (bl_neg_scores / bl_neg_scores.max()));
+
+                distribution<float> ranked = result;
+                distribution<float> baseline_ranked = baseline_result;
+
+                std::sort(ranked.begin(), ranked.end());
+                std::sort(baseline_ranked.begin(), baseline_ranked.end());
+
+                // Look at individual error terms
+                vector<pair<int, float> > improvements;
+
+                vector<float> errors_pred, errors_bl;
+
+                distribution<double>
+                    category_errors(4),
+                    category_counts(4),
+                    baseline_category_errors(4),
+                    category_improvements(4);
+
+                for (unsigned i = 0;  i < npt;  ++i) {
+                    float pred  = result[i];
+                    float bl    = baseline_result[i];
+                    float label = data_test.targets[i];
+
+                    float improvement;
+                    float error_pred, error_bl;
+                    if (target == AUC) {
+                        int upos, lpos, bl_upos, bl_lpos, needed;
+                        lpos = std::lower_bound(ranked.begin(),
+                                                ranked.end(),
+                                                pred)
+                            - ranked.begin();
+                        bl_lpos = std::lower_bound(baseline_ranked.begin(),
+                                                   baseline_ranked.end(),
+                                                   bl)
+                            - baseline_ranked.begin();
+                        upos = std::upper_bound(ranked.begin(),
+                                                ranked.end(),
+                                                pred)
+                            - ranked.begin();
+                        bl_upos = std::upper_bound(baseline_ranked.begin(),
+                                                   baseline_ranked.end(),
+                                                   bl)
+                            - baseline_ranked.begin();
+
+                        needed = npt;
+
+                        if (label == -1.0) {
+                            error_pred = (pos_scores.at(lpos) + pos_scores.at(upos)) / 2.0;
+                            error_bl = (bl_pos_scores.at(bl_lpos) + bl_pos_scores.at(bl_upos)) / 2.0;
+                        }
+                        else {
+                            error_pred = (neg_scores.at(lpos) + neg_scores.at(upos)) / 2.0;
+                            error_bl = (bl_neg_scores.at(bl_lpos) + bl_neg_scores.at(bl_upos)) / 2.0;
+                        }
+
+                        improvement = error_bl - error_pred;
+                    }
+                    else {
+                        error_pred  = sqr(pred - label);
+                        error_bl    = sqr(bl - label);
+                        improvement = error_bl - error_pred;
+                    }
+
+                    errors_pred.push_back(error_pred);
+                    errors_bl.push_back(error_bl);
+                    improvements.push_back(make_pair(i, improvement));
+
+                    int cat = data_test.target_difficulty[i].category;
+                    category_errors[cat] += error_pred;
+                    category_counts[cat] += 1.0;
+                    baseline_category_errors[cat] += error_bl;
+                    category_improvements[cat] += improvement;
+                }
+
+                distribution<double> avg_error
+                    = xdiv(category_errors, category_counts);
+                distribution<double> bl_avg_error
+                    = xdiv(baseline_category_errors, category_counts);
+                distribution<double> avg_improvement
+                    = xdiv(category_improvements, category_counts);
+
+                for (unsigned i = 0;  i < 4;  ++i) {
+                    Difficulty_Category cat = (Difficulty_Category)i;
+                    cerr << "category " << cat << ": count "
+                         << category_counts[i]
+                         << " avg error " << avg_error[i]
+                         << " baseline avg error " << bl_avg_error[i]
+                         << " avg improvement "
+                         << avg_improvement[i] << endl;
+                }
+                cerr << "overall: count " << category_counts.total()
+                     << " avg error "
+                     << avg_error.dotprod(category_counts)
+                          / category_counts.total()
+                     << " baseline avg error "
+                     << bl_avg_error.dotprod(category_counts)
+                          / category_counts.total()
+                     << " avg improvement "
+                     << avg_improvement.dotprod(category_counts)
+                          / category_counts.total()
+                     << endl;
+
+
+                sort_on_second_ascending(improvements);
+
+                cerr << "worst entries: " << endl;
+                for (unsigned ii = 0;  ii < min(npt, 50);  ++ii) {
+                    int i = improvements[ii].first;
+
+                    float pred  = result[i];
+                    float bl    = baseline_result[i];
+                    float label = data_test.targets[i];
+
+                    cerr << ii << ": " << i << " " << " label: " << label
+                         << " pred: " << pred << " bl: " << bl
+                         << " " << data_test.target_difficulty[i].category;
+
+                    float improvement = improvements[ii].second;
+                    float error_pred  = errors_pred[i];
+                    float error_bl    = errors_bl[i];
+
+                    cerr << " error_pred: " << error_pred
+                         << " error_bl: " << error_bl;
+
+                    cerr << " improvement: " << improvement << endl;
+
+                    distribution<float> model_inputs(data_test.models.size());
+                    for (unsigned j = 0;  j < data_test.models.size();  ++j)
+                        model_inputs[j] = data_test.models[j][i];
+
+                    cerr << "    min: " << model_inputs.min()
+                         << "  max: " << model_inputs.max() << " avg: "
+                         << model_inputs.mean() << endl;
+
+                    cerr << "explanation: " << endl;
+                    cerr << blender->explain(model_inputs) << endl << endl;
+                }
+
+                cerr << "best entries: " << endl;
+                for (unsigned ii = 0;  ii < min(npt, 50);  ++ii) {
+                    int i = improvements[improvements.size() - ii - 1].first;
+
+                    float pred  = result[i];
+                    float bl    = baseline_result[i];
+                    float label = data_test.targets[i];
+
+                    cerr << ii << ": " << i << " " << " label: " << label
+                         << " pred: " << pred << " bl: " << bl
+                         << " " << data_test.target_difficulty[i].category;
+
+                    float improvement = improvements[improvements.size() - ii - 1].second;
+                    float error_pred  = errors_pred[i];
+                    float error_bl    = errors_bl[i];
+
+                    cerr << " error_pred: " << error_pred
+                         << " error_bl: " << error_bl;
+
+                    cerr << " improvement: " << improvement << endl;
+                }
+
+            }
+            cerr << endl;
+
             trial_scores.push_back(score);
+
+            vector<distribution<float> > weights(4, distribution<float>(npt, 0.0));
+            for (unsigned i = 0;  i < npt;  ++i) {
+                //cerr << "cat = " << data_test.target_difficulty[i].category
+                //     << endl;
+                weights.at(data_test.target_difficulty[i].category)[i] = 1.0;
+            }
+
+            for (unsigned i = 0;  i < 4;  ++i) {
+                Difficulty_Category cat = (Difficulty_Category)i;
+                cerr << "total is " << weights[i].total() << endl;
+                //weights[i].normalize();
+                double score = result.calc_score(data_test.targets,
+                                                 weights[i],
+                                                 target);
+                cerr << "score for " << cat << ": "
+                     << format("%.4f", score);
+
+                if (baseline_blender) {
+                    double baseline_score
+                        = baseline_result.calc_score(data_test.targets,
+                                                     weights[i],
+                                                     target);
+                    cerr << format(" baseline: %.4f diff: %6.4f",
+                                   baseline_score, score - baseline_score);
+                }
+
+                cerr << endl;
+            }
         }
     }
 
