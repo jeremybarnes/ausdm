@@ -345,3 +345,17 @@ jeremy@jeremy-desktop:~/projects/ausdm$ for n in 1 2 3 4 5 7 10 12 15 17 20 25 3
 
 
 
+--------------------------------
+
+Gated forest with 5000 decision trees:
+
+score: 0.0568  baseline: 0.0597  diff: -0.00286
+category UNKNOWN: count 0 avg error 0 baseline avg error 0 avg improvement 0
+category AUTO: count 1792 avg error 0.0250006 baseline avg error 0.0277302 avg improvement 0.00272964
+category POSS: count 1046 avg error 0.0777513 baseline avg error 0.080278 avg improvement 0.00252669
+category IMP: count 162 avg error 0.273266 baseline avg error 0.279722 avg improvement 0.00645689
+overall: count 3000 avg error 0.0567993 baseline avg error 0.0596595 avg improvement 0.00286015
+
+Gini = 0.8796782168085
+AUC = 0.93983910840425
+

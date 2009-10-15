@@ -1,0 +1,156 @@
+# -*- Awk -*-
+# ranker-classifier-training-config.txt
+# Jeremy Barnes, 11 August 2009
+#
+# Controls how the ranking classifier is trained
+
+# Neural Network
+nn {
+    type=perceptron;
+    arch=100;
+    verbosity=3;
+    max_iter=100;
+    learning_rate=0.2;
+    batch_size=64;
+}
+
+# Bagged boosted decision trees
+bbdt {
+    type=bagging;
+    verbosity=3;
+    weak_learner {
+        type=boosting;
+        verbosity=3;
+        weak_learner {
+            type=decision_tree;
+            max_depth=3;
+            verbosity=0;
+            update_alg=gentle;
+            random_feature_propn=0.5;
+        }
+        min_iter=5;
+        max_iter=50;
+    }
+    num_bags=5;
+}
+
+bbdt2 {
+    type=bagging;
+    verbosity=3;
+    weak_learner {
+        type=boosting;
+        verbosity=3;
+        weak_learner {
+            type=decision_tree;
+            max_depth=3;
+            verbosity=0;
+            update_alg=gentle;
+            random_feature_propn=0.2;
+        }
+        min_iter=5;
+        max_iter=10;
+    }
+    num_bags=500;
+}
+
+# Bagged boosted neural networks
+bbnn {
+    type=bagging;
+    verbosity=3;
+    weak_learner {
+        type=boosting;
+        verbosity=3;
+        weak_learner : nn {
+        }
+        min_iter=5;
+        max_iter=50;
+    }
+    num_bags=3;
+}
+
+# Bagged decision trees
+bdt {
+    type=bagging;
+    verbosity=3;
+    weak_learner {
+        type=decision_tree;
+        verbosity=0;
+        max_depth=6;
+    }
+    num_bags=20;
+}
+
+# Single decision tree
+dt {
+    type=decision_tree;
+    verbosity=3;
+    max_depth=5;
+}
+
+# Generalized Linear Model.  Very smooth but needs very good features.
+glz {
+    type=glz;
+    verbosity=3;
+}
+
+# Boosted stumps
+bs {
+    type=boosted_stumps;
+    min_iter=10;
+    max_iter=200;
+    update_alg=gentle;
+    verbosity=3;
+}
+
+bs2 {
+    type=boosting;
+    verbosity=3;
+    weak_learner {
+        type=decision_tree;
+        max_depth=1;
+        verbosity=0;
+        update_alg=gentle;
+    }
+    min_iter=5;
+    max_iter=300;
+    trace_training_acc=true;
+}
+
+bbs2 {
+    type=bagging;
+    num_bags=5;
+    weak_learner {
+        type=boosting;
+        verbosity=3;
+        weak_learner {
+            type=decision_tree;
+            max_depth=1;
+            verbosity=0;
+            update_alg=gentle;
+        }
+        min_iter=5;
+        max_iter=300;
+        trace_training_acc=true;
+    }
+}
+
+glz2 {
+    type=glz;
+    verbosity=3;
+    link_function=linear;
+}
+
+nn2 {
+    type=perceptron;
+    arch=100;
+    verbosity=3;
+    max_iter=100;
+    learning_rate=0.2;
+    batch_size=64;
+    output_activation=tanh;
+}
+
+# Copy the one that we want to the given key
+blender: bbdt2 {
+}
+
