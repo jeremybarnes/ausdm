@@ -140,6 +140,13 @@ glz2 {
     link_function=linear;
 }
 
+bglz2 {
+    type=bagging;
+    num_bags=100;
+    weak_learner : glz2 {
+    }
+}
+
 nn2 {
     type=perceptron;
     arch=100;
@@ -151,6 +158,8 @@ nn2 {
 }
 
 # Copy the one that we want to the given key
-blender: bbdt2 {
+blender_rmse : bglz2 {
 }
 
+blender_auc : bbdt2 {
+}

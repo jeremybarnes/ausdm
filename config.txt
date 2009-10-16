@@ -27,6 +27,7 @@ auc2 {
 }
 
 auc: gated {
+    num_models_to_train=10;
 }
 
 rmse {

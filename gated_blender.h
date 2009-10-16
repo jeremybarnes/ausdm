@@ -72,6 +72,9 @@ struct Gated_Blender : public Blender {
     boost::shared_ptr<ML::Classifier_Impl> blender;
     Target target;
 
+    std::string blender_trainer_config_file;
+    std::string blender_trainer_name;
+
     const Data * data;
 
     std::string dump_predict_features, dump_training_features;

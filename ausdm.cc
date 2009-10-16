@@ -324,6 +324,9 @@ int main(int argc, char ** argv)
         if (hold_out_data > 0.0) {
             int npt = data_test.targets.size();
 
+            cerr << "result = " << result << endl;
+            cerr << "baseline = " << baseline_result << endl;
+
             double score = result.calc_score(data_test.targets, target);
             cerr << format("score: %0.4f", score);
             if (baseline_blender) {
@@ -331,6 +334,7 @@ int main(int argc, char ** argv)
                     = baseline_result.calc_score(data_test.targets, target);
                 cerr << format("  baseline: %0.4f  diff: %0.5f",
                                baseline_score, score - baseline_score);
+                cerr << endl;
 
                 vector<pair<float, float> > ranked_targets, baseline_ranked_targets;
                 for (unsigned i = 0;  i < npt;  ++i) {

@@ -55,6 +55,12 @@ configure(const ML::Configuration & config_,
     config.find(dump_training_features, "dump_training_features");
     config.find(dump_predict_features, "dump_predict_features");
 
+    blender_trainer_config_file = "classifier-config.txt";
+    config.find(blender_trainer_config_file, "blender.config_file");
+
+    blender_trainer_name = (target == AUC ? "blender_auc" : "blender_rmse");
+    config.find(blender_trainer_name, "blender.trainer_name");
+
     this->target = target;
 }
 
@@ -491,7 +497,7 @@ init(const Data & training_data_in,
         if (target == AUC)
             correct[i] = blend_training_data.targets[i] > 0.0;
         else
-            correct[i] = (blend_training_data.targets[i] - 3.0) / 2.5;
+            correct[i] = blend_training_data.targets[i];
 
         correct_prediction = correct[i];
 
@@ -546,10 +552,10 @@ init(const Data & training_data_in,
 #endif
 
     Configuration config;
-    config.load("classifier-config.txt");
+    config.load(blender_trainer_config_file);
 
     boost::shared_ptr<Classifier_Generator> trainer
-        = get_trainer("blender", config);
+        = get_trainer(blender_trainer_name, config);
 
     trainer->init(fs, Feature(nv));
 
@@ -888,10 +894,13 @@ predict(const ML::distribution<float> & models) const
         result = blender->predict(1, *features);
     else result = blender->predict(0, *features);
 
+    if (debug) cerr << "result before scaling = "
+                    << result << endl;
+
     if (target == RMSE) {
-        result = result * 2.5 + 3.0;
-        if (result < 1.0) result = 1.0;
-        if (result > 5.0) result = 5.0;
+        //result = result * 2.5 + 3.0;
+        if (result < -1.0) result = -1.0;
+        if (result >  1.0) result = 1.0;
     }
 
     if (debug) cerr << "result = " << result << " correct = "

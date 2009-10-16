@@ -359,3 +359,27 @@ overall: count 3000 avg error 0.0567993 baseline avg error 0.0596595 avg improve
 Gini = 0.8796782168085
 AUC = 0.93983910840425
 
+With 20 models:
+
+score: 0.0569  baseline: 0.0597  diff: -0.00272
+category UNKNOWN: count 0 avg error 0 baseline avg error 0 avg improvement 0
+category AUTO: count 1792 avg error 0.0251198 baseline avg error 0.0277302 avg improvement 0.00261046
+category POSS: count 1046 avg error 0.0778645 baseline avg error 0.080278 avg improvement 0.00241351
+category IMP: count 162 avg error 0.273835 baseline avg error 0.279722 avg improvement 0.00588778
+overall: count 3000 avg error 0.0569407 baseline avg error 0.0596595 avg improvement 0.00271876
+
+With 50 models:
+
+score: 0.0571  baseline: 0.0597  diff: -0.00258
+category UNKNOWN: count 0 avg error 0 baseline avg error 0 avg improvement 0
+category AUTO: count 1792 avg error 0.0251981 baseline avg error 0.0277302 avg improvement 0.00253209
+category POSS: count 1046 avg error 0.0784204 baseline avg error 0.080278 avg improvement 0.00185765
+category IMP: count 162 avg error 0.27204 baseline avg error 0.279722 avg improvement 0.00768226
+overall: count 3000 avg error 0.0570844 baseline avg error 0.0596595 avg improvement 0.00257504
+
+
+With 100 models:
+
+(probably not worth doing...)
+
+
