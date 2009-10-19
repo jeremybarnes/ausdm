@@ -150,8 +150,10 @@ perform_irls(const distribution<Float> & correct,
     //cerr << "correct.size() = " << correct.size() << endl;
     //cerr << "w.total() = " << w.total() << endl;
 
+    Ridge_Regressor regressor(1e-5);
+
     distribution<Float> trained
-        = run_irls(correct, outputs_reduced, w, link_function);
+        = run_irls(correct, outputs_reduced, w, link_function, regressor);
 
     distribution<Float> parameters(nv);
     for (unsigned v = 0;  v < nv;  ++v)
@@ -207,6 +209,8 @@ perform_irls(const distribution<Float> & correct,
             throw Exception("IRLS returned inplausibly high weights");
         }
     }
+
+    cerr << "irls returned parameters " << parameters << endl;
 
     return parameters;
 }

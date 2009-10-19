@@ -382,4 +382,208 @@ With 100 models:
 
 (probably not worth doing...)
 
+----
 
+Running AUC with just a GLZ:
+
+
+Linear Regression:
+
+
+Learned GLZ function: 
+feature                                     label0       label1   
+bias                                         0.000000    -0.000000
+min_model                                    0.000000    -0.000000
+max_model                                    0.000000    -0.000000
+avg_model_chosen                             0.000000    -0.000000
+min_weighted                                -3.067802     3.067802
+max_weighted                                -0.580425     0.580425
+avg_weighted                                 7.412578    -7.412578
+weighted_avg                               -15.461981    15.461981
+S_auc_8_output                           39555.097656-39555.097656
+S_auc_8_conf                                 0.000000    -0.000000
+S_auc_8_weighted                        337726.687500-337726.687500
+S_auc_8_dev_from_mean                        0.851580    -0.851580
+S_auc_8_diff_from_int                       -0.151940     0.151940
+S_auc_65_output                          39554.570312-39554.570312
+S_auc_65_conf                            90859.679688-90859.679688
+S_auc_65_weighted                           -1.470467     1.470467
+S_auc_65_dev_from_mean                       2.422136    -2.422136
+S_auc_65_diff_from_int                       0.454647    -0.454647
+S_auc_66_output                          39563.464844-39563.464844
+S_auc_66_conf                                0.000000    -0.000000
+S_auc_66_weighted                            0.000000    -0.000000
+S_auc_66_dev_from_mean                     -13.190518    13.190518
+S_auc_66_diff_from_int                       1.878807    -1.878807
+S_auc_72_output                              0.000000    -0.000000
+S_auc_72_conf                                0.000000    -0.000000
+S_auc_72_weighted                        39550.214844-39550.214844
+S_auc_72_dev_from_mean                       9.720531    -9.720531
+S_auc_72_diff_from_int                      -2.116513     2.116513
+S_auc_82_output                          39554.601562-39554.601562
+S_auc_82_conf                            90853.570312-90853.570312
+S_auc_82_weighted                            5.586189    -5.586189
+S_auc_82_dev_from_mean                      -1.326253     1.326253
+S_auc_82_diff_from_int                       1.782153    -1.782153
+S_auc_89_output                          39534.972656-39534.972656
+S_auc_89_conf                            90854.921875-90854.921875
+S_auc_89_weighted                            3.652061    -3.652061
+S_auc_89_dev_from_mean                      36.556847   -36.556847
+S_auc_89_diff_from_int                       2.792318    -2.792318
+S_auc_124_output                             0.000000    -0.000000
+S_auc_124_conf                           96008.171875-96008.171875
+S_auc_124_weighted                       39554.011719-39554.011719
+S_auc_124_dev_from_mean                      1.052265    -1.052265
+S_auc_124_diff_from_int                     -0.587233     0.587233
+S_auc_141_output                         39570.210938-39570.210938
+S_auc_141_conf                          -5068163.5000005068163.500000
+S_auc_141_weighted                      -5232521.0000005232521.000000
+S_auc_141_dev_from_mean                    -33.423252    33.423252
+S_auc_141_diff_from_int                     -3.691887     3.691887
+S_auc_151_output                         39558.589844-39558.589844
+S_auc_151_conf                           90850.171875-90850.171875
+S_auc_151_weighted                          -7.856544     7.856544
+S_auc_151_dev_from_mean                     -5.966421     5.966421
+S_auc_151_diff_from_int                     -0.992893     0.992893
+S_auc_168_output                        -451288.906250451288.906250
+S_auc_168_conf                          -65365.578125 65365.578125
+S_auc_168_weighted                      490844.125000-490844.125000
+S_auc_168_dev_from_mean                      2.643380    -2.643380
+S_auc_168_diff_from_int                      0.317969    -0.317969
+chosen_conf_min                              0.000000    -0.000000
+chosen_conf_max                          55077.019531-55077.019531
+chosen_conf_avg                         -908543.312500908543.312500
+highest_chosen_output                   153855.828125-153855.828125
+highest_chosen_weighted                 -153855.921875153855.921875
+model_avg                                    0.000000    -0.000000
+chosen_model_avg                        -395603.437500395603.437500
+models_mean                                 59.470715   -59.470715
+models_std                                   0.131589    -0.131589
+models_min                                   0.000000    -0.000000
+models_max                                   1.412297    -1.412297
+models_range                                -0.536038     0.536038
+models_range_dev_high                       -1.083698     1.083698
+models_range_dev_low                         1.388429    -1.388429
+diff_mean_10_all                           -58.981258    58.981258
+abs_diff_mean_10_all                        -1.434823     1.434823
+BIAS                                    186843.671875-186843.671875
+
+
+
+score: 0.0615  baseline: 0.0597  diff: 0.00186
+category UNKNOWN: count 0 avg error 0 baseline avg error 0 avg improvement 0
+category AUTO: count 1792 avg error 0.0279182 baseline avg error 0.0277302 avg improvement -0.000188001
+category POSS: count 1046 avg error 0.0837001 baseline avg error 0.080278 avg improvement -0.00342211
+category IMP: count 162 avg error 0.289917 baseline avg error 0.279722 avg improvement -0.0101945
+overall: count 3000 avg error 0.0615155 baseline avg error 0.0596595 avg improvement -0.00185598
+w
+
+
+Ridge Regression:
+
+
+Learned GLZ function: 
+feature                                     label0       label1   
+bias                                         0.000000    -0.000000
+min_model                                    0.000000    -0.000000
+max_model                                    0.000000    -0.000000
+avg_model_chosen                             0.000000    -0.000000
+min_weighted                                -0.035519     0.035519
+max_weighted                                 0.020892    -0.020892
+avg_weighted                                 0.000000    -0.000000
+weighted_avg                                -0.341624     0.341624
+S_auc_8_output                              -0.328620     0.328620
+S_auc_8_conf                                 0.217331    -0.217331
+S_auc_8_weighted                            -0.009243     0.009243
+S_auc_8_dev_from_mean                       -0.035127     0.035127
+S_auc_8_diff_from_int                        0.010684    -0.010684
+S_auc_65_output                             -0.317247     0.317247
+S_auc_65_conf                                0.212566    -0.212566
+S_auc_65_weighted                           -0.005806     0.005806
+S_auc_65_dev_from_mean                      -0.029357     0.029357
+S_auc_65_diff_from_int                       0.013780    -0.013780
+S_auc_66_output                             -0.317711     0.317711
+S_auc_66_conf                                0.214542    -0.214542
+S_auc_66_weighted                           -0.005482     0.005482
+S_auc_66_dev_from_mean                      -0.028891     0.028891
+S_auc_66_diff_from_int                       0.016726    -0.016726
+S_auc_72_output                             -0.333903     0.333903
+S_auc_72_conf                                0.219665    -0.219665
+S_auc_72_weighted                           -0.008495     0.008495
+S_auc_72_dev_from_mean                      -0.040573     0.040573
+S_auc_72_diff_from_int                       0.020935    -0.020935
+S_auc_82_output                             -0.334490     0.334490
+S_auc_82_conf                                0.218557    -0.218557
+S_auc_82_weighted                           -0.009297     0.009297
+S_auc_82_dev_from_mean                      -0.038677     0.038677
+S_auc_82_diff_from_int                       0.016342    -0.016342
+S_auc_89_output                             -0.391729     0.391729
+S_auc_89_conf                                0.000000    -0.000000
+S_auc_89_weighted                           -0.000000     0.000000
+S_auc_89_dev_from_mean                      -0.075317     0.075317
+S_auc_89_diff_from_int                      -0.009634     0.009634
+S_auc_124_output                            -0.339837     0.339837
+S_auc_124_conf                               0.000000    -0.000000
+S_auc_124_weighted                           0.000000    -0.000000
+S_auc_124_dev_from_mean                     -0.044046     0.044046
+S_auc_124_diff_from_int                      0.007553    -0.007553
+S_auc_141_output                            -0.391455     0.391455
+S_auc_141_conf                               0.240761    -0.240761
+S_auc_141_weighted                          -0.028445     0.028445
+S_auc_141_dev_from_mean                     -0.075014     0.075014
+S_auc_141_diff_from_int                     -0.008678     0.008678
+S_auc_151_output                            -0.339494     0.339494
+S_auc_151_conf                               0.220228    -0.220228
+S_auc_151_weighted                          -0.011876     0.011876
+S_auc_151_dev_from_mean                     -0.043474     0.043474
+S_auc_151_diff_from_int                      0.016723    -0.016723
+S_auc_168_output                            -0.378733     0.378733
+S_auc_168_conf                               0.236946    -0.236946
+S_auc_168_weighted                          -0.024743     0.024743
+S_auc_168_dev_from_mean                     -0.066869     0.066869
+S_auc_168_diff_from_int                     -0.012450     0.012450
+chosen_conf_min                              0.000000    -0.000000
+chosen_conf_max                              0.236931    -0.236931
+chosen_conf_avg                              0.178060    -0.178060
+highest_chosen_output                       -0.341891     0.341891
+highest_chosen_weighted                     -0.030948     0.030948
+model_avg                                    0.000000    -0.000000
+chosen_model_avg                             0.000000    -0.000000
+models_mean                                 -0.275737     0.275737
+models_std                                   0.071349    -0.071349
+models_min                                   0.000000    -0.000000
+models_max                                  -0.227445     0.227445
+models_range                                 0.058359    -0.058359
+models_range_dev_high                        0.018765    -0.018765
+models_range_dev_low                        -0.016837     0.016837
+diff_mean_10_all                             0.071585    -0.071585
+abs_diff_mean_10_all                        -0.000738     0.000738
+BIAS                                        -0.045517     0.045517
+
+processing 3000 predictions...
+
+0%   10   20   30   40   50   60   70   80   90   100%
+|----|----|----|----|----|----|----|----|----|----|
+***************************************************
+ done.
+elapsed: [124.61s cpu, 97296.2517 mticks, 36.40s wall]
+score: 0.0584  baseline: 0.0597  diff: -0.00122
+category UNKNOWN: count 0 avg error 0 baseline avg error 0 avg improvement 0
+category AUTO: count 1792 avg error 0.0254104 baseline avg error 0.0277302 avg improvement 0.00231981
+category POSS: count 1046 avg error 0.0798008 baseline avg error 0.080278 avg improvement 0.000477186
+category IMP: count 162 avg error 0.285864 baseline avg error 0.279722 avg improvement -0.0061414
+overall: count 3000 avg error 0.058439 baseline avg error 0.0596595 avg improvement 0.00122044
+
+Much better!
+
+
+----
+
+Using ridge regression for conf:
+
+
+Success
+Gini = 0.8756866303033
+AUC = 0.93784331515165
+
+Not what I was hoping for...

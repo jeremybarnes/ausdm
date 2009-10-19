@@ -324,8 +324,8 @@ int main(int argc, char ** argv)
         if (hold_out_data > 0.0) {
             int npt = data_test.targets.size();
 
-            cerr << "result = " << result << endl;
-            cerr << "baseline = " << baseline_result << endl;
+            //cerr << "result = " << result << endl;
+            //cerr << "baseline = " << baseline_result << endl;
 
             double score = result.calc_score(data_test.targets, target);
             cerr << format("score: %0.4f", score);

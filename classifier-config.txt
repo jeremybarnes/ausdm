@@ -91,6 +91,7 @@ dt {
 glz {
     type=glz;
     verbosity=3;
+    normalize=false;
 }
 
 # Boosted stumps
