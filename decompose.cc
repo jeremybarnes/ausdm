@@ -33,10 +33,43 @@
 #include <boost/bind.hpp>
 
 #include "boosting/perceptron_generator.h"
-
+#include "algebra/matrix_ops.h"
 
 using namespace std;
 using namespace ML;
+
+struct Twoway_Layer : public Layer {
+    Twoway_Layer(size_t inputs, size_t outputs, Activation activation)
+        : Layer(inputs, outputs, activation)
+    {
+        ibias.resize(inputs);
+    }
+
+    distribution<float> ibias;
+
+    distribution<float> iapply(const distribution<float> & output) const
+    {
+        distribution<float> result = weights * output;
+        result += ibias;
+        transform(result);
+        return result;
+    }
+};
+
+distribution<float>
+add_noise(const distribution<float> & inputs,
+          const distribution<float> & cleared_values,
+          Thread_Context & context,
+          float prob_cleared)
+{
+    distribution<float> result = inputs;
+
+    for (unsigned i = 0;  i < inputs.size();  ++i)
+        if (context.random01() < prob_cleared)
+            result[i] = cleared_values[i];
+    
+    return result;
+}
 
 int main(int argc, char ** argv)
 {
@@ -135,7 +168,9 @@ int main(int argc, char ** argv)
 
     set<string> model_names;
 
-    for (unsigned i = 0;  i < 2;  ++i) {
+    // (Small only for the moment until we get the hang of it)
+
+    for (unsigned i = 0;  i < 1;  ++i) {
         for (unsigned j = 0;  j < 2;  ++j) {
             for (unsigned k = 0;  k < 2;  ++k) {
                 string filename = format("download/%s_%s_%s.csv",
@@ -144,7 +179,7 @@ int main(int argc, char ** argv)
                                          set_names[k]);
                 Data & this_data = data[i][j];
 
-                this_data.load(filename, (Target)j, false /* clear first */);
+                this_data.load(filename, (Target)j, (k == 0) /* clear first */);
                 
                 model_names.insert(this_data.model_names.begin(),
                                    this_data.model_names.end());
@@ -163,29 +198,132 @@ int main(int argc, char ** argv)
     // Denoising auto encoder
     // We train a stack of layers, one at a time
 
-    Perceptron::Layer layer;
+    const Data & to_train
+        = data[0][0];
     
-    for (unsigned x = 0;  x < nx;  ++x) {
-        // Present this input
-        distribution<float> model_input;
+    int nx = to_train.targets.size();
+    int nm = to_train.models.size();
 
-        // Add noise
-        distribution<float> noisy_model_input
-            = add_noise(model_input);
+    Twoway_Layer layer(nm, nm / 2, ACT_LOGSIG);
 
-        // Apply the layer
-        distribution<float> hidden_rep
-            = layer.apply(noisy_model_input);
+    bool prob_cleared = 0.25;
+    distribution<float> cleared_values(nm);
 
-        // Reconstruct the input
-        distribution<float> denoised_input
-            = layer.inverse(hidden_rep);
+    Thread_Context thread_context;
+    
+    double total_mse = 0.0;
 
-        // Error signal
-        distribution<float> error
-            = model_input - denoised_input;
+    double learning_rate = 1e-5;
 
-        // Propagation of error
+    for (unsigned iter = 0;  iter < 5;  ++iter) {
+        cerr << "iter " << iter << " training on " << nx << " examples"
+             << endl;
+        boost::progress_display progress(nx, cerr);
+
+        for (unsigned x = 0;  x < nx;  ++x, ++progress) {
+            // Present this input
+            distribution<float> model_input(nm);
+            for (unsigned m = 0;  m < nm;  ++m)
+                model_input[m] = to_train.models[m][x];
+            
+            // Add noise
+            distribution<float> noisy_input
+                = add_noise(model_input, cleared_values, thread_context,
+                            prob_cleared);
+            
+            // Apply the layer
+            distribution<float> hidden_rep
+                = layer.apply(noisy_input);
+            
+            // Reconstruct the input
+            distribution<float> denoised_input
+                = layer.iapply(hidden_rep);
+            
+            // Error signal
+            distribution<float> diff
+                = model_input - denoised_input;
+            
+            // Overall error
+            float error = pow(diff.two_norm(), 2);
+            
+            total_mse += error;
+        
+            // Now we solve for the gradient direction for the two biases as
+            // well as for the weights matrix
+            //
+            // If f() is the activation function for the forward direction and
+            // g() is the activation function for the reverse direction, we can
+            // write
+            //
+            // h = f(Wi1 + b)
+            //
+            // where i1 is the (noisy) inputs, h is the hidden unit outputs, W
+            // is the weight matrix and b is the forward bias vector.  Going
+            // back again, we then take
+            // 
+            // i2 = g(W*h + c) = g(W*f(Wi + b) + c)
+            //
+            // where i2 is the denoised approximation of the true input weights
+            // (i) and W* is W transposed.
+            //
+            // Using the MSE, we get
+            //
+            // e = sqr(||i2 - i||) = sum(sqr(i2 - i))
+            //
+            // where e is the MSE.
+            //
+            // Differentiating with respect to i2, we get
+            //
+            // de/di2 = 2(i2 - i)
+            //
+            // Finally, we want to know the gradient direction for each of the
+            // parameters W, b and c.  Taking c first, we get
+            //
+            // de/dc = de/di2 di2/dc
+            //       = 2 (i2 - i) g'(i2)
+            //
+            // As for b, we get
+            //
+            // de/db = de/di2 di2/db
+            //       = 2 (i2 - i) g'(i2) W* f'(Wi + b)
+            //
+            // And for W:
+            //
+            // de/dW = de/di2 di2/dW
+            //       = 2 (i2 - i) g'(i2) [ h + W* f'(Wi + b) i ]
+            //
+            // Since we want to minimise the reconstruction error, we use the
+            // negative of the gradient.
+
+            // NOTE: here, the activation function for the input and the output
+            // are the same.
+        
+            boost::multi_array<float, 2> & W
+                = layer.weights;
+            distribution<float> & b = layer.bias;
+            distribution<float> & c = layer.ibias;
+
+            distribution<float> c_updates
+                = 2 * diff * layer.derivative(denoised_input);
+
+            distribution<float> hidden_activation
+                = noisy_input * W + b;
+
+            distribution<float> hidden_deriv
+                = layer.derivative(hidden_activation);
+
+            distribution<float> b_updates
+                = c_updates * W * hidden_deriv;
+
+            //boost::multi_array<float, 2> W_updates
+            //    = c_updates * (hidden_rep + noisy_input * W * hidden_deriv);
+        
+            c -= learning_rate * c_updates;
+            b -= learning_rate * b_updates;
+            //W -= learning_rate * W_updates;
+        }
+
+        cerr << "rmse of iteration: " << sqrt(total_mse / nx)
+             << endl;
     }
-    
 }
