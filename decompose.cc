@@ -32,6 +32,9 @@
 #include <boost/tuple/tuple.hpp>
 #include <boost/bind.hpp>
 
+#include "boosting/perceptron_generator.h"
+
+
 using namespace std;
 using namespace ML;
 
@@ -43,14 +46,14 @@ int main(int argc, char ** argv)
     // Configuration file to use
     string config_file = "config.txt";
 
-    // Name of blender in config file
+    // Name of decomposer in config file
     string decomposer_name;
 
     // Extra configuration options
     vector<string> extra_config_options;
 
     // What type of target do we predict?
-    string target_type;
+    //string target_type;
     {
         using namespace boost::program_options;
 
@@ -67,8 +70,8 @@ int main(int argc, char ** argv)
         options_description control_options("Control Options");
 
         control_options.add_options()
-            ("target-type,t", value<string>(&target_type),
-             "select target type: auc or rmse")
+            //("target-type,t", value<string>(&target_type),
+            // "select target type: auc or rmse")
             ("output-file,o",
              value<string>(&output_file),
              "dump output file to the given filename");
@@ -98,6 +101,7 @@ int main(int argc, char ** argv)
         }
     }
 
+#if 0
     Target target;
     if (target_type == "auc") target = AUC;
     else if (target_type == "rmse") target = RMSE;
@@ -105,6 +109,7 @@ int main(int argc, char ** argv)
 
     if (decomposer_name == "")
         decomposer_name = target_type;
+#endif
 
     // Load up configuration
     Configuration config;
@@ -118,34 +123,69 @@ int main(int argc, char ** argv)
 
     cerr << "loading data...";
 
-    string targ_type_uc;
-    if (target == AUC) targ_type_uc = "AUC";
-    else if (target == RMSE) targ_type_uc = "RMSE";
-    else throw Exception("unknown target type");
+    // The decomposition is entirely unsupervised, and so doesn't use the
+    // label at all; thus we can put the training and validation sets together
+
+    // Data[s/m/l][auc/rmse]
+    Data data[3][2];
+
+    const char * const size_names[3]   = { "S", "M", "L" };
+    const char * const target_names[2] = { "RMSE", "AUC" };
+    const char * const set_names[2]    = { "Train", "Score" };
+
+    set<string> model_names;
+
+    for (unsigned i = 0;  i < 2;  ++i) {
+        for (unsigned j = 0;  j < 2;  ++j) {
+            for (unsigned k = 0;  k < 2;  ++k) {
+                string filename = format("download/%s_%s_%s.csv",
+                                         size_names[i],
+                                         target_names[j],
+                                         set_names[k]);
+                Data & this_data = data[i][j];
+
+                this_data.load(filename, (Target)j, false /* clear first */);
+                
+                model_names.insert(this_data.model_names.begin(),
+                                   this_data.model_names.end());
+            }
+        }
+    }
+
+    cerr << "done" << endl;
+
+    cerr << model_names.size() << " total models" << endl;
+
+    // Now, we look at all of the column names to get an idea of the input
+    // dimensions.  
 
 
-    Model_Output result;
+    // Denoising auto encoder
+    // We train a stack of layers, one at a time
 
-    Data data_train;
-    data_train.load("download/S_" + targ_type_uc + "_Train.csv", target);
-
-    Data data_test;
-    data_test.load("download/S_" + targ_type_uc + "_Score.csv", target);
+    Perceptron::Layer layer;
     
+    for (unsigned x = 0;  x < nx;  ++x) {
+        // Present this input
+        distribution<float> model_input;
 
+        // Add noise
+        distribution<float> noisy_model_input
+            = add_noise(model_input);
 
-    if (hold_out_data > 0.0) {
-        double mean = Stats::mean(trial_scores.begin(), trial_scores.end());
-        double std = Stats::std_dev(trial_scores.begin(), trial_scores.end(),
-                                    mean);
-        
-        cout << "scores: " << trial_scores << endl;
-        cout << format("%6.4f +/- %6.4f", mean, std) << endl;
+        // Apply the layer
+        distribution<float> hidden_rep
+            = layer.apply(noisy_model_input);
+
+        // Reconstruct the input
+        distribution<float> denoised_input
+            = layer.inverse(hidden_rep);
+
+        // Error signal
+        distribution<float> error
+            = model_input - denoised_input;
+
+        // Propagation of error
     }
-
-    if (output_file != "" && num_trials == 1) {
-        filter_ostream out(output_file);
-        for (unsigned i = 0;  i < result.size();  ++i)
-            out << format("%.6f", result[i] * 1000.0) << endl;
-    }
+    
 }

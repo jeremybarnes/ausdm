@@ -43,6 +43,8 @@ $(eval $(call add_sources,exception_hook.cc))
 
 $(eval $(call program,ausdm,ausdm utils ACE boost_program_options-mt db arch boosting svdlibc,ausdm.cc exception_hook.cc,tools))
 
+$(eval $(call program,decompose,ausdm utils ACE boost_program_options-mt db arch boosting svdlibc,decompose.cc exception_hook.cc,tools))
+
 $(eval $(call include_sub_makes,svdlibc))
 
 include loadbuild.mk

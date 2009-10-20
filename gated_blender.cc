@@ -77,7 +77,8 @@ perform_irls(const distribution<Float> & correct,
     if (outputs.shape()[1] != nx)
         throw Exception("wrong shape for outputs");
 
-    bool verify = true;
+    bool verify = false;
+    //verify = true;
 
     distribution<Float> svalues1
         (std::min(outputs.shape()[0], outputs.shape()[1]) + 1);
@@ -210,7 +211,7 @@ perform_irls(const distribution<Float> & correct,
         }
     }
 
-    cerr << "irls returned parameters " << parameters << endl;
+    //cerr << "irls returned parameters " << parameters << endl;
 
     return parameters;
 }

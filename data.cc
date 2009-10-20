@@ -302,7 +302,7 @@ load(const std::string & filename, Target target, bool clear_first)
         throw Exception("wrong number of models");
 
     // Create the data structures
-    cerr << model_names.size() << " models... ";
+    //cerr << model_names.size() << " models... ";
     
     if (clear_first) {
         models.resize(model_names.size());
@@ -336,7 +336,7 @@ load(const std::string & filename, Target target, bool clear_first)
         c.expect_eol();
     }
 
-    cerr << num_rows << " rows... ";
+    //cerr << num_rows << " rows... ";
 }
 
 void
