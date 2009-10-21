@@ -57,12 +57,52 @@ struct Twoway_Layer : public Dense_Layer<double> {
         return activation;
     }
 
+    distribution<float> iapply(const distribution<float> & output) const
+    {
+        distribution<float> activation = multiply<float>(weights, output);
+        activation += ibias;
+        transfer(&activation[0], &activation[0], inputs(), transfer_function);
+        return activation;
+    }
+
+    distribution<double>
+    itransfer(const distribution<double> & activation) const
+    {
+        int ni = inputs();
+        if (activation.size() != ni)
+            throw Exception("invalid sizes in itransfer");
+        distribution<double> result(ni);
+        transfer(&activation[0], &result[0], ni, transfer_function);
+        return activation;
+    }
+
+    distribution<float>
+    itransfer(const distribution<float> & activation) const
+    {
+        int ni = inputs();
+        if (activation.size() != ni)
+            throw Exception("invalid sizes in itransfer");
+        distribution<float> result(ni);
+        transfer(&activation[0], &result[0], ni, transfer_function);
+        return activation;
+    }
+
     distribution<double> iderivative(const distribution<double> & input) const
     {
         if (input.size() != this->inputs())
             throw Exception("iderivative(): wrong size");
         int ni = this->inputs();
         distribution<double> result(ni);
+        derivative(&input[0], &result[0], ni, transfer_function);
+        return result;
+    }
+
+    distribution<float> iderivative(const distribution<float> & input) const
+    {
+        if (input.size() != this->inputs())
+            throw Exception("iderivative(): wrong size");
+        int ni = this->inputs();
+        distribution<float> result(ni);
         derivative(&input[0], &result[0], ni, transfer_function);
         return result;
     }
@@ -185,7 +225,7 @@ int main(int argc, char ** argv)
 
     for (unsigned i = 0;  i < 1;  ++i) {
         for (unsigned j = 0;  j < 2;  ++j) {
-            for (unsigned k = 0;  k < 2;  ++k) {
+            for (unsigned k = 0;  k < 1;  ++k) {
                 string filename = format("download/%s_%s_%s.csv",
                                          size_names[i],
                                          target_names[j],
@@ -223,45 +263,48 @@ int main(int argc, char ** argv)
     Twoway_Layer layer(nm, nh, TF_LOGSIG, thread_context);
 
     bool prob_cleared = 0.25;
-    distribution<double> cleared_values(nm);
+    distribution<float> cleared_values(nm);
 
-    double total_mse = 0.0;
 
-    double learning_rate = 1e-7;
+    double learning_rate = 1e-5;
 
     for (unsigned iter = 0;  iter < 5;  ++iter) {
         cerr << "iter " << iter << " training on " << nx << " examples"
              << endl;
+        Timer timer;
+
         boost::progress_display progress(nx, cerr);
 
         int ni = layer.inputs();
         int no = layer.outputs();
 
+        double total_mse = 0.0;
+        
         for (unsigned x = 0;  x < nx;  ++x, ++progress) {
             // Present this input
-            distribution<double> model_input(nm);
+            distribution<float> model_input(nm);
             for (unsigned m = 0;  m < nm;  ++m)
                 model_input[m] = 0.8 * to_train.models[m][x];
             
             // Add noise
-            distribution<double> noisy_input
+            distribution<float> noisy_input
                 = add_noise(model_input, cleared_values, thread_context,
                             prob_cleared);
             
             // Apply the layer
-            distribution<double> hidden_rep
+            distribution<float> hidden_rep
                 = layer.apply(noisy_input);
             
             // Reconstruct the input
-            distribution<double> denoised_input
+            distribution<float> denoised_input
                 = layer.iapply(hidden_rep);
             
             // Error signal
-            distribution<double> diff
+            distribution<float> diff
                 = model_input - denoised_input;
             
             // Overall error
-            double error = pow(diff.two_norm(), 2);
+            float error = pow(diff.two_norm(), 2);
             
             total_mse += error;
         
@@ -318,35 +361,35 @@ int main(int argc, char ** argv)
             boost::multi_array<double, 2> & W
                 = layer.weights;
             distribution<double> & b = layer.bias;
-            distribution<double> & c = layer.ibias;
+            distribution<double> & c JML_UNUSED = layer.ibias;
 
-            distribution<double> c_updates
+            distribution<float> c_updates
                 = -2 * diff * layer.iderivative(denoised_input);
 
 #if 0
             cerr << "c_updates = " << c_updates << endl;
 
-            distribution<double> c_updates_numeric(ni);
+            distribution<float> c_updates_numeric(ni);
 
             // Calculate numerically the c updates
             for (unsigned i = 0;  i < ni;  ++i) {
                 // Reconstruct the input
-                distribution<double> denoised_activation2
+                distribution<float> denoised_activation2
                     = W * hidden_rep + c;
                 
-                double epsilon = 1e-4;
+                float epsilon = 1e-4;
 
                 denoised_activation2[i] += epsilon;
 
-                distribution<double> denoised_input2 = denoised_activation2;
+                distribution<float> denoised_input2 = denoised_activation2;
                 layer.transform(denoised_input2);
             
                 // Error signal
-                distribution<double> diff2
+                distribution<float> diff2
                     = model_input - denoised_input2;
             
                 // Overall error
-                double error2 = pow(diff2.two_norm(), 2);
+                float error2 = pow(diff2.two_norm(), 2);
 
                 double delta = error2 - error;
 
@@ -357,14 +400,53 @@ int main(int argc, char ** argv)
                  << endl;
 #endif
 
-            distribution<double> hidden_activation
-                = noisy_input * W + b;
+            distribution<float> hidden_activation
+                = multiply<float>(noisy_input, W) + b.cast<float>();
 
-            distribution<double> hidden_deriv
+            distribution<float> hidden_deriv
                 = layer.derivative(hidden_activation);
 
-            distribution<double> b_updates
-                = c_updates * W * hidden_deriv;
+            distribution<float> b_updates
+                = multiply<float>(c_updates, W) * hidden_deriv;
+
+#if 0
+            cerr << "b_updates = " << c_updates << endl;
+
+            distribution<float> b_updates_numeric(no);
+
+            // Calculate numerically the c updates
+            for (unsigned i = 0;  i < no;  ++i) {
+
+                double epsilon = 1e-5;
+
+                // Apply the layer
+                distribution<float> hidden_act2
+                    = layer.activation(noisy_input);
+
+                hidden_act2[i] += epsilon;
+                
+                distribution<float> hidden_rep2
+                    = layer.transfer(hidden_act2);
+                
+                distribution<float> denoised_input2
+                    = layer.iapply(hidden_rep2);
+            
+                // Error signal
+                distribution<float> diff2
+                    = model_input - denoised_input2;
+            
+                // Overall error
+                float error2 = pow(diff2.two_norm(), 2);
+
+                double delta = error2 - error;
+
+                b_updates_numeric[i] = delta / epsilon;
+            }
+
+            cerr << "b_updates_numeric = " << b_updates_numeric
+                 << endl;
+#endif
+
 
             boost::multi_array<double, 2> W_updates(boost::extents[ni][no]);
             for (unsigned i = 0;  i < ni;  ++i) {
@@ -374,12 +456,15 @@ int main(int argc, char ** argv)
             }
             //    = c_updates * (hidden_rep + noisy_input * W * hidden_deriv);
         
-            c -= learning_rate * c_updates;
-            //b -= learning_rate * b_updates;
+            //c -= learning_rate * c_updates;
+            b -= learning_rate * b_updates;
             //W -= learning_rate * W_updates;
         }
 
         cerr << "rmse of iteration: " << sqrt(total_mse / nx)
              << endl;
+        cerr << timer.elapsed() << endl;
     }
+
+    cerr << timer.elapsed() << endl;
 }
