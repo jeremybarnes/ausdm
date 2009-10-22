@@ -479,8 +479,6 @@ int main(int argc, char ** argv)
 
             boost::multi_array<double, 2> W_updates(boost::extents[ni][no]);
             boost::multi_array<double, 2> W_factors(boost::extents[ni][no]);
-            boost::multi_array<double, 2> W_factors2(boost::extents[ni][no]);
-            boost::multi_array<double, 2> W_prods(boost::extents[ni][ni]);
 
             distribution<double> factor_totals(no);
 
@@ -488,7 +486,6 @@ int main(int argc, char ** argv)
                 for (unsigned j = 0;  j < no;  ++j) {
                     W_updates[i][j] = c_updates[i] * hidden_rep[j];
                     W_factors[i][j] = hidden_deriv[j] * model_input[i];
-                    W_factors2[i][j] = c_updates[i] * W[i][j];
                     factor_totals[j] += c_updates[i] * W[i][j];
                 }
             }
