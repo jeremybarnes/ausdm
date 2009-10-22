@@ -492,7 +492,9 @@ int main(int argc, char ** argv)
 
             for (unsigned i = 0;  i < ni;  ++i)
                 for (unsigned j = 0;  j < no;  ++j)
-                    W_updates[i][j] += factor_totals[j] * W_factors[i][j];
+                    W_updates[i][j]
+                        = c_updates[i] * hidden_rep[j]
+                        + factor_totals[j] * W_factors[i][j];
             
 
 #if 1  // test numerically
