@@ -493,29 +493,9 @@ int main(int argc, char ** argv)
                 }
             }
 
-#if 0
             for (unsigned i = 0;  i < ni;  ++i)
-                for (unsigned i2 = 0;  i2 < ni;  ++i2)
-                    W_prods[i][i2]
-                        = SIMD::vec_dotprod(&W_factors[i][0],
-                                            &W_factors2[i2][0],
-                                            no);
-#endif
-            
-            for (unsigned i = 0;  i < ni;  ++i) {
-
-                for (unsigned j = 0;  j < no;  ++j) {
-
-                    double total = 0.0;
-
-                    //for (unsigned i2 = 0;  i2 < ni;  ++i2)
-                    //    total += W_factors2[i2][j];
-                    
-                    total = factor_totals[j];
-
-                    W_updates[i][j] += total * W_factors[i][j];
-                }
-            }
+                for (unsigned j = 0;  j < no;  ++j)
+                    W_updates[i][j] += factor_totals[j] * W_factors[i][j];
             
 
 #if 1  // test numerically
