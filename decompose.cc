@@ -1,4 +1,4 @@
-/* ausdm.cc                                                       -*- C++ -*-
+/* ausdm.cc                                                        -*- C++ -*-
    Jeremy Barnes, 6 August 2009
    Copyright (c) 2009 Jeremy Barnes.  All rights reserved.
 
@@ -478,24 +478,77 @@ int main(int argc, char ** argv)
 
 
             boost::multi_array<double, 2> W_updates(boost::extents[ni][no]);
+            boost::multi_array<double, 2> W_factors(boost::extents[ni][no]);
+            boost::multi_array<double, 2> W_factors2(boost::extents[ni][no]);
+            boost::multi_array<double, 2> W_prods(boost::extents[ni][ni]);
 
             distribution<double> ddenoised_input_dwij(ni);
 
             for (unsigned i = 0;  i < ni;  ++i) {
+                for (unsigned j = 0;  j < no;  ++j) {
+                    W_updates[i][j] = c_updates[i] * hidden_rep[j];
+                    W_factors[i][j] = hidden_deriv[j] * model_input[i];
+                    W_factors2[i][j] = c_updates[i] * W[i][j];
+                }
+            }
+
+            for (unsigned i = 0;  i < ni;  ++i)
+                for (unsigned i2 = 0;  i2 < ni;  ++i2)
+                    W_prods[i][i2]
+                        = SIMD::vec_dotprod(&W_factors[i][0],
+                                            &W_factors2[i2][0],
+                                            no);
+            
+            for (unsigned i = 0;  i < ni;  ++i) {
+
+                for (unsigned i2 = 0;  i2 < ni;  ++i2) {
+
+                    //for (unsigned j = 0;  j < no;  ++j)
+                    //    W_updates[i][j] += W_prods[i][i2];
+                    
+#if 1
+                    SIMD::vec_add(&W_updates[i][0],
+                                  &W_factors2[i2][0],
+                                  &W_factors[i][0],
+                                  &W_updates[i][0],
+                                  no);
+#endif
+
+                    for (unsigned j = 0;  j < no && false;  ++j) {
+                        
+#if 0
+                        cerr << "W_factors2[i2][j] = "
+                             << W_factors2[i2][j]
+                             << " prod = " << c_updates[i2] * W[i2][j]
+                             << endl;
+
+                        cerr << "i = " << i << " i2 = " << i2
+                             << " j = " << j << endl;
+
+                        cerr << "update1 = "
+                             << c_updates[i2] * W[i2][j] * W_factors[i][j]
+                             << endl;
+                        cerr << "update2 = "
+                             << W_factors2[i2][j] * W_factors[i][j]
+                             << endl;
+#endif
+
+                        //W_updates[i][j]
+                        //    += c_updates[i2]
+                        //    * W[i2][j]
+                        //    * W_factors[i][j];
+
+                        W_updates[i][j]
+                            += W_factors2[i2][j]
+                            * W_factors[i][j];
+                    }
+                }
+            }
+
+#if 1  // test numerically
+            for (unsigned i = 0;  i < ni;  ++i) {
 
                 for (unsigned j = 0;  j < no;  ++j) {
-
-                    W_updates[i][j] = 0.0;
-                    for (unsigned i2 = 0;  i2 < ni;  ++i2) {
-                        W_updates[i][j]
-                            += c_updates[i2]
-                            * (W[i2][j]
-                               * hidden_deriv[j]
-                               * model_input[i]
-                               + ((i2 == i) * hidden_rep[j]));
-                    }
-
-#if 0  // test numerically
                     double epsilon = 1e-6;
 
                     double old_w = W[i][j];
@@ -554,10 +607,9 @@ int main(int argc, char ** argv)
 
                    W[i][j] = old_w;
                     
-
-#endif  // if one/zero
                 }
             }
+#endif  // if one/zero
             //    = c_updates * (hidden_rep + noisy_input * W * hidden_deriv);
         
             c -= learning_rate * c_updates;
