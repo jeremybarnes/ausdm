@@ -482,19 +482,19 @@ int main(int argc, char ** argv)
 
             distribution<double> factor_totals(no);
 
-            for (unsigned i = 0;  i < ni;  ++i) {
-                for (unsigned j = 0;  j < no;  ++j) {
-                    W_updates[i][j] = c_updates[i] * hidden_rep[j];
-                    W_factors[i][j] = hidden_deriv[j] * model_input[i];
-                    factor_totals[j] += c_updates[i] * W[i][j];
-                }
-            }
-
             for (unsigned i = 0;  i < ni;  ++i)
+                for (unsigned j = 0;  j < no;  ++j)
+                    factor_totals[j] += c_updates[i] * W[i][j];
+
+            for (unsigned i = 0;  i < ni;  ++i) {
+                for (unsigned j = 0;  j < no;  ++j)
+                    W_factors[i][j] = hidden_deriv[j] * model_input[i];
+
                 for (unsigned j = 0;  j < no;  ++j)
                     W_updates[i][j]
                         = c_updates[i] * hidden_rep[j]
                         + factor_totals[j] * W_factors[i][j];
+            }
             
 
 #if 1  // test numerically
