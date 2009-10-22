@@ -130,11 +130,19 @@ struct Twoway_Layer : public Dense_Layer<LFloat> {
     Twoway_Layer(size_t inputs, size_t outputs,
                  Transfer_Function_Type transfer,
                  Thread_Context & context)
-        : Dense_Layer<LFloat>(inputs, outputs, transfer, context)
+        : Dense_Layer<LFloat>(inputs, outputs, transfer)
     {
         ibias.resize(inputs);
+        random_fill(1.0 / sqrt(inputs), context);
     }
 
+    Twoway_Layer(size_t inputs, size_t outputs,
+                 Transfer_Function_Type transfer)
+        : Dense_Layer<LFloat>(inputs, outputs, transfer)
+    {
+        ibias.resize(inputs);
+        ibias.fill(0.0);
+    }
     distribution<LFloat> ibias;
 
     distribution<double> iapply(const distribution<double> & output) const
@@ -194,23 +202,421 @@ struct Twoway_Layer : public Dense_Layer<LFloat> {
         derivative(&input[0], &result[0], ni, transfer_function);
         return result;
     }
+
+    void update(const Twoway_Layer & updates, double learning_rate)
+    {
+        int ni = inputs();
+        int no = outputs();
+
+        ibias -= learning_rate * updates.ibias;
+        bias -= learning_rate * updates.bias;
+        
+        for (unsigned i = 0;  i < ni;  ++i)
+            SIMD::vec_add(&weights[i][0], -learning_rate,
+                          &updates.weights[i][0],
+                          &weights[i][0], no);
+    }
+
+    virtual void random_fill(float limit, Thread_Context & context)
+    {
+        Dense_Layer<LFloat>::random_fill(limit, context);
+        for (unsigned i = 0;  i < ibias.size();  ++i)
+            ibias[i] = limit * (context.random01() * 2.0f - 1.0f);
+    }
+
+    virtual void zero_fill()
+    {
+        Dense_Layer<LFloat>::zero_fill();
+        ibias.fill(0.0);
+    }
 };
+
+// Float type to use for calculations
+typedef double CFloat;
 
 template<typename Float>
 distribution<Float>
 add_noise(const distribution<Float> & inputs,
           const distribution<Float> & cleared_values,
+          distribution<bool> & was_cleared,
           Thread_Context & context,
           float prob_cleared)
 {
     distribution<Float> result = inputs;
 
+    was_cleared.clear();
+    was_cleared.resize(inputs.size());
+
     for (unsigned i = 0;  i < inputs.size();  ++i) {
-        if (context.random01() < prob_cleared)
+        if (context.random01() < prob_cleared) {
             result[i] = cleared_values[i];
+            was_cleared[i] = true;
+        }
     }
     
     return result;
+}
+
+
+double train_example(const Twoway_Layer & layer,
+                     const Data & data,
+                     int example_num,
+                     const distribution<CFloat> & cleared_values,
+                     distribution<double> & cleared_values_update,
+                     float prob_cleared,
+                     Thread_Context & thread_context,
+                     Twoway_Layer & updates,
+                     int iter)
+{
+    int nm = data.models.size();
+
+    int ni JML_UNUSED = layer.inputs();
+    int no JML_UNUSED = layer.outputs();
+
+    // Present this input
+    distribution<CFloat> model_input(nm);
+    for (unsigned m = 0;  m < nm;  ++m)
+        model_input[m] = 0.8 * data.models[m][example_num];
+            
+
+    distribution<bool> was_cleared;
+
+    // Add noise
+    distribution<CFloat> noisy_input
+        = add_noise(model_input, cleared_values, was_cleared, thread_context,
+                    prob_cleared);
+
+    distribution<CFloat> hidden_act
+        = layer.activation(noisy_input);
+            
+    // Apply the layer
+    distribution<CFloat> hidden_rep
+        = layer.apply(noisy_input);
+            
+    // Reconstruct the input
+    distribution<CFloat> denoised_input
+        = layer.iapply(hidden_rep);
+            
+    // Error signal
+    distribution<CFloat> diff
+        = model_input - denoised_input;
+    
+    // Overall error
+    double error = pow(diff.two_norm(), 2);
+    
+    if (example_num < 10 && false) {
+        cerr << "iter " << iter << " ex " << example_num << endl;
+        cerr << "  input: " << distribution<float>(model_input.begin(),
+                                                   model_input.begin() + 10)
+             << endl;
+        cerr << "  noisy input: " << distribution<float>(noisy_input.begin(),
+                                                         noisy_input.begin() + 10)
+             << endl;
+        cerr << "  output: " << distribution<float>(denoised_input.begin(),
+                                                    denoised_input.begin() + 10)
+             << endl;
+        cerr << "  diff: " << distribution<float>(diff.begin(),
+                                                  diff.begin() + 10)
+             << endl;
+        cerr << "error: " << error << endl;
+        cerr << endl;
+        
+    }
+        
+    // Now we solve for the gradient direction for the two biases as
+    // well as for the weights matrix
+    //
+    // If f() is the activation function for the forward direction and
+    // g() is the activation function for the reverse direction, we can
+    // write
+    //
+    // h = f(Wi1 + b)
+    //
+    // where i1 is the (noisy) inputs, h is the hidden unit outputs, W
+    // is the weight matrix and b is the forward bias vector.  Going
+    // back again, we then take
+    // 
+    // i2 = g(W*h + c) = g(W*f(Wi + b) + c)
+    //
+    // where i2 is the denoised approximation of the true input weights
+    // (i) and W* is W transposed.
+    //
+    // Using the MSE, we get
+    //
+    // e = sqr(||i2 - i||) = sum(sqr(i2 - i))
+    //
+    // where e is the MSE.
+    //
+    // Differentiating with respect to i2, we get
+    //
+    // de/di2 = 2(i2 - i)
+    //
+    // Finally, we want to know the gradient direction for each of the
+    // parameters W, b and c.  Taking c first, we get
+    //
+    // de/dc = de/di2 di2/dc
+    //       = 2 (i2 - i) g'(i2)
+    //
+    // As for b, we get
+    //
+    // de/db = de/di2 di2/db
+    //       = 2 (i2 - i) g'(i2) W* f'(Wi + b)
+    //
+    // And for W:
+    //
+    // de/dW = de/di2 di2/dW
+    //       = 2 (i2 - i) g'(i2) [ h + W* f'(Wi + b) i ]
+    //
+    // Since we want to minimise the reconstruction error, we use the
+    // negative of the gradient.
+
+    // NOTE: here, the activation function for the input and the output
+    // are the same.
+        
+    const boost::multi_array<LFloat, 2> & W
+        = layer.weights;
+
+    const distribution<LFloat> & b = layer.bias;
+    const distribution<LFloat> & c JML_UNUSED = layer.ibias;
+
+    distribution<CFloat> c_updates
+        = -2 * diff * layer.iderivative(denoised_input);
+
+#if 0
+    cerr << "c_updates = " << c_updates << endl;
+
+    distribution<CFloat> c_updates_numeric(ni);
+
+    // Calculate numerically the c updates
+    for (unsigned i = 0;  i < ni;  ++i) {
+        // Reconstruct the input
+        distribution<CFloat> denoised_activation2
+            = W * hidden_rep + c;
+                
+        float epsilon = 1e-4;
+
+        denoised_activation2[i] += epsilon;
+
+        distribution<CFloat> denoised_input2 = denoised_activation2;
+        layer.transfer(denoised_input2);
+            
+        // Error signal
+        distribution<CFloat> diff2
+            = model_input - denoised_input2;
+            
+        // Overall error
+        double error2 = pow(diff2.two_norm(), 2);
+
+        double delta = error2 - error;
+
+        c_updates_numeric[i] = delta / epsilon;
+    }
+
+    cerr << "c_updates_numeric = " << c_updates_numeric
+         << endl;
+#endif
+
+    distribution<CFloat> hidden_activation
+        = multiply_r<CFloat>(noisy_input, W) + b.cast<CFloat>();
+
+    distribution<CFloat> hidden_deriv
+        = layer.derivative(hidden_activation);
+
+    distribution<CFloat> b_updates
+        = multiply_r<CFloat>(c_updates, W) * hidden_deriv;
+
+#if 0
+    cerr << "b_updates = " << c_updates << endl;
+
+    distribution<CFloat> b_updates_numeric(no);
+
+    // Calculate numerically the c updates
+    for (unsigned i = 0;  i < no;  ++i) {
+
+        double epsilon = 1e-5;
+
+        // Apply the layer
+        distribution<CFloat> hidden_act2
+            = layer.activation(noisy_input);
+
+        hidden_act2[i] += epsilon;
+                
+        distribution<CFloat> hidden_rep2
+            = layer.transfer(hidden_act2);
+                
+        //cerr << "hidden_rep = " << hidden_rep << endl;
+        //cerr << "hidden_rep2 = " << hidden_rep2 << endl;
+
+        distribution<CFloat> denoised_input2
+            = layer.iapply(hidden_rep2);
+            
+        //cerr << "denoised_input = " << denoised_input << endl;
+        //cerr << "denoised_input2 = " << denoised_input2 << endl;
+                    
+
+        // Error signal
+        distribution<CFloat> diff2
+            = model_input - denoised_input2;
+            
+        //cerr << "diff = " << diff << endl;
+        //cerr << "diff2 = " << diff2 << endl;
+
+        // Overall error
+        double error2 = pow(diff2.two_norm(), 2);
+
+        double delta = error2 - error;
+
+        b_updates_numeric[i] = xdiv(delta, epsilon);
+
+        cerr << "error = " << error << " error2 = " << error2
+             << " delta = " << delta
+             << " diff " << b_updates[i]
+             << " diff2 " << b_updates_numeric[i] << endl;
+
+    }
+
+    cerr << "b_updates_numeric = " << b_updates_numeric
+         << endl;
+#endif
+
+
+    boost::multi_array<double, 2> W_updates(boost::extents[ni][no]);
+
+    distribution<double> factor_totals(no);
+
+    for (unsigned i = 0;  i < ni;  ++i)
+        SIMD::vec_add(&factor_totals[0], c_updates[i], &W[i][0],
+                      &factor_totals[0], no);
+
+    for (unsigned i = 0;  i < ni;  ++i) {
+        calc_W_updates(c_updates[i],
+                       &hidden_rep[0],
+                       model_input[i],
+                       &factor_totals[0],
+                       &hidden_deriv[0],
+                       &W_updates[i][0],
+                       no);
+    }
+            
+
+#if 0  // test numerically
+    for (unsigned i = 0;  i < ni;  ++i) {
+
+        for (unsigned j = 0;  j < no;  ++j) {
+            double epsilon = 1e-6;
+
+            // Apply the layer
+            distribution<CFloat> hidden_act2
+                = layer.activation(noisy_input);
+            hidden_act2[j] += epsilon * noisy_input[i];
+
+            //cerr << "noisy_input = " << noisy_input << endl;
+            //cerr << "hidden_act = " << hidden_act << endl;
+            //cerr << "hidden_act2 = " << hidden_act2 << endl;
+
+            distribution<CFloat> hidden_rep2
+                = layer.transfer(hidden_act2);
+                    
+            //cerr << "hidden_rep = " << hidden_rep << endl;
+            //cerr << "hidden_rep2 = " << hidden_rep2 << endl;
+                    
+            distribution<CFloat> denoised_input2
+                = layer.iapply(hidden_rep2);
+                    
+            //cerr << "denoised_input = " << denoised_input << endl;
+            //cerr << "denoised_input2 = " << denoised_input2 << endl;
+
+            // Error signal
+            distribution<CFloat> diff2
+                = model_input - denoised_input2;
+                    
+            //cerr << "diff = " << diff << endl;
+            //cerr << "diff2 = " << diff2 << endl;
+                    
+            // Overall error
+            double error2 = pow(diff2.two_norm(), 2);
+                    
+            double delta = error2 - error;
+
+            double deriv2 = xdiv(delta, epsilon);
+
+            cerr << "error = " << error << " error2 = " << error2
+                 << " delta = " << delta
+                 << " deriv " << W_updates[i][j]
+                 << " deriv2 " << deriv2 << endl;
+
+#if 0
+            // look at dh/dwij
+            distribution<double> dh_dwij2
+                = (hidden_rep2 - hidden_rep) / epsilon;
+
+            cerr << "dh_dwij = " << dh_dwij << endl;
+            cerr << "dh_dwij2 = " << dh_dwij2 << endl;
+#endif
+        }
+    }
+#endif  // if one/zero
+
+    distribution<double> cleared_value_updates
+        = W * b_updates;
+
+#if 0  // test numerically
+    for (unsigned i = 0;  i < ni;  ++i) {
+        double epsilon = 1e-6;
+
+        distribution<CFloat> noisy_input2 = noisy_input;
+        noisy_input2[i] += epsilon;
+
+        // Apply the layer
+        distribution<CFloat> hidden_act2
+            = layer.activation(noisy_input2);
+
+        distribution<CFloat> hidden_rep2
+            = layer.transfer(hidden_act2);
+                    
+        distribution<CFloat> denoised_input2
+            = layer.iapply(hidden_rep2);
+                    
+        // Error signal
+        distribution<CFloat> diff2
+            = model_input - denoised_input2;
+                    
+        // Overall error
+        double error2 = pow(diff2.two_norm(), 2);
+                    
+        double delta = error2 - error;
+
+        double deriv2 = xdiv(delta, epsilon);
+
+        cerr << "error = " << error << " error2 = " << error2
+             << " delta = " << delta
+             << " deriv " << cleared_value_updates[i]
+             << " deriv2 " << deriv2 << endl;
+    }
+#endif // test numerically
+
+#if 0
+    cerr << "cleared_value_updates.size() = " << cleared_value_updates.size()
+         << endl;
+    cerr << "ni = " << ni << endl;
+    cerr << "b_updates.size() = " << b_updates.size() << endl;
+#endif
+
+    for (unsigned i = 0;  i < ni;  ++i) {
+        if (was_cleared[i]) {
+            cleared_values_update[i] += cleared_value_updates[i];
+        }
+    }
+
+    updates.bias += b_updates;
+    updates.ibias += c_updates;
+
+    for (unsigned i = 0;  i < ni;  ++i)
+        SIMD::vec_add(&updates.weights[i][0],
+                      &W_updates[i][0],
+                      &updates.weights[i][0], no);
+
+    return error;
 }
 
 int main(int argc, char ** argv)
@@ -302,7 +708,7 @@ int main(int argc, char ** argv)
     // label at all; thus we can put the training and validation sets together
 
     // Data[s/m/l][auc/rmse]
-    Data data[3][2];
+    Data data[3][2][2];
 
     const char * const size_names[3]   = { "S", "M", "L" };
     const char * const target_names[2] = { "RMSE", "AUC" };
@@ -313,15 +719,15 @@ int main(int argc, char ** argv)
     // (Small only for the moment until we get the hang of it)
 
     for (unsigned i = 0;  i < 1;  ++i) {
-        for (unsigned j = 0;  j < 2;  ++j) {
-            for (unsigned k = 0;  k < 1;  ++k) {
+        for (unsigned j = 0;  j < 1;  ++j) {
+            for (unsigned k = 0;  k < 2;  ++k) {
                 string filename = format("download/%s_%s_%s.csv",
                                          size_names[i],
                                          target_names[j],
                                          set_names[k]);
-                Data & this_data = data[i][j];
+                Data & this_data = data[i][j][k];
 
-                this_data.load(filename, (Target)j, (k == 0) /* clear first */);
+                this_data.load(filename, (Target)j, true /*(k == 0)*/ /* clear first */);
                 
                 model_names.insert(this_data.model_names.begin(),
                                    this_data.model_names.end());
@@ -341,7 +747,7 @@ int main(int argc, char ** argv)
     // We train a stack of layers, one at a time
 
     const Data & to_train
-        = data[0][0];
+        = data[0][0][0];
     
     int nx = to_train.targets.size();
     int nm = to_train.models.size();
@@ -351,16 +757,17 @@ int main(int argc, char ** argv)
     
     Twoway_Layer layer(nm, nh, TF_TANH, thread_context);
 
-    float prob_cleared = 0.25;
-
-    // Float type to use for calculations
-    typedef double CFloat;
+    float prob_cleared = 0.10;
 
     distribution<CFloat> cleared_values(nm);
+    //for (unsigned i = 0;  i < nm;  ++i)
+    //    cleared_values[i] = 0.1 * (0.5 - thread_context.random01());
 
+    //cerr << "cleared_values = " << cleared_values << endl;
 
     double learning_rate = 1e-5;
 
+    int minibatch_size = 256;
 
     for (unsigned iter = 0;  iter < 10;  ++iter) {
         cerr << "iter " << iter << " training on " << nx << " examples"
@@ -373,20 +780,62 @@ int main(int argc, char ** argv)
         int no JML_UNUSED= layer.outputs();
 
         double total_mse = 0.0;
+
+        for (unsigned x = 0;  x < nx;  x += minibatch_size) {
+
+            Twoway_Layer updates(nm, nh, TF_TANH);
+            distribution<double> cleared_value_updates(ni);
+
+            for (unsigned x2 = x;  x2 < nx && x2 < x + minibatch_size;
+                 ++x2, ++progress)
+                total_mse += train_example(layer, data[0][0][0], x2,
+                                           cleared_values,
+                                           cleared_value_updates,
+                                           prob_cleared,
+                                           thread_context, updates,
+                                           iter);
+            
+            layer.update(updates, learning_rate);
+
+            //cerr << "cleared_value_updates = " << cleared_value_updates
+            //     << endl;
+            //cerr << "c_updates = " << updates.ibias << endl;
+            
+            cleared_values -= 100.0 * learning_rate * cleared_value_updates;
+        }
         
-        for (unsigned x = 0;  x < nx;  ++x, ++progress) {
+        cerr << "rmse of iteration: " << sqrt(total_mse / nx)
+             << endl;
+        cerr << timer.elapsed() << endl;
+
+        double test_error = 0.0, test_error_noisy = 0.0;
+
+        const Data & test_data = data[0][0][1];
+
+        int nxt = test_data.targets.size();
+
+        cerr << "testing on " << nxt << " examples"
+             << endl;
+        boost::progress_display tprogress(nxt, cerr);
+
+        for (unsigned x = 0;  x < nxt;  ++x, ++tprogress) {
+            int nm = test_data.models.size();
+
+            int ni JML_UNUSED = layer.inputs();
+            int no JML_UNUSED = layer.outputs();
+
             // Present this input
             distribution<CFloat> model_input(nm);
             for (unsigned m = 0;  m < nm;  ++m)
-                model_input[m] = 0.8 * to_train.models[m][x];
-            
+                model_input[m] = 0.8 * test_data.models[m][x];
+    
+    
+            distribution<bool> was_cleared;
+
             // Add noise
             distribution<CFloat> noisy_input
-                = add_noise(model_input, cleared_values, thread_context,
-                            prob_cleared);
-
-            distribution<CFloat> hidden_act
-                = layer.activation(noisy_input);
+                = add_noise(model_input, cleared_values, was_cleared,
+                            thread_context, prob_cleared);
             
             // Apply the layer
             distribution<CFloat> hidden_rep
@@ -399,274 +848,37 @@ int main(int argc, char ** argv)
             // Error signal
             distribution<CFloat> diff
                 = model_input - denoised_input;
-            
+    
             // Overall error
             double error = pow(diff.two_norm(), 2);
+
+            test_error_noisy += error;
+
+
+            // Apply the layer
+            distribution<CFloat> hidden_rep2
+                = layer.apply(model_input);
             
-            total_mse += error;
-        
-            // Now we solve for the gradient direction for the two biases as
-            // well as for the weights matrix
-            //
-            // If f() is the activation function for the forward direction and
-            // g() is the activation function for the reverse direction, we can
-            // write
-            //
-            // h = f(Wi1 + b)
-            //
-            // where i1 is the (noisy) inputs, h is the hidden unit outputs, W
-            // is the weight matrix and b is the forward bias vector.  Going
-            // back again, we then take
-            // 
-            // i2 = g(W*h + c) = g(W*f(Wi + b) + c)
-            //
-            // where i2 is the denoised approximation of the true input weights
-            // (i) and W* is W transposed.
-            //
-            // Using the MSE, we get
-            //
-            // e = sqr(||i2 - i||) = sum(sqr(i2 - i))
-            //
-            // where e is the MSE.
-            //
-            // Differentiating with respect to i2, we get
-            //
-            // de/di2 = 2(i2 - i)
-            //
-            // Finally, we want to know the gradient direction for each of the
-            // parameters W, b and c.  Taking c first, we get
-            //
-            // de/dc = de/di2 di2/dc
-            //       = 2 (i2 - i) g'(i2)
-            //
-            // As for b, we get
-            //
-            // de/db = de/di2 di2/db
-            //       = 2 (i2 - i) g'(i2) W* f'(Wi + b)
-            //
-            // And for W:
-            //
-            // de/dW = de/di2 di2/dW
-            //       = 2 (i2 - i) g'(i2) [ h + W* f'(Wi + b) i ]
-            //
-            // Since we want to minimise the reconstruction error, we use the
-            // negative of the gradient.
-
-            // NOTE: here, the activation function for the input and the output
-            // are the same.
-        
-            boost::multi_array<LFloat, 2> & W
-                = layer.weights;
-            distribution<LFloat> & b = layer.bias;
-            distribution<LFloat> & c JML_UNUSED = layer.ibias;
-
-            distribution<CFloat> c_updates
-                = -2 * diff * layer.iderivative(denoised_input);
-
-#if 0
-            cerr << "c_updates = " << c_updates << endl;
-
-            distribution<CFloat> c_updates_numeric(ni);
-
-            // Calculate numerically the c updates
-            for (unsigned i = 0;  i < ni;  ++i) {
-                // Reconstruct the input
-                distribution<CFloat> denoised_activation2
-                    = W * hidden_rep + c;
-                
-                float epsilon = 1e-4;
-
-                denoised_activation2[i] += epsilon;
-
-                distribution<CFloat> denoised_input2 = denoised_activation2;
-                layer.transform(denoised_input2);
+            // Reconstruct the input
+            distribution<CFloat> reconstructed_input
+                = layer.iapply(hidden_rep2);
             
-                // Error signal
-                distribution<CFloat> diff2
-                    = model_input - denoised_input2;
-            
-                // Overall error
-                double error2 = pow(diff2.two_norm(), 2);
-
-                double delta = error2 - error;
-
-                c_updates_numeric[i] = delta / epsilon;
-            }
-
-            cerr << "c_updates_numeric = " << c_updates_numeric
-                 << endl;
-#endif
-
-            distribution<CFloat> hidden_activation
-                = multiply_r<CFloat>(noisy_input, W) + b.cast<CFloat>();
-
-            distribution<CFloat> hidden_deriv
-                = layer.derivative(hidden_activation);
-
-            distribution<CFloat> b_updates
-                = multiply_r<CFloat>(c_updates, W) * hidden_deriv;
-
-#if 0
-            cerr << "b_updates = " << c_updates << endl;
-
-            distribution<CFloat> b_updates_numeric(no);
-
-            // Calculate numerically the c updates
-            for (unsigned i = 0;  i < no;  ++i) {
-
-                double epsilon = 1e-5;
-
-                // Apply the layer
-                distribution<CFloat> hidden_act2
-                    = layer.activation(noisy_input);
-
-                hidden_act2[i] += epsilon;
-                
-                distribution<CFloat> hidden_rep2
-                    = layer.transfer(hidden_act2);
-                
-                //cerr << "hidden_rep = " << hidden_rep << endl;
-                //cerr << "hidden_rep2 = " << hidden_rep2 << endl;
-
-                distribution<CFloat> denoised_input2
-                    = layer.iapply(hidden_rep2);
-            
-                //cerr << "denoised_input = " << denoised_input << endl;
-                //cerr << "denoised_input2 = " << denoised_input2 << endl;
-                    
-
-                // Error signal
-                distribution<CFloat> diff2
-                    = model_input - denoised_input2;
-            
-                //cerr << "diff = " << diff << endl;
-                //cerr << "diff2 = " << diff2 << endl;
-
-                // Overall error
-                double error2 = pow(diff2.two_norm(), 2);
-
-                double delta = error2 - error;
-
-                b_updates_numeric[i] = xdiv(delta, epsilon);
-
-                cerr << "error = " << error << " error2 = " << error2
-                     << " delta = " << delta
-                     << " diff " << b_updates[i]
-                     << " diff2 " << b_updates_numeric[i] << endl;
-
-            }
-
-            cerr << "b_updates_numeric = " << b_updates_numeric
-                 << endl;
-#endif
-
-
-            boost::multi_array<double, 2> W_updates(boost::extents[ni][no]);
-
-            distribution<double> factor_totals(no);
-
-            for (unsigned i = 0;  i < ni;  ++i)
-                SIMD::vec_add(&factor_totals[0], c_updates[i], &W[i][0],
-                              &factor_totals[0], no);
-
-            for (unsigned i = 0;  i < ni;  ++i) {
-                calc_W_updates(c_updates[i],
-                               &hidden_rep[0],
-                               model_input[i],
-                               &factor_totals[0],
-                               &hidden_deriv[0],
-                               &W_updates[i][0],
-                               no);
-                               
-
-                //for (unsigned j = 0;  j < no;  ++j)
-                //    W_updates[i][j]
-                //        = c_updates[i] * hidden_rep[j]
-                //        + factor_totals[j] * hidden_deriv[j] * model_input[i];
-            }
-            
-
-#if 0  // test numerically
-            for (unsigned i = 0;  i < ni;  ++i) {
-
-                for (unsigned j = 0;  j < no;  ++j) {
-                    double epsilon = 1e-6;
-
-                    double old_w = W[i][j];
-                    W[i][j] += epsilon;
-
-                    cerr << "oldw " << old_w << " neww "
-                         << W[i][j] << endl;
-
-                    // Apply the layer
-                    distribution<CFloat> hidden_act2
-                        = layer.activation(noisy_input);
-
-                    //cerr << "noisy_input = " << noisy_input << endl;
-                    //cerr << "hidden_act = " << hidden_act << endl;
-                    //cerr << "hidden_act2 = " << hidden_act2 << endl;
-
-                    distribution<CFloat> hidden_rep2
-                        = layer.transfer(hidden_act2);
-                    
-                    //cerr << "hidden_rep = " << hidden_rep << endl;
-                    //cerr << "hidden_rep2 = " << hidden_rep2 << endl;
-                    
-                    distribution<CFloat> denoised_input2
-                        = layer.iapply(hidden_rep2);
-                    
-                    //cerr << "denoised_input = " << denoised_input << endl;
-                    //cerr << "denoised_input2 = " << denoised_input2 << endl;
-
-                     // Error signal
-                    distribution<CFloat> diff2
-                        = model_input - denoised_input2;
-                    
-                    //cerr << "diff = " << diff << endl;
-                    //cerr << "diff2 = " << diff2 << endl;
-                    
-                    // Overall error
-                    double error2 = pow(diff2.two_norm(), 2);
-                    
-                    double delta = error2 - error;
-
-                    double deriv2 = xdiv(delta, epsilon);
-
-                    cerr << "error = " << error << " error2 = " << error2
-                         << " delta = " << delta
-                         << " deriv " << W_updates[i][j]
-                         << " deriv2 " << deriv2 << endl;
-
-#if 0
-                    // look at dh/dwij
-                    distribution<double> dh_dwij2
-                        = (hidden_rep2 - hidden_rep) / epsilon;
-
-                    cerr << "dh_dwij = " << dh_dwij << endl;
-                    cerr << "dh_dwij2 = " << dh_dwij2 << endl;
-#endif
-
-                   W[i][j] = old_w;
-                    
-                }
-            }
-#endif  // if one/zero
-            //    = c_updates * (hidden_rep + noisy_input * W * hidden_deriv);
-        
-            c -= learning_rate * c_updates;
-            b -= learning_rate * b_updates;
-
-            for (unsigned i = 0;  i < ni;  ++i)
-                SIMD::vec_add(&W[i][0], -learning_rate, &W_updates[i][0],
-                              &W[i][0], no);
-            //for (unsigned j = 0;  j < no;  ++j)
-            //    W[i][j] -= learning_rate * W_updates[i][j];
-            //W -= learning_rate * W_updates;
+            // Error signal
+            distribution<CFloat> diff2
+                = model_input - reconstructed_input;
+    
+            // Overall error
+            double error2 = pow(diff2.two_norm(), 2);
+    
+            test_error += error2;
         }
 
-        cerr << "rmse of iteration: " << sqrt(total_mse / nx)
+        cerr << "testing rmse of iteration: exact " << sqrt(test_error / nxt)
+             << " noisy " << sqrt(test_error_noisy / nxt)
              << endl;
         cerr << timer.elapsed() << endl;
+
+        //cerr << "cleared_values = " << cleared_values << endl;
     }
 
     cerr << timer.elapsed() << endl;
