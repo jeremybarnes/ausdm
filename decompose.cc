@@ -480,16 +480,19 @@ int main(int argc, char ** argv)
             boost::multi_array<double, 2> W_updates(boost::extents[ni][no]);
 
             for (unsigned i = 0;  i < ni;  ++i) {
+
                 for (unsigned j = 0;  j < no;  ++j) {
 
-                    double dacth_dwij = model_input[i];
+                    //distribution<double> dh_dwij(nh);
+                    //dh_dwij[j] = hidden_deriv[j] * model_input[i];
 
-                    distribution<double> dh_dwij(nh);
-                    dh_dwij[j] = hidden_deriv[j] * dacth_dwij;
-
-                    distribution<double> ddenoised_input_dwij
-                        = W * dh_dwij;
+                    //distribution<double> ddenoised_input_dwij
+                    //    = W * dh_dwij;
                     
+                    distribution<double> ddenoised_input_dwij(ni);
+                    for (unsigned i2 = 0;  i2 < ni;  ++i2)
+                        ddenoised_input_dwij[i2] = W[i2][j] * hidden_deriv[j] * model_input[i];
+
                     ddenoised_input_dwij[i] += hidden_rep[j];
 
                     W_updates[i][j] = c_updates.dotprod(ddenoised_input_dwij);
@@ -542,12 +545,14 @@ int main(int argc, char ** argv)
                          << " deriv " << W_updates[i][j]
                          << " deriv2 " << deriv2 << endl;
 
+#if 0
                     // look at dh/dwij
                     distribution<double> dh_dwij2
                         = (hidden_rep2 - hidden_rep) / epsilon;
 
                     cerr << "dh_dwij = " << dh_dwij << endl;
                     cerr << "dh_dwij2 = " << dh_dwij2 << endl;
+#endif
 
                    W[i][j] = old_w;
                     
