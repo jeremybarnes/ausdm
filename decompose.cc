@@ -479,25 +479,23 @@ int main(int argc, char ** argv)
 
             boost::multi_array<double, 2> W_updates(boost::extents[ni][no]);
 
+            distribution<double> ddenoised_input_dwij(ni);
+
             for (unsigned i = 0;  i < ni;  ++i) {
 
                 for (unsigned j = 0;  j < no;  ++j) {
 
-                    //distribution<double> dh_dwij(nh);
-                    //dh_dwij[j] = hidden_deriv[j] * model_input[i];
+                    W_updates[i][j] = 0.0;
+                    for (unsigned i2 = 0;  i2 < ni;  ++i2) {
+                        W_updates[i][j]
+                            += c_updates[i2]
+                            * (W[i2][j]
+                               * hidden_deriv[j]
+                               * model_input[i]
+                               + ((i2 == i) * hidden_rep[j]));
+                    }
 
-                    //distribution<double> ddenoised_input_dwij
-                    //    = W * dh_dwij;
-                    
-                    distribution<double> ddenoised_input_dwij(ni);
-                    for (unsigned i2 = 0;  i2 < ni;  ++i2)
-                        ddenoised_input_dwij[i2] = W[i2][j] * hidden_deriv[j] * model_input[i];
-
-                    ddenoised_input_dwij[i] += hidden_rep[j];
-
-                    W_updates[i][j] = c_updates.dotprod(ddenoised_input_dwij);
-
-#if 1  // test numerically
+#if 0  // test numerically
                     double epsilon = 1e-6;
 
                     double old_w = W[i][j];
@@ -564,6 +562,10 @@ int main(int argc, char ** argv)
         
             c -= learning_rate * c_updates;
             b -= learning_rate * b_updates;
+
+            for (unsigned i = 0;  i < ni;  ++i)
+                for (unsigned j = 0;  j < no;  ++j)
+                    W[i][j] -= learning_rate * W_updates[i][j];
             //W -= learning_rate * W_updates;
         }
 
