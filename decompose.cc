@@ -34,20 +34,24 @@
 
 #include "boosting/perceptron_generator.h"
 #include "algebra/matrix_ops.h"
+#include "math/xdiv.h"
+
 
 using namespace std;
 using namespace ML;
 
-struct Twoway_Layer : public Dense_Layer<double> {
+typedef double LFloat;
+
+struct Twoway_Layer : public Dense_Layer<LFloat> {
     Twoway_Layer(size_t inputs, size_t outputs,
                  Transfer_Function_Type transfer,
                  Thread_Context & context)
-        : Dense_Layer<double>(inputs, outputs, transfer, context)
+        : Dense_Layer<LFloat>(inputs, outputs, transfer, context)
     {
         ibias.resize(inputs);
     }
 
-    distribution<double> ibias;
+    distribution<LFloat> ibias;
 
     distribution<double> iapply(const distribution<double> & output) const
     {
@@ -59,7 +63,7 @@ struct Twoway_Layer : public Dense_Layer<double> {
 
     distribution<float> iapply(const distribution<float> & output) const
     {
-        distribution<float> activation = multiply<float>(weights, output);
+        distribution<float> activation = multiply_r<float>(weights, output);
         activation += ibias;
         transfer(&activation[0], &activation[0], inputs(), transfer_function);
         return activation;
@@ -117,9 +121,10 @@ add_noise(const distribution<Float> & inputs,
 {
     distribution<Float> result = inputs;
 
-    for (unsigned i = 0;  i < inputs.size();  ++i)
+    for (unsigned i = 0;  i < inputs.size();  ++i) {
         if (context.random01() < prob_cleared)
             result[i] = cleared_values[i];
+    }
     
     return result;
 }
@@ -260,51 +265,59 @@ int main(int argc, char ** argv)
 
     Thread_Context thread_context;
     
-    Twoway_Layer layer(nm, nh, TF_LOGSIG, thread_context);
+    Twoway_Layer layer(nm, nh, TF_TANH, thread_context);
 
-    bool prob_cleared = 0.25;
-    distribution<float> cleared_values(nm);
+    float prob_cleared = 0.25;
+
+    // Float type to use for calculations
+    typedef double CFloat;
+
+    distribution<CFloat> cleared_values(nm);
 
 
     double learning_rate = 1e-5;
 
-    for (unsigned iter = 0;  iter < 5;  ++iter) {
+
+    for (unsigned iter = 0;  iter < 10;  ++iter) {
         cerr << "iter " << iter << " training on " << nx << " examples"
              << endl;
         Timer timer;
 
         boost::progress_display progress(nx, cerr);
 
-        int ni = layer.inputs();
-        int no = layer.outputs();
+        int ni JML_UNUSED = layer.inputs();
+        int no JML_UNUSED= layer.outputs();
 
         double total_mse = 0.0;
         
         for (unsigned x = 0;  x < nx;  ++x, ++progress) {
             // Present this input
-            distribution<float> model_input(nm);
+            distribution<CFloat> model_input(nm);
             for (unsigned m = 0;  m < nm;  ++m)
                 model_input[m] = 0.8 * to_train.models[m][x];
             
             // Add noise
-            distribution<float> noisy_input
+            distribution<CFloat> noisy_input
                 = add_noise(model_input, cleared_values, thread_context,
                             prob_cleared);
+
+            distribution<CFloat> hidden_act
+                = layer.activation(noisy_input);
             
             // Apply the layer
-            distribution<float> hidden_rep
+            distribution<CFloat> hidden_rep
                 = layer.apply(noisy_input);
             
             // Reconstruct the input
-            distribution<float> denoised_input
+            distribution<CFloat> denoised_input
                 = layer.iapply(hidden_rep);
             
             // Error signal
-            distribution<float> diff
+            distribution<CFloat> diff
                 = model_input - denoised_input;
             
             // Overall error
-            float error = pow(diff.two_norm(), 2);
+            double error = pow(diff.two_norm(), 2);
             
             total_mse += error;
         
@@ -358,38 +371,38 @@ int main(int argc, char ** argv)
             // NOTE: here, the activation function for the input and the output
             // are the same.
         
-            boost::multi_array<double, 2> & W
+            boost::multi_array<LFloat, 2> & W
                 = layer.weights;
-            distribution<double> & b = layer.bias;
-            distribution<double> & c JML_UNUSED = layer.ibias;
+            distribution<LFloat> & b = layer.bias;
+            distribution<LFloat> & c JML_UNUSED = layer.ibias;
 
-            distribution<float> c_updates
+            distribution<CFloat> c_updates
                 = -2 * diff * layer.iderivative(denoised_input);
 
 #if 0
             cerr << "c_updates = " << c_updates << endl;
 
-            distribution<float> c_updates_numeric(ni);
+            distribution<CFloat> c_updates_numeric(ni);
 
             // Calculate numerically the c updates
             for (unsigned i = 0;  i < ni;  ++i) {
                 // Reconstruct the input
-                distribution<float> denoised_activation2
+                distribution<CFloat> denoised_activation2
                     = W * hidden_rep + c;
                 
                 float epsilon = 1e-4;
 
                 denoised_activation2[i] += epsilon;
 
-                distribution<float> denoised_input2 = denoised_activation2;
+                distribution<CFloat> denoised_input2 = denoised_activation2;
                 layer.transform(denoised_input2);
             
                 // Error signal
-                distribution<float> diff2
+                distribution<CFloat> diff2
                     = model_input - denoised_input2;
             
                 // Overall error
-                float error2 = pow(diff2.two_norm(), 2);
+                double error2 = pow(diff2.two_norm(), 2);
 
                 double delta = error2 - error;
 
@@ -400,19 +413,19 @@ int main(int argc, char ** argv)
                  << endl;
 #endif
 
-            distribution<float> hidden_activation
-                = multiply<float>(noisy_input, W) + b.cast<float>();
+            distribution<CFloat> hidden_activation
+                = multiply_r<CFloat>(noisy_input, W) + b.cast<CFloat>();
 
-            distribution<float> hidden_deriv
+            distribution<CFloat> hidden_deriv
                 = layer.derivative(hidden_activation);
 
-            distribution<float> b_updates
-                = multiply<float>(c_updates, W) * hidden_deriv;
+            distribution<CFloat> b_updates
+                = multiply_r<CFloat>(c_updates, W) * hidden_deriv;
 
 #if 0
             cerr << "b_updates = " << c_updates << endl;
 
-            distribution<float> b_updates_numeric(no);
+            distribution<CFloat> b_updates_numeric(no);
 
             // Calculate numerically the c updates
             for (unsigned i = 0;  i < no;  ++i) {
@@ -420,27 +433,43 @@ int main(int argc, char ** argv)
                 double epsilon = 1e-5;
 
                 // Apply the layer
-                distribution<float> hidden_act2
+                distribution<CFloat> hidden_act2
                     = layer.activation(noisy_input);
 
                 hidden_act2[i] += epsilon;
                 
-                distribution<float> hidden_rep2
+                distribution<CFloat> hidden_rep2
                     = layer.transfer(hidden_act2);
                 
-                distribution<float> denoised_input2
+                //cerr << "hidden_rep = " << hidden_rep << endl;
+                //cerr << "hidden_rep2 = " << hidden_rep2 << endl;
+
+                distribution<CFloat> denoised_input2
                     = layer.iapply(hidden_rep2);
             
+                //cerr << "denoised_input = " << denoised_input << endl;
+                //cerr << "denoised_input2 = " << denoised_input2 << endl;
+                    
+
                 // Error signal
-                distribution<float> diff2
+                distribution<CFloat> diff2
                     = model_input - denoised_input2;
             
+                //cerr << "diff = " << diff << endl;
+                //cerr << "diff2 = " << diff2 << endl;
+
                 // Overall error
-                float error2 = pow(diff2.two_norm(), 2);
+                double error2 = pow(diff2.two_norm(), 2);
 
                 double delta = error2 - error;
 
-                b_updates_numeric[i] = delta / epsilon;
+                b_updates_numeric[i] = xdiv(delta, epsilon);
+
+                cerr << "error = " << error << " error2 = " << error2
+                     << " delta = " << delta
+                     << " diff " << b_updates[i]
+                     << " diff2 " << b_updates_numeric[i] << endl;
+
             }
 
             cerr << "b_updates_numeric = " << b_updates_numeric
@@ -449,14 +478,86 @@ int main(int argc, char ** argv)
 
 
             boost::multi_array<double, 2> W_updates(boost::extents[ni][no]);
+
             for (unsigned i = 0;  i < ni;  ++i) {
                 for (unsigned j = 0;  j < no;  ++j) {
-                    W_updates[i][j] = 0.0;
+
+                    double dacth_dwij = model_input[i];
+
+                    distribution<double> dh_dwij(nh);
+                    dh_dwij[j] = hidden_deriv[j] * dacth_dwij;
+
+                    distribution<double> ddenoised_input_dwij
+                        = W * dh_dwij;
+                    
+                    ddenoised_input_dwij[i] += hidden_rep[j];
+
+                    W_updates[i][j] = c_updates.dotprod(ddenoised_input_dwij);
+
+#if 1  // test numerically
+                    double epsilon = 1e-6;
+
+                    double old_w = W[i][j];
+                    W[i][j] += epsilon;
+
+                    cerr << "oldw " << old_w << " neww "
+                         << W[i][j] << endl;
+
+                    // Apply the layer
+                    distribution<CFloat> hidden_act2
+                        = layer.activation(noisy_input);
+
+                    //cerr << "noisy_input = " << noisy_input << endl;
+                    //cerr << "hidden_act = " << hidden_act << endl;
+                    //cerr << "hidden_act2 = " << hidden_act2 << endl;
+
+                    distribution<CFloat> hidden_rep2
+                        = layer.transfer(hidden_act2);
+                    
+                    //cerr << "hidden_rep = " << hidden_rep << endl;
+                    //cerr << "hidden_rep2 = " << hidden_rep2 << endl;
+                    
+                    distribution<CFloat> denoised_input2
+                        = layer.iapply(hidden_rep2);
+                    
+                    //cerr << "denoised_input = " << denoised_input << endl;
+                    //cerr << "denoised_input2 = " << denoised_input2 << endl;
+
+                     // Error signal
+                    distribution<CFloat> diff2
+                        = model_input - denoised_input2;
+                    
+                    //cerr << "diff = " << diff << endl;
+                    //cerr << "diff2 = " << diff2 << endl;
+                    
+                    // Overall error
+                    double error2 = pow(diff2.two_norm(), 2);
+                    
+                    double delta = error2 - error;
+
+                    double deriv2 = xdiv(delta, epsilon);
+
+                    cerr << "error = " << error << " error2 = " << error2
+                         << " delta = " << delta
+                         << " deriv " << W_updates[i][j]
+                         << " deriv2 " << deriv2 << endl;
+
+                    // look at dh/dwij
+                    distribution<double> dh_dwij2
+                        = (hidden_rep2 - hidden_rep) / epsilon;
+
+                    cerr << "dh_dwij = " << dh_dwij << endl;
+                    cerr << "dh_dwij2 = " << dh_dwij2 << endl;
+
+                   W[i][j] = old_w;
+                    
+
+#endif  // if one/zero
                 }
             }
             //    = c_updates * (hidden_rep + noisy_input * W * hidden_deriv);
         
-            //c -= learning_rate * c_updates;
+            c -= learning_rate * c_updates;
             b -= learning_rate * b_updates;
             //W -= learning_rate * W_updates;
         }
