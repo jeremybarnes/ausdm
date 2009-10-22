@@ -40,6 +40,90 @@
 using namespace std;
 using namespace ML;
 
+typedef float v4sf __attribute__((__vector_size__(16)));
+
+JML_ALWAYS_INLINE v4sf vec_splat(float val)
+{
+    v4sf result = {val, val, val, val};
+
+    return result;
+}
+
+typedef double v2df __attribute__((__vector_size__(16)));
+
+JML_ALWAYS_INLINE v2df vec_splat(double val)
+{
+    v2df result = {val, val};
+    return result;
+}
+
+
+// set r = k1 x + k2 y z
+
+void calc_W_updates(double k1, const double * x, double k2, const double * y,
+                    const double * z, double * r, size_t n)
+{
+    unsigned i = 0;
+
+    v2df kk1 = vec_splat(k1);
+    v2df kk2 = vec_splat(k2);
+
+    if (true) {
+        for (; i + 8 <= n;  i += 8) {
+            v2df yy0 = __builtin_ia32_loadupd(y + i + 0);
+            v2df xx0 = __builtin_ia32_loadupd(x + i + 0);
+            v2df zz0 = __builtin_ia32_loadupd(z + i + 0);
+            yy0 *= kk2;
+            xx0 *= kk1;
+            yy0 *= zz0;
+            yy0 += xx0;
+            __builtin_ia32_storeupd(r + i + 0, yy0);
+
+            v2df yy1 = __builtin_ia32_loadupd(y + i + 2);
+            v2df xx1 = __builtin_ia32_loadupd(x + i + 2);
+            v2df zz1 = __builtin_ia32_loadupd(z + i + 2);
+            yy1 *= kk2;
+            xx1 *= kk1;
+            yy1 *= zz1;
+            yy1 += xx1;
+            __builtin_ia32_storeupd(r + i + 2, yy1);
+            
+            v2df yy2 = __builtin_ia32_loadupd(y + i + 4);
+            v2df xx2 = __builtin_ia32_loadupd(x + i + 4);
+            v2df zz2 = __builtin_ia32_loadupd(z + i + 4);
+            yy2 *= kk2;
+            xx2 *= kk1;
+            yy2 *= zz2;
+            yy2 += xx2;
+            __builtin_ia32_storeupd(r + i + 4, yy2);
+
+            v2df yy3 = __builtin_ia32_loadupd(y + i + 6);
+            v2df xx3 = __builtin_ia32_loadupd(x + i + 6);
+            v2df zz3 = __builtin_ia32_loadupd(z + i + 6);
+            yy3 *= kk2;
+            xx3 *= kk1;
+            yy3 *= zz3;
+            yy3 += xx3;
+            __builtin_ia32_storeupd(r + i + 6, yy3);
+        }
+
+        for (; i + 2 <= n;  i += 2) {
+            v2df yy0 = __builtin_ia32_loadupd(y + i + 0);
+            v2df xx0 = __builtin_ia32_loadupd(x + i + 0);
+            v2df zz0 = __builtin_ia32_loadupd(z + i + 0);
+            yy0 *= kk2;
+            xx0 *= kk1;
+            yy0 *= zz0;
+            yy0 += xx0;
+            __builtin_ia32_storeupd(r + i + 0, yy0);
+        }
+    }
+
+    for (;  i < n;  ++i) r[i] = k1 * x[i] + k2 * y[i] * z[i];
+}
+
+
+
 typedef double LFloat;
 
 struct Twoway_Layer : public Dense_Layer<LFloat> {
@@ -486,10 +570,19 @@ int main(int argc, char ** argv)
                               &factor_totals[0], no);
 
             for (unsigned i = 0;  i < ni;  ++i) {
-                for (unsigned j = 0;  j < no;  ++j)
-                    W_updates[i][j]
-                        = c_updates[i] * hidden_rep[j]
-                        + factor_totals[j] * hidden_deriv[j] * model_input[i];
+                calc_W_updates(c_updates[i],
+                               &hidden_rep[0],
+                               model_input[i],
+                               &factor_totals[0],
+                               &hidden_deriv[0],
+                               &W_updates[i][0],
+                               no);
+                               
+
+                //for (unsigned j = 0;  j < no;  ++j)
+                //    W_updates[i][j]
+                //        = c_updates[i] * hidden_rep[j]
+                //        + factor_totals[j] * hidden_deriv[j] * model_input[i];
             }
             
 
