@@ -478,27 +478,29 @@ int main(int argc, char ** argv)
 
 
             boost::multi_array<double, 2> W_updates(boost::extents[ni][no]);
-            boost::multi_array<double, 2> W_factors(boost::extents[ni][no]);
 
             distribution<double> factor_totals(no);
             distribution<double> W_factorsi(no);
 
-            for (unsigned i = 0;  i < ni;  ++i)
-                for (unsigned j = 0;  j < no;  ++j)
-                    factor_totals[j] += c_updates[i] * W[i][j];
+            for (unsigned i = 0;  i < ni;  ++i) {
+                SIMD::vec_add(&factor_totals[0], c_updates[i], &W[i][0],
+                              &factor_totals[0], no);
+                //for (unsigned j = 0;  j < no;  ++j)
+                //    factor_totals[j] += c_updates[i] * W[i][j];
+            }
 
             for (unsigned i = 0;  i < ni;  ++i) {
-                for (unsigned j = 0;  j < no;  ++j)
-                    W_factorsi[j] = hidden_deriv[j] * model_input[i];
+                //for (unsigned j = 0;  j < no;  ++j)
+                //    W_factorsi[j] = hidden_deriv[j] * model_input[i];
 
                 for (unsigned j = 0;  j < no;  ++j)
                     W_updates[i][j]
                         = c_updates[i] * hidden_rep[j]
-                        + factor_totals[j] * W_factorsi[j];
+                        + factor_totals[j] * hidden_deriv[j] * model_input[i];
             }
             
 
-#if 1  // test numerically
+#if 0  // test numerically
             for (unsigned i = 0;  i < ni;  ++i) {
 
                 for (unsigned j = 0;  j < no;  ++j) {
