@@ -208,16 +208,12 @@ double train_example(const Twoway_Layer & layer,
                      int iter,
                      Lock & update_lock)
 {
-    int nm = data.nm();
-
     int ni JML_UNUSED = layer.inputs();
     int no JML_UNUSED = layer.outputs();
 
     // Present this input
-    distribution<CFloat> model_input(nm);
-    for (unsigned m = 0;  m < nm;  ++m)
-        model_input[m] = 0.8 * data.models[m][example_num];
-            
+    distribution<CFloat> model_input
+        = (0.8f * data.examples[example_num]).cast<CFloat>();
 
     distribution<bool> was_cleared;
 
@@ -673,16 +669,13 @@ struct Test_Examples_Job {
         double test_error_exact = 0.0, test_error_noisy = 0.0;
 
         for (unsigned x = first;  x < last;  ++x) {
-            int nm = data.nm();
-
             int ni JML_UNUSED = layer.inputs();
             int no JML_UNUSED = layer.outputs();
 
             // Present this input
-            distribution<CFloat> model_input(nm);
-            for (unsigned m = 0;  m < nm;  ++m)
-                model_input[m] = 0.8 * data.models[m][x];
-    
+            distribution<CFloat> model_input
+                = (0.8f * data.examples[x]).cast<CFloat>();
+            
             distribution<bool> was_cleared;
 
             // Add noise
@@ -896,15 +889,11 @@ int main(int argc, char ** argv)
     vector<distribution<float> > layer_train(nx), layer_test(nxt);
     for (unsigned x = 0;  x < nx;  ++x) {
         distribution<float> model_input(nm);
-        for (unsigned m = 0;  m < nm;  ++m)
-            model_input[m] = 0.8 * training_data.models[m][x];
-        layer_train[x].swap(model_input);
+        layer_train[x] = 0.8f * training_data.models[x];
     }
     for (unsigned x = 0;  x < nxt;  ++x) {
         distribution<float> model_input(nm);
-        for (unsigned m = 0;  m < nm;  ++m)
-            model_input[m] = 0.8 * training_data.models[m][x];
-        layer_train[x].swap(model_input);
+        layer_test[x] = 0.8f * testing_data.models[x];
     }
 
     for (unsigned layer_num = 0;  layer_num < nlayers;  ++layer_num) {

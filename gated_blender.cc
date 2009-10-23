@@ -245,7 +245,7 @@ train_conf(int model, const Data & training_data,
             // works for AUC; for RMSE we will need something different.
             // Eventually, we might want to predict the margin directly or
             // take a threshold for the margin, eg 0.5
-            float pred = (training_data.models[model][i] - 3.0) / 2.0;
+            float pred = training_data.models[model][i];
             float margin = pred * training_data.targets[i];
             
             correct[i] = (margin >= 0.0);
@@ -254,15 +254,15 @@ train_conf(int model, const Data & training_data,
         }
         else {
             // Try to predict the probability that it's within 0.5 either side
-            // of the correct answer
+            // of the correct answer.  With our modified scale, this really
+            // means predicting if it's within 0.25.
             correct[i]
                 = abs(training_data.models[model][i]
-                      - training_data.targets[i]) <= 0.5;
+                      - training_data.targets[i]) <= 0.25;
         }
 
-        distribution<float> model_outputs(training_data.nm());
-        for (unsigned j = 0;  j < training_data.nm();  ++j)
-            model_outputs[j] = training_data.models[j][i];
+        const distribution<float> & model_outputs
+            = training_data.examples[i];
         
         distribution<double> target_singular
             (training_data.singular_targets[i].begin(),
@@ -508,9 +508,8 @@ init(const Data & training_data_in,
 
         //cerr << "correct_prediction = " << correct_prediction << endl;
 
-        distribution<float> model_outputs(nm);
-        for (unsigned j = 0;  j < nm;  ++j)
-            model_outputs[j] = blend_training_data.models[j][i];
+        const distribution<float> & model_outputs
+            = blend_training_data.examples[i];
 
         const Target_Stats & target_stats
             = blend_training_data.target_stats[i];
@@ -856,12 +855,6 @@ predict(const ML::distribution<float> & models) const
 
     distribution<float> conf = this->conf(models, target_stats);
     
-    distribution<float> model_preds(nm);
-    for (unsigned i = 0;  i < nm;  ++i)
-        model_preds[i] = (models[i] > 3.0 ? 1.0 : -1.0);
-
-    //float result = model_preds.dotprod(conf) / conf.total();
-
     //float result = models.dotprod(conf) / conf.total();
 
     //float result = conf.total() * 0.1 * 4.0 + 1.0;

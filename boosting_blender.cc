@@ -58,7 +58,6 @@ init(const Data & training_data,
     distribution<float> example_weights = example_weights_;
 
     int nx = training_data.nx();
-    int nm = training_data.nm();
 
     if (example_weights.size() != nx)
         throw Exception("invalid nx");
@@ -101,10 +100,8 @@ init(const Data & training_data,
             else num_possible += 1;
 #endif
             
-            distribution<float> models(nm);
-
-            for (unsigned m = 0;  m < nm;  ++m)
-                models[m] = training_data.models[m][x];
+            const distribution<float> & models
+                = training_data.examples[x];
 
             weak_predictions[x] = weak->predict(models);
         }

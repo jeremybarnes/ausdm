@@ -68,9 +68,7 @@ struct Predict_Job {
     void operator () ()
     {
         for (int j = first;  j < last;  ++j) {
-            distribution<float> model_inputs(data.nm());
-            for (unsigned i = 0;  i < data.nm();  ++i)
-                model_inputs[i] = data.models[i][j];
+            const distribution<float> & model_inputs = data.examples[j];
 
             correct_prediction = data.targets[j];
 
@@ -322,7 +320,7 @@ int main(int argc, char ** argv)
         cerr << timer.elapsed() << endl;
 
         if (hold_out_data > 0.0) {
-            int npt = data_test.nx();
+            int nxt = data_test.nx();
 
             //cerr << "result = " << result << endl;
             //cerr << "baseline = " << baseline_result << endl;
@@ -337,7 +335,7 @@ int main(int argc, char ** argv)
                 cerr << endl;
 
                 vector<pair<float, float> > ranked_targets, baseline_ranked_targets;
-                for (unsigned i = 0;  i < npt;  ++i) {
+                for (unsigned i = 0;  i < nxt;  ++i) {
                     ranked_targets.push_back(make_pair(result[i],
                                                        data_test.targets[i]));
                     baseline_ranked_targets.push_back
@@ -350,7 +348,7 @@ int main(int argc, char ** argv)
                 distribution<float> pos_scores, neg_scores, bl_pos_scores, bl_neg_scores;
                 int pos_total = 0, neg_total = 0;
                 pos_scores.push_back(0);  neg_scores.push_back(0);
-                for (unsigned i = 0;  i < npt;  ++i) {
+                for (unsigned i = 0;  i < nxt;  ++i) {
                     if (ranked_targets[i].second == -1.0)
                         ++neg_total;
                     else ++pos_total;
@@ -363,7 +361,7 @@ int main(int argc, char ** argv)
 
                 pos_total = 0; neg_total = 0;
                 bl_pos_scores.push_back(0);  bl_neg_scores.push_back(0);
-                for (unsigned i = 0;  i < npt;  ++i) {
+                for (unsigned i = 0;  i < nxt;  ++i) {
                     if (baseline_ranked_targets[i].second == -1.0)
                         ++neg_total;
                     else ++pos_total;
@@ -391,7 +389,7 @@ int main(int argc, char ** argv)
                     baseline_category_errors(4),
                     category_improvements(4);
 
-                for (unsigned i = 0;  i < npt;  ++i) {
+                for (unsigned i = 0;  i < nxt;  ++i) {
                     float pred  = result[i];
                     float bl    = baseline_result[i];
                     float label = data_test.targets[i];
@@ -417,7 +415,7 @@ int main(int argc, char ** argv)
                                                    bl)
                             - baseline_ranked.begin();
 
-                        needed = npt;
+                        needed = nxt;
 
                         if (label == -1.0) {
                             error_pred = (pos_scores.at(lpos) + pos_scores.at(upos)) / 2.0;
@@ -479,7 +477,7 @@ int main(int argc, char ** argv)
                 sort_on_second_ascending(improvements);
 
                 cerr << "worst entries: " << endl;
-                for (unsigned ii = 0;  ii < min(npt, 50);  ++ii) {
+                for (unsigned ii = 0;  ii < min(nxt, 50);  ++ii) {
                     int i = improvements[ii].first;
 
                     float pred  = result[i];
@@ -499,9 +497,8 @@ int main(int argc, char ** argv)
 
                     cerr << " improvement: " << improvement << endl;
 
-                    distribution<float> model_inputs(data_test.nm());
-                    for (unsigned j = 0;  j < data_test.nm();  ++j)
-                        model_inputs[j] = data_test.models[j][i];
+                    const distribution<float> & model_inputs
+                        = data_test.examples[i];
 
                     cerr << "    min: " << model_inputs.min()
                          << "  max: " << model_inputs.max() << " avg: "
@@ -512,7 +509,7 @@ int main(int argc, char ** argv)
                 }
 
                 cerr << "best entries: " << endl;
-                for (unsigned ii = 0;  ii < min(npt, 50);  ++ii) {
+                for (unsigned ii = 0;  ii < min(nxt, 50);  ++ii) {
                     int i = improvements[improvements.size() - ii - 1].first;
 
                     float pred  = result[i];
@@ -538,8 +535,8 @@ int main(int argc, char ** argv)
 
             trial_scores.push_back(score);
 
-            vector<distribution<float> > weights(4, distribution<float>(npt, 0.0));
-            for (unsigned i = 0;  i < npt;  ++i) {
+            vector<distribution<float> > weights(4, distribution<float>(nxt, 0.0));
+            for (unsigned i = 0;  i < nxt;  ++i) {
                 //cerr << "cat = " << data_test.target_difficulty[i].category
                 //     << endl;
                 weights.at(data_test.target_difficulty[i].category)[i] = 1.0;
