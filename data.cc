@@ -301,17 +301,19 @@ load(const std::string & filename, Target target, bool clear_first)
     if (!clear_first && model_names.size() != m)
         throw Exception("wrong number of models");
 
+    int nm = model_names.size();
+
     // Create the data structures
     //cerr << model_names.size() << " models... ";
     
     if (clear_first) {
         models.resize(model_names.size());
-        for (unsigned i = 0;  i < nm();  ++i) {
+        for (unsigned i = 0;  i < nm;  ++i) {
             models[i].reserve(50000);
         }
     }
 
-    examples.resize(50000);
+    examples.reserve(50000);
     
     int num_rows = 0;
     for (; c; ++num_rows) {
@@ -319,7 +321,7 @@ load(const std::string & filename, Target target, bool clear_first)
         model_ids.push_back(id);
         c.expect_literal(',');
 
-        distribution<float> example(nm());
+        distribution<float> example(nm);
 
         float target_val = c.expect_int();
 
@@ -330,7 +332,7 @@ load(const std::string & filename, Target target, bool clear_first)
 
         targets.push_back(target_val);
 
-        for (unsigned i = 0;  i < nm();  ++i) {
+        for (unsigned i = 0;  i < nm;  ++i) {
             c.expect_literal(',');
             int score = c.expect_int();
             float val = (score - 3000)/ 2000.0;
