@@ -633,6 +633,9 @@ int main(int argc, char ** argv)
     // Extra configuration options
     vector<string> extra_config_options;
 
+    // Probability that it's cleared
+    float prob_cleared = 0.10;
+
     // What type of target do we predict?
     //string target_type;
     {
@@ -699,6 +702,8 @@ int main(int argc, char ** argv)
     // Allow configuration to be overridden on the command line
     config.parse_command_line(extra_config_options);
 
+    config.get(prob_cleared, "prob_cleared");
+
     // Load up the data
     Timer timer;
 
@@ -757,8 +762,6 @@ int main(int argc, char ** argv)
     
     Twoway_Layer layer(nm, nh, TF_TANH, thread_context);
 
-    float prob_cleared = 0.10;
-
     distribution<CFloat> cleared_values(nm);
     //for (unsigned i = 0;  i < nm;  ++i)
     //    cleared_values[i] = 0.1 * (0.5 - thread_context.random01());
@@ -804,6 +807,8 @@ int main(int argc, char ** argv)
             cleared_values -= 100.0 * learning_rate * cleared_value_updates;
         }
         
+        //cerr << "cleared_values = " << cleared_values << endl;
+
         cerr << "rmse of iteration: " << sqrt(total_mse / nx)
              << endl;
         cerr << timer.elapsed() << endl;
