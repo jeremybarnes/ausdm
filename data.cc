@@ -306,7 +306,7 @@ load(const std::string & filename, Target target, bool clear_first)
     
     if (clear_first) {
         models.resize(model_names.size());
-        for (unsigned i = 0;  i < models.size();  ++i) {
+        for (unsigned i = 0;  i < nm();  ++i) {
             models[i].reserve(50000);
         }
     }
@@ -319,7 +319,7 @@ load(const std::string & filename, Target target, bool clear_first)
         model_ids.push_back(id);
         c.expect_literal(',');
 
-        distribution<float> example(models.size());
+        distribution<float> example(nm());
 
         float target_val = c.expect_int();
 
@@ -330,7 +330,7 @@ load(const std::string & filename, Target target, bool clear_first)
 
         targets.push_back(target_val);
 
-        for (unsigned i = 0;  i < models.size();  ++i) {
+        for (unsigned i = 0;  i < nm();  ++i) {
             c.expect_literal(',');
             int score = c.expect_int();
             float val = (score - 3000)/ 2000.0;
@@ -385,7 +385,7 @@ calc_scores()
 {
     vector<pair<float, int> > model_scores;
 
-    for (unsigned i = 0;  i < models.size();  ++i) {
+    for (unsigned i = 0;  i < nm();  ++i) {
         if (target == RMSE)
             models[i].score = models[i].calc_rmse(targets);
         else models[i].score = models[i].calc_auc(targets);
@@ -395,7 +395,7 @@ calc_scores()
 
     sort_on_first_ascending(model_scores);
 
-    for (unsigned i = 0;  i < models.size();  ++i)
+    for (unsigned i = 0;  i < nm();  ++i)
         models[model_scores[i].second].rank = i;
 
 #if 0
@@ -417,7 +417,7 @@ Data::
 hold_out(Data & remove_to, float proportion,
          int random_seed)
 {
-    distribution<float> example_weights(targets.size());
+    distribution<float> example_weights(nx());
     distribution<float> remove_to_example_weights;
 
     hold_out(remove_to, proportion, example_weights,
@@ -437,7 +437,7 @@ hold_out(Data & remove_to, float proportion,
     srand(random_seed);
 
     vector<int> to_remove;
-    for (unsigned i = 0;  i < targets.size();  ++i) {
+    for (unsigned i = 0;  i < nx();  ++i) {
         to_remove.push_back(i);
     }
 
@@ -449,7 +449,7 @@ hold_out(Data & remove_to, float proportion,
     to_remove.erase(to_remove.begin() + proportion * to_remove.size(),
                     to_remove.end());
 
-    vector<int> remove_me(targets.size(), false);
+    vector<int> remove_me(nx(), false);
     for (unsigned i = 0;  i < to_remove.size();  ++i)
         remove_me[to_remove[i]] = true;
 
@@ -466,7 +466,7 @@ hold_out(Data & remove_to, float proportion,
     remove_to.models.resize(model_names.size());
 
     distribution<float> new_example_weights;
-    new_example_weights.reserve(targets.size() - to_remove.size());
+    new_example_weights.reserve(nx() - to_remove.size());
 
     remove_to_example_weights.clear();
     remove_to_example_weights.reserve(to_remove.size());
@@ -474,16 +474,16 @@ hold_out(Data & remove_to, float proportion,
     bool has_st = !singular_targets.empty();
 
     for (unsigned i = 0;  i < model_names.size();  ++i) {
-        new_me.models[i].reserve(targets.size() - to_remove.size());
+        new_me.models[i].reserve(nx() - to_remove.size());
         remove_to.models[i].reserve(to_remove.size());
     }
 
     if (has_st) {
-        new_me.singular_targets.reserve(targets.size() - to_remove.size());
+        new_me.singular_targets.reserve(nx() - to_remove.size());
         remove_to.singular_targets.reserve(to_remove.size());
     }
 
-    for (unsigned i = 0;  i < targets.size();  ++i) {
+    for (unsigned i = 0;  i < nx();  ++i) {
         Data & add_to = remove_me[i] ? remove_to : new_me;
         distribution<float> & weights
             = remove_me[i] ? remove_to_example_weights : new_example_weights;
@@ -511,8 +511,8 @@ void
 Data::
 decompose()
 {
-    int m = models.size();
-    int n = targets.size();
+    int m = nm();
+    int n = nx();
 
     boost::multi_array<float, 2> values(boost::extents[n][m]);
 
@@ -557,9 +557,9 @@ decompose()
 
     //cerr << "singular_values = " << singular_values << endl;
 
-    singular_models.resize(models.size());
+    singular_models.resize(nm());
     
-    for (unsigned i = 0;  i < models.size();  ++i)
+    for (unsigned i = 0;  i < nm();  ++i)
         singular_models[i]
             = distribution<float>(&lvectors[i][0],
                                   &lvectors[i][nwanted - 1] + 1);
@@ -567,9 +567,9 @@ decompose()
     //cerr << "singular_models[0] = " << singular_models[0] << endl;
     //cerr << "singular_models[1] = " << singular_models[1] << endl;
 
-    singular_targets.resize(targets.size());
+    singular_targets.resize(nx());
 
-    for (unsigned i = 0;  i < targets.size();  ++i)
+    for (unsigned i = 0;  i < nx();  ++i)
         singular_targets[i]
             = distribution<float>(&rvectors[i][0],
                                   &rvectors[i][nwanted - 1] + 1);
@@ -582,11 +582,11 @@ void
 Data::
 apply_decomposition(const Data & decomposed)
 {
-    singular_targets.resize(targets.size());
+    singular_targets.resize(nx());
 
-    for (unsigned i = 0;  i < targets.size();  ++i) {
-        distribution<float> mvalues(models.size());
-        for (unsigned j = 0;  j < models.size();  ++j)
+    for (unsigned i = 0;  i < nx();  ++i) {
+        distribution<float> mvalues(nm());
+        for (unsigned j = 0;  j < nm();  ++j)
             mvalues[j] = models[j][i];
 
         singular_targets[i] = decomposed.apply_decomposition(mvalues);
@@ -606,7 +606,7 @@ apply_decomposition(const distribution<float> & models) const
     // First, get the singular vector for the model
     distribution<double> target_singular(singular_values.size());
 
-    for (unsigned i = 0;  i < models.size();  ++i)
+    for (unsigned i = 0;  i < nm();  ++i)
         target_singular += singular_models[i] * models[i];
     
     target_singular /= singular_values;
@@ -618,10 +618,10 @@ void
 Data::
 stats()
 {
-    target_stats.resize(targets.size());
-    target_difficulty.resize(targets.size());
+    target_stats.resize(nx());
+    target_difficulty.resize(nx());
 
-    distribution<float> model_vals(models.size());
+    distribution<float> model_vals(nm());
 
     double total_mean_neg = 0.0, total_mean_pos = 0.0;
     double num_neg = 0.0, num_pos = 0.0;
@@ -629,8 +629,8 @@ stats()
 
     int nimpossible = 0, nautomatic = 0, npossible = 0, nunknown = 0;
 
-    for (unsigned i = 0;  i < targets.size();  ++i) {
-        for (unsigned j = 0;  j < models.size();  ++j)
+    for (unsigned i = 0;  i < nx();  ++i) {
+        for (unsigned j = 0;  j < nm();  ++j)
             model_vals[j] = models[j][i];
         target_stats[i] = Target_Stats(model_vals.begin(), model_vals.end());
         target_difficulty[i] = Difficulty(model_vals, targets[i], target);

@@ -57,8 +57,8 @@ init(const Data & training_data,
 
     distribution<float> example_weights = example_weights_;
 
-    int nx = training_data.targets.size();
-    int nm = training_data.models.size();
+    int nx = training_data.nx();
+    int nm = training_data.nm();
 
     if (example_weights.size() != nx)
         throw Exception("invalid nx");
@@ -86,7 +86,7 @@ init(const Data & training_data,
 #if 0
             float label = training_data.targets[x];
             int & is_possible = possible[x];
-            for (unsigned m = 0;  m < training_data.models.size() && !is_possible;
+            for (unsigned m = 0;  m < training_data.nm() && !is_possible;
                  ++m) {
                 
                 float pred = (training_data.models[m][x] - 3.0) / 2.0;

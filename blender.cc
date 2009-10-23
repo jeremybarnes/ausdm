@@ -72,11 +72,11 @@ init(const Data & data,
      const ML::distribution<float> & example_weights)
 {
     model_weights.clear();
-    model_weights.resize(data.models.size(), 0.0);
+    model_weights.resize(data.nm(), 0.0);
 
     if (mode == "best_n" || mode == "best_n_weighted") {
-        if (num_models > data.models.size())
-            num_models = data.models.size();
+        if (num_models > data.nm())
+            num_models = data.nm();
 
         for (unsigned i = 0;  i < num_models;  ++i) {
             int m = data.model_ranking[i];

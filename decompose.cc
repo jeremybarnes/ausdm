@@ -208,7 +208,7 @@ double train_example(const Twoway_Layer & layer,
                      int iter,
                      Lock & update_lock)
 {
-    int nm = data.models.size();
+    int nm = data.nm();
 
     int ni JML_UNUSED = layer.inputs();
     int no JML_UNUSED = layer.outputs();
@@ -673,7 +673,7 @@ struct Test_Examples_Job {
         double test_error_exact = 0.0, test_error_noisy = 0.0;
 
         for (unsigned x = first;  x < last;  ++x) {
-            int nm = data.models.size();
+            int nm = data.nm();
 
             int ni JML_UNUSED = layer.inputs();
             int no JML_UNUSED = layer.outputs();
@@ -869,9 +869,9 @@ int main(int argc, char ** argv)
     const Data & training_data = data[0][0][0];
     const Data & testing_data  = data[0][0][1];
     
-    int nx = training_data.targets.size();
-    int nxt = testing_data.targets.size();
-    int nm = training_data.models.size();
+    int nx = training_data.nx();
+    int nxt = testing_data.nx();
+    int nm = training_data.nm();
     int nh = nm / 2;
 
     Thread_Context thread_context;

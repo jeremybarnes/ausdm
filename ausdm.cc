@@ -68,8 +68,8 @@ struct Predict_Job {
     void operator () ()
     {
         for (int j = first;  j < last;  ++j) {
-            distribution<float> model_inputs(data.models.size());
-            for (unsigned i = 0;  i < data.models.size();  ++i)
+            distribution<float> model_inputs(data.nm());
+            for (unsigned i = 0;  i < data.nm();  ++i)
                 model_inputs[i] = data.models[i][j];
 
             correct_prediction = data.targets[j];
@@ -256,8 +256,8 @@ int main(int argc, char ** argv)
         
         data_test.stats();
 
-        distribution<float> example_weights(data_train.targets.size(),
-                                            1.0 / data_train.targets.size());
+        distribution<float> example_weights(data_train.nx(),
+                                            1.0 / data_train.nx());
 
         boost::shared_ptr<Blender> blender
             = get_blender(config, blender_name, data_train,
@@ -274,7 +274,7 @@ int main(int argc, char ** argv)
             data_test.stats();
         }
 
-        int np = data_test.targets.size();
+        int np = data_test.nx();
         
         // Now run the model
         result.resize(np);
@@ -322,7 +322,7 @@ int main(int argc, char ** argv)
         cerr << timer.elapsed() << endl;
 
         if (hold_out_data > 0.0) {
-            int npt = data_test.targets.size();
+            int npt = data_test.nx();
 
             //cerr << "result = " << result << endl;
             //cerr << "baseline = " << baseline_result << endl;
@@ -499,8 +499,8 @@ int main(int argc, char ** argv)
 
                     cerr << " improvement: " << improvement << endl;
 
-                    distribution<float> model_inputs(data_test.models.size());
-                    for (unsigned j = 0;  j < data_test.models.size();  ++j)
+                    distribution<float> model_inputs(data_test.nm());
+                    for (unsigned j = 0;  j < data_test.nm();  ++j)
                         model_inputs[j] = data_test.models[j][i];
 
                     cerr << "    min: " << model_inputs.min()

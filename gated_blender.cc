@@ -222,10 +222,10 @@ train_conf(int model, const Data & training_data,
            const ML::distribution<float> & example_weights)
 {
     // Generate a matrix with the predictions
-    int nx = training_data.targets.size();
+    int nx = training_data.nx();
     int nv = get_conf_features
         (model,
-         distribution<float>(training_data.models.size()),
+         distribution<float>(training_data.nm()),
          distribution<double>(training_data.singular_values.size()),
          Target_Stats())
         .size();
@@ -238,7 +238,7 @@ train_conf(int model, const Data & training_data,
     boost::multi_array<Float, 2> outputs(boost::extents[nv][nx]);
     distribution<Float> w(example_weights.begin(), example_weights.end());
 
-    for (unsigned i = 0;  i < training_data.targets.size();  ++i) {
+    for (unsigned i = 0;  i < training_data.nx();  ++i) {
 
         if (target == AUC) {
             // For now, we will try to predict if the margin > 0.  This only
@@ -260,8 +260,8 @@ train_conf(int model, const Data & training_data,
                       - training_data.targets[i]) <= 0.5;
         }
 
-        distribution<float> model_outputs(training_data.models.size());
-        for (unsigned j = 0;  j < training_data.models.size();  ++j)
+        distribution<float> model_outputs(training_data.nm());
+        for (unsigned j = 0;  j < training_data.nm();  ++j)
             model_outputs[j] = training_data.models[j][i];
         
         distribution<double> target_singular
@@ -285,11 +285,11 @@ train_conf(int model, const Data & training_data,
     //cerr << "parameters for model " << model << ": " << parameters << endl;
 
     Model_Output before, after;
-    before.resize(training_data.targets.size());
-    after.resize(training_data.targets.size());
+    before.resize(training_data.nx());
+    after.resize(training_data.nx());
 
     // Test the original model and the weighted version for AUC
-    for (unsigned i = 0;  i < training_data.targets.size();  ++i) {
+    for (unsigned i = 0;  i < training_data.nx();  ++i) {
 
         distribution<float> features(nv);
         for (unsigned j = 0;  j < nv;  ++j)
@@ -419,7 +419,7 @@ init(const Data & training_data_in,
     conf_training_data.calc_scores();
     blend_training_data.calc_scores();
 
-    int nm = conf_training_data.models.size();
+    int nm = conf_training_data.nm();
 
     // Now to train.  For each of the models, we go through the training
     // data and create a data file; we then do an IRLS on the model.
@@ -457,7 +457,7 @@ init(const Data & training_data_in,
     worker.run_until_finished(group);
 
 
-    int nx = blend_training_data.targets.size();
+    int nx = blend_training_data.nx();
 
     int nv = get_blend_features
         (distribution<float>(nm),
@@ -497,7 +497,7 @@ init(const Data & training_data_in,
 
     Training_Data training_data(fs);
 
-    for (unsigned i = 0;  i < blend_training_data.targets.size();  ++i) {
+    for (unsigned i = 0;  i < blend_training_data.nx();  ++i) {
 
         if (target == AUC)
             correct[i] = blend_training_data.targets[i] > 0.0;
@@ -686,10 +686,12 @@ conf(const ML::distribution<float> & models,
     distribution<float> target_singular
         = data->apply_decomposition(models);
 
-    // For each model, calculate a confidence
-    distribution<float> result(models.size());
+    int nm = models.size();
 
-    for (unsigned i = 0;  i < models.size();  ++i) {
+    // For each model, calculate a confidence
+    distribution<float> result(nm);
+
+    for (unsigned i = 0;  i < nm;  ++i) {
         // Skip untrained models
         if (model_coefficients[i].empty()) continue;
 
@@ -729,7 +731,7 @@ blend_feature_space() const
     result->add_feature("avg_weighted", REAL);
     result->add_feature("weighted_avg", REAL);
 
-    for (unsigned i = 0;  i < data->models.size();  ++i) {
+    for (unsigned i = 0;  i < data->nm();  ++i) {
         if (data->models[i].rank >= num_models_to_train)
             continue;
         string s = data->model_names[i];
@@ -850,10 +852,12 @@ predict(const ML::distribution<float> & models) const
 
     Target_Stats target_stats(models.begin(), models.end());
     
+    int nm = models.size();
+
     distribution<float> conf = this->conf(models, target_stats);
     
-    distribution<float> model_preds(models.size());
-    for (unsigned i = 0;  i < models.size();  ++i)
+    distribution<float> model_preds(nm);
+    for (unsigned i = 0;  i < nm;  ++i)
         model_preds[i] = (models[i] > 3.0 ? 1.0 : -1.0);
 
     //float result = model_preds.dotprod(conf) / conf.total();
@@ -862,7 +866,7 @@ predict(const ML::distribution<float> & models) const
 
     //float result = conf.total() * 0.1 * 4.0 + 1.0;
    
-    for (unsigned i = 0;  i < models.size() && debug;  ++i) {
+    for (unsigned i = 0;  i < nm && debug;  ++i) {
         if (conf[i] == 0.0) continue;
         cerr << "model " << i << ": pred " << models[i] << " conf "
              << conf[i] << endl;

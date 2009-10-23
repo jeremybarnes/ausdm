@@ -180,7 +180,7 @@ struct Data {
 
     void stats();
 
-    int nm() const { return models.size(); }
+    int nm() const { return nm(); }
     int nx() const { return examples.size(); }
 
     Target target;
