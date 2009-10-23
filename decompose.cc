@@ -18,6 +18,7 @@
 #include "utils/filter_streams.h"
 #include "utils/configuration.h"
 #include "arch/timers.h"
+#include "utils/info.h"
 #include "utils/guard.h"
 #include "arch/threads.h"
 
@@ -40,89 +41,27 @@
 using namespace std;
 using namespace ML;
 
-typedef float v4sf __attribute__((__vector_size__(16)));
-
-JML_ALWAYS_INLINE v4sf vec_splat(float val)
-{
-    v4sf result = {val, val, val, val};
-
-    return result;
-}
-
-typedef double v2df __attribute__((__vector_size__(16)));
-
-JML_ALWAYS_INLINE v2df vec_splat(double val)
-{
-    v2df result = {val, val};
-    return result;
-}
-
-
-// set r = k1 x + k2 y z
-
 void calc_W_updates(double k1, const double * x, double k2, const double * y,
                     const double * z, double * r, size_t n)
 {
-    unsigned i = 0;
-
-    v2df kk1 = vec_splat(k1);
-    v2df kk2 = vec_splat(k2);
-
-    if (true) {
-        for (; i + 8 <= n;  i += 8) {
-            v2df yy0 = __builtin_ia32_loadupd(y + i + 0);
-            v2df xx0 = __builtin_ia32_loadupd(x + i + 0);
-            v2df zz0 = __builtin_ia32_loadupd(z + i + 0);
-            yy0 *= kk2;
-            xx0 *= kk1;
-            yy0 *= zz0;
-            yy0 += xx0;
-            __builtin_ia32_storeupd(r + i + 0, yy0);
-
-            v2df yy1 = __builtin_ia32_loadupd(y + i + 2);
-            v2df xx1 = __builtin_ia32_loadupd(x + i + 2);
-            v2df zz1 = __builtin_ia32_loadupd(z + i + 2);
-            yy1 *= kk2;
-            xx1 *= kk1;
-            yy1 *= zz1;
-            yy1 += xx1;
-            __builtin_ia32_storeupd(r + i + 2, yy1);
-            
-            v2df yy2 = __builtin_ia32_loadupd(y + i + 4);
-            v2df xx2 = __builtin_ia32_loadupd(x + i + 4);
-            v2df zz2 = __builtin_ia32_loadupd(z + i + 4);
-            yy2 *= kk2;
-            xx2 *= kk1;
-            yy2 *= zz2;
-            yy2 += xx2;
-            __builtin_ia32_storeupd(r + i + 4, yy2);
-
-            v2df yy3 = __builtin_ia32_loadupd(y + i + 6);
-            v2df xx3 = __builtin_ia32_loadupd(x + i + 6);
-            v2df zz3 = __builtin_ia32_loadupd(z + i + 6);
-            yy3 *= kk2;
-            xx3 *= kk1;
-            yy3 *= zz3;
-            yy3 += xx3;
-            __builtin_ia32_storeupd(r + i + 6, yy3);
-        }
-
-        for (; i + 2 <= n;  i += 2) {
-            v2df yy0 = __builtin_ia32_loadupd(y + i + 0);
-            v2df xx0 = __builtin_ia32_loadupd(x + i + 0);
-            v2df zz0 = __builtin_ia32_loadupd(z + i + 0);
-            yy0 *= kk2;
-            xx0 *= kk1;
-            yy0 *= zz0;
-            yy0 += xx0;
-            __builtin_ia32_storeupd(r + i + 0, yy0);
-        }
-    }
-
-    for (;  i < n;  ++i) r[i] = k1 * x[i] + k2 * y[i] * z[i];
+    return SIMD::vec_k1_x_plus_k2_y_z(k1, x, k2, y, z, r, n);
 }
 
+template<typename Val>
+void atomic_add(Val & value, const Val & increment)
+{
+    Val old_val = value, new_val;
+    do {
+        new_val = old_val + increment;
+    } while (!JML_LIKELY(cmp_xchg(value, old_val, new_val)));
+}
 
+template<typename Val>
+void atomic_update_vec(Val * old, const Val * increment, int n)
+{
+    for (unsigned i = 0;  i < n;  ++i)
+        atomic_add(old[i], increment[i]);
+}
 
 typedef double LFloat;
 
@@ -266,7 +205,8 @@ double train_example(const Twoway_Layer & layer,
                      float prob_cleared,
                      Thread_Context & thread_context,
                      Twoway_Layer & updates,
-                     int iter)
+                     int iter,
+                     Lock & update_lock)
 {
     int nm = data.models.size();
 
@@ -602,22 +542,197 @@ double train_example(const Twoway_Layer & layer,
     cerr << "b_updates.size() = " << b_updates.size() << endl;
 #endif
 
-    for (unsigned i = 0;  i < ni;  ++i) {
-        if (was_cleared[i]) {
-            cleared_values_update[i] += cleared_value_updates[i];
-        }
+    if (true) {  // faster, despite the lock
+        Guard guard(update_lock);
+        
+        for (unsigned i = 0;  i < ni;  ++i)
+            if (was_cleared[i])
+                cleared_values_update[i] += cleared_value_updates[i];
+        
+        updates.bias += b_updates;
+        updates.ibias += c_updates;
+        
+        for (unsigned i = 0;  i < ni;  ++i)
+            SIMD::vec_add(&updates.weights[i][0],
+                          &W_updates[i][0],
+                          &updates.weights[i][0], no);
     }
+    else {
+        for (unsigned i = 0;  i < ni;  ++i)
+            if (was_cleared[i])
+                atomic_add(cleared_values_update[i], cleared_value_updates[i]);
+        atomic_update_vec(&updates.bias[0], &b_updates[0], no);
+        atomic_update_vec(&updates.ibias[0], &c_updates[0], ni);
 
-    updates.bias += b_updates;
-    updates.ibias += c_updates;
-
-    for (unsigned i = 0;  i < ni;  ++i)
-        SIMD::vec_add(&updates.weights[i][0],
-                      &W_updates[i][0],
-                      &updates.weights[i][0], no);
+        for (unsigned i = 0;  i < ni;  ++i)
+            atomic_update_vec(&updates.weights[i][0], &W_updates[i][0], no);
+    }
 
     return error;
 }
+
+struct Train_Examples_Job {
+
+    const Twoway_Layer & layer;
+    const Data & data;
+    int first;
+    int last;
+    const distribution<CFloat> & cleared_values;
+    float prob_cleared;
+    const Thread_Context & context;
+    int random_seed;
+    Twoway_Layer & updates;
+    distribution<double> & cleared_values_update;
+    int iter;
+    Lock & update_lock;
+    double & error;
+    boost::progress_display & progress;
+
+    Train_Examples_Job(const Twoway_Layer & layer,
+                       const Data & data,
+                       int first, int last,
+                       const distribution<CFloat> & cleared_values,
+                       float prob_cleared,
+                       const Thread_Context & context,
+                       int random_seed,
+                       Twoway_Layer & updates,
+                       distribution<double> & cleared_values_update,
+                       int iter,
+                       Lock & update_lock,
+                       double & error,
+                       boost::progress_display & progress)
+        : layer(layer), data(data), first(first), last(last),
+          cleared_values(cleared_values), prob_cleared(prob_cleared),
+          context(context), random_seed(random_seed), updates(updates),
+          cleared_values_update(cleared_values_update), iter(iter),
+          update_lock(update_lock), error(error), progress(progress)
+    {
+    }
+
+    void operator () ()
+    {
+        Thread_Context thread_context(context);
+        thread_context.seed(random_seed);
+
+        double total_error = 0.0;
+        for (unsigned x = first;  x < last;  ++x)
+            total_error += train_example(layer, data, x, cleared_values,
+                                         cleared_values_update,
+                                         prob_cleared, thread_context,
+                                         updates, iter, update_lock);
+
+        Guard guard(update_lock);
+        error += total_error;
+        progress += (last - first);
+    }
+};
+
+
+struct Test_Examples_Job {
+
+    const Twoway_Layer & layer;
+    const Data & data;
+    int first;
+    int last;
+    const distribution<CFloat> & cleared_values;
+    float prob_cleared;
+    const Thread_Context & context;
+    int random_seed;
+    int iter;
+    Lock & update_lock;
+    double & error_exact;
+    double & error_noisy;
+    boost::progress_display & progress;
+
+    Test_Examples_Job(const Twoway_Layer & layer,
+                      const Data & data,
+                      int first, int last,
+                      const distribution<CFloat> & cleared_values,
+                      float prob_cleared,
+                      const Thread_Context & context,
+                      int random_seed,
+                      int iter,
+                      Lock & update_lock,
+                      double & error_exact,
+                      double & error_noisy,
+                      boost::progress_display & progress)
+        : layer(layer), data(data), first(first), last(last),
+          cleared_values(cleared_values), prob_cleared(prob_cleared),
+          context(context), random_seed(random_seed), iter(iter),
+          update_lock(update_lock),
+          error_exact(error_exact), error_noisy(error_noisy),
+          progress(progress)
+    {
+    }
+
+    void operator () ()
+    {
+        Thread_Context thread_context(context);
+        thread_context.seed(random_seed);
+
+        double test_error_exact = 0.0, test_error_noisy = 0.0;
+
+        for (unsigned x = first;  x < last;  ++x) {
+            int nm = data.models.size();
+
+            int ni JML_UNUSED = layer.inputs();
+            int no JML_UNUSED = layer.outputs();
+
+            // Present this input
+            distribution<CFloat> model_input(nm);
+            for (unsigned m = 0;  m < nm;  ++m)
+                model_input[m] = 0.8 * data.models[m][x];
+    
+            distribution<bool> was_cleared;
+
+            // Add noise
+            distribution<CFloat> noisy_input
+                = add_noise(model_input, cleared_values, was_cleared,
+                            thread_context, prob_cleared);
+            
+            // Apply the layer
+            distribution<CFloat> hidden_rep
+                = layer.apply(noisy_input);
+            
+            // Reconstruct the input
+            distribution<CFloat> denoised_input
+                = layer.iapply(hidden_rep);
+            
+            // Error signal
+            distribution<CFloat> diff
+                = model_input - denoised_input;
+    
+            // Overall error
+            double error = pow(diff.two_norm(), 2);
+
+            test_error_noisy += error;
+
+
+            // Apply the layer
+            distribution<CFloat> hidden_rep2
+                = layer.apply(model_input);
+            
+            // Reconstruct the input
+            distribution<CFloat> reconstructed_input
+                = layer.iapply(hidden_rep2);
+            
+            // Error signal
+            distribution<CFloat> diff2
+                = model_input - reconstructed_input;
+    
+            // Overall error
+            double error2 = pow(diff2.two_norm(), 2);
+    
+            test_error_exact += error2;
+        }
+
+        Guard guard(update_lock);
+        error_exact += test_error_exact;
+        error_noisy += test_error_noisy;
+        progress += (last - first);
+    }
+};
+
 
 int main(int argc, char ** argv)
 {
@@ -771,49 +886,79 @@ int main(int argc, char ** argv)
     double learning_rate = 1e-5;
 
     int minibatch_size = 256;
+    int microbatch_size = minibatch_size / (num_cpus() * 4);
 
-    for (unsigned iter = 0;  iter < 10;  ++iter) {
+    for (unsigned iter = 0;  iter < 100;  ++iter) {
         cerr << "iter " << iter << " training on " << nx << " examples"
              << endl;
         Timer timer;
 
         boost::progress_display progress(nx, cerr);
+        Lock progress_lock;
 
         int ni JML_UNUSED = layer.inputs();
         int no JML_UNUSED= layer.outputs();
 
         double total_mse = 0.0;
 
+        static Worker_Task & worker = Worker_Task::instance(num_threads() - 1);
+        
         for (unsigned x = 0;  x < nx;  x += minibatch_size) {
-
+                
             Twoway_Layer updates(nm, nh, TF_TANH);
             distribution<double> cleared_value_updates(ni);
+            
+            // Now, submit it as jobs to the worker task to be done
+            // multithreaded
+            int group;
+            {
+                int parent = -1;  // no parent group
+                group = worker.get_group(NO_JOB, "dump user results task",
+                                         parent);
+                
+                // Make sure the group gets unlocked once we've populated
+                // everything
+                Call_Guard guard(boost::bind(&Worker_Task::unlock_group,
+                                             boost::ref(worker),
+                                             group));
+                
+                
+                for (unsigned x2 = x;  x2 < nx && x2 < x + minibatch_size;
+                     x2 += microbatch_size) {
 
-            for (unsigned x2 = x;  x2 < nx && x2 < x + minibatch_size;
-                 ++x2, ++progress)
-                total_mse += train_example(layer, data[0][0][0], x2,
-                                           cleared_values,
-                                           cleared_value_updates,
-                                           prob_cleared,
-                                           thread_context, updates,
-                                           iter);
+                    Train_Examples_Job job(layer, data[0][0][0],
+                                           x2,
+                                           min(x + minibatch_size,
+                                               x2 + microbatch_size),
+                                           cleared_values, prob_cleared,
+                                           thread_context,
+                                           thread_context.random(),
+                                           updates, cleared_value_updates,
+                                           iter, progress_lock,
+                                           total_mse,
+
+                                           progress);
+                    // Send it to a thread to be processed
+                    worker.add(job, "blend job", group);
+                }
+            }
+
+            worker.run_until_finished(group);
             
             layer.update(updates, learning_rate);
-
+            
             //cerr << "cleared_value_updates = " << cleared_value_updates
             //     << endl;
             //cerr << "c_updates = " << updates.ibias << endl;
             
             cleared_values -= 100.0 * learning_rate * cleared_value_updates;
         }
-        
-        //cerr << "cleared_values = " << cleared_values << endl;
 
         cerr << "rmse of iteration: " << sqrt(total_mse / nx)
              << endl;
         cerr << timer.elapsed() << endl;
 
-        double test_error = 0.0, test_error_noisy = 0.0;
+        double test_error_exact = 0.0, test_error_noisy = 0.0;
 
         const Data & test_data = data[0][0][1];
 
@@ -823,62 +968,44 @@ int main(int argc, char ** argv)
              << endl;
         boost::progress_display tprogress(nxt, cerr);
 
-        for (unsigned x = 0;  x < nxt;  ++x, ++tprogress) {
-            int nm = test_data.models.size();
 
-            int ni JML_UNUSED = layer.inputs();
-            int no JML_UNUSED = layer.outputs();
-
-            // Present this input
-            distribution<CFloat> model_input(nm);
-            for (unsigned m = 0;  m < nm;  ++m)
-                model_input[m] = 0.8 * test_data.models[m][x];
-    
-    
-            distribution<bool> was_cleared;
-
-            // Add noise
-            distribution<CFloat> noisy_input
-                = add_noise(model_input, cleared_values, was_cleared,
-                            thread_context, prob_cleared);
+        // Now, submit it as jobs to the worker task to be done
+        // multithreaded
+        int group;
+        {
+            int parent = -1;  // no parent group
+            group = worker.get_group(NO_JOB, "dump user results task",
+                                     parent);
             
-            // Apply the layer
-            distribution<CFloat> hidden_rep
-                = layer.apply(noisy_input);
+            // Make sure the group gets unlocked once we've populated
+            // everything
+            Call_Guard guard(boost::bind(&Worker_Task::unlock_group,
+                                         boost::ref(worker),
+                                         group));
             
-            // Reconstruct the input
-            distribution<CFloat> denoised_input
-                = layer.iapply(hidden_rep);
-            
-            // Error signal
-            distribution<CFloat> diff
-                = model_input - denoised_input;
-    
-            // Overall error
-            double error = pow(diff.two_norm(), 2);
+            // 20 jobs per CPU
+            int batch_size = nxt / (num_cpus() * 20);
 
-            test_error_noisy += error;
+            for (unsigned x = 0; x < nxt;  x += batch_size) {
+                
+                Test_Examples_Job job(layer, test_data,
+                                      x, min<int>(x + batch_size, nxt),
+                                      cleared_values, prob_cleared,
+                                      thread_context,
+                                      thread_context.random(),
+                                      iter, progress_lock,
+                                      test_error_exact, test_error_noisy,
+                                      tprogress);
 
-
-            // Apply the layer
-            distribution<CFloat> hidden_rep2
-                = layer.apply(model_input);
-            
-            // Reconstruct the input
-            distribution<CFloat> reconstructed_input
-                = layer.iapply(hidden_rep2);
-            
-            // Error signal
-            distribution<CFloat> diff2
-                = model_input - reconstructed_input;
-    
-            // Overall error
-            double error2 = pow(diff2.two_norm(), 2);
-    
-            test_error += error2;
+                // Send it to a thread to be processed
+                worker.add(job, "blend job", group);
+            }
         }
 
-        cerr << "testing rmse of iteration: exact " << sqrt(test_error / nxt)
+        worker.run_until_finished(group);
+            
+        cerr << "testing rmse of iteration: exact "
+             << sqrt(test_error_exact / nxt)
              << " noisy " << sqrt(test_error_noisy / nxt)
              << endl;
         cerr << timer.elapsed() << endl;
