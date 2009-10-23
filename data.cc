@@ -310,12 +310,16 @@ load(const std::string & filename, Target target, bool clear_first)
             models[i].reserve(50000);
         }
     }
+
+    examples.resize(50000);
     
     int num_rows = 0;
     for (; c; ++num_rows) {
         int id = c.expect_int();
         model_ids.push_back(id);
         c.expect_literal(',');
+
+        distribution<float> example(models.size());
 
         float target_val = c.expect_int();
 
@@ -329,8 +333,13 @@ load(const std::string & filename, Target target, bool clear_first)
         for (unsigned i = 0;  i < models.size();  ++i) {
             c.expect_literal(',');
             int score = c.expect_int();
-            models[i].push_back((score - 3000)/ 2000.0);
+            float val = (score - 3000)/ 2000.0;
+            example[i] = val;
+            models[i].push_back(val);
         }
+
+        examples.push_back(distribution<float>());
+        examples.back().swap(example);
 
         c.skip_whitespace();
         c.expect_eol();

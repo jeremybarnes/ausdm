@@ -866,11 +866,12 @@ int main(int argc, char ** argv)
     // Denoising auto encoder
     // We train a stack of layers, one at a time
 
-    const Data & to_train
-        = data[0][0][0];
+    const Data & training_data = data[0][0][0];
+    const Data & testing_data  = data[0][0][1];
     
-    int nx = to_train.targets.size();
-    int nm = to_train.models.size();
+    int nx = training_data.targets.size();
+    int nxt = testing_data.targets.size();
+    int nm = training_data.models.size();
     int nh = nm / 2;
 
     Thread_Context thread_context;
@@ -883,7 +884,7 @@ int main(int argc, char ** argv)
 
     //cerr << "cleared_values = " << cleared_values << endl;
 
-    double learning_rate = 1e-4;
+    double learning_rate = 5e-5;
 
     int minibatch_size = 256;
     int microbatch_size = minibatch_size / (num_cpus() * 4);
@@ -892,7 +893,21 @@ int main(int argc, char ** argv)
 
     //int layer_sizes[nlayers] = [100, 50, 30];
 
-    for (unsigned layer = 0;  nlayers;  ++layer) {
+    vector<distribution<float> > layer_train(nx), layer_test(nxt);
+    for (unsigned x = 0;  x < nx;  ++x) {
+        distribution<float> model_input(nm);
+        for (unsigned m = 0;  m < nm;  ++m)
+            model_input[m] = 0.8 * training_data.models[m][x];
+        layer_train[x].swap(model_input);
+    }
+    for (unsigned x = 0;  x < nxt;  ++x) {
+        distribution<float> model_input(nm);
+        for (unsigned m = 0;  m < nm;  ++m)
+            model_input[m] = 0.8 * training_data.models[m][x];
+        layer_train[x].swap(model_input);
+    }
+
+    for (unsigned layer_num = 0;  layer_num < nlayers;  ++layer_num) {
 
         for (unsigned iter = 0;  iter < 100;  ++iter) {
             cerr << "iter " << iter << " training on " << nx << " examples"
@@ -966,10 +981,6 @@ int main(int argc, char ** argv)
 
             double test_error_exact = 0.0, test_error_noisy = 0.0;
             
-            const Data & test_data = data[0][0][1];
-            
-            int nxt = test_data.targets.size();
-
             cerr << "testing on " << nxt << " examples"
                  << endl;
             boost::progress_display tprogress(nxt, cerr);
@@ -994,7 +1005,7 @@ int main(int argc, char ** argv)
                 
                 for (unsigned x = 0; x < nxt;  x += batch_size) {
                     
-                    Test_Examples_Job job(layer, test_data,
+                    Test_Examples_Job job(layer, testing_data,
                                           x, min<int>(x + batch_size, nxt),
                                           cleared_values, prob_cleared,
                                           thread_context,

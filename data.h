@@ -180,6 +180,9 @@ struct Data {
 
     void stats();
 
+    int nm() const { return models.size(); }
+    int nx() const { return examples.size(); }
+
     Target target;
 
     /// Target values to predict
@@ -192,6 +195,8 @@ struct Data {
     std::vector<int> model_ids;
 
     std::vector<Model_Output> models;
+
+    std::vector<distribution<float> > examples;
 
     /// Sorted list of models in order of score
     std::vector<int> model_ranking;
