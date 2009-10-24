@@ -587,3 +587,57 @@ Gini = 0.8756866303033
 AUC = 0.93784331515165
 
 Not what I was hoping for...
+
+
+
+-------
+
+Denoising auto encoders
+
+Training on small training set, with sizes 200, 100, 80, 50.
+prob_cleared=0.25
+
+Layer 0:
+testing rmse of layer: exact 0.750719 noisy 0.824763
+testing rmse of stack: exact 0.750719 noisy 0.825078
+
+Layer 1:
+testing rmse of layer: exact 0.647396 noisy 0.663439
+testing rmse of stack: exact 1.2244 noisy 1.10089
+
+Layer 2:
+testing rmse of layer: exact 0.54445 noisy 0.572186
+testing rmse of stack: exact 1.62892 noisy 1.47308
+
+Layer 3:
+testing rmse of layer: exact 0.534287 noisy 0.553167
+testing rmse of stack: exact 2.01664 noisy 1.87444
+
+Note that the RMSE of the exact represntation becomes higher than that of the
+noisy representation when we get into the higher layers.  This is strange; we
+would expect the opposite!
+
+
+Setting prob_cleared to 0.01:
+
+Layer 0:
+
+testing rmse of layer: exact 0.656643 noisy 0.680308
+testing rmse of stack: exact 0.656643 noisy 0.680228
+
+
+Layer 1:
+
+testing rmse of layer: exact 0.570418 noisy 0.583081
+testing rmse of stack: exact 0.995111 noisy 0.995972
+
+Layer 2:
+
+testing rmse of layer: exact 0.427001 noisy 0.44472
+testing rmse of stack: exact 1.22612 noisy 1.22274
+
+
+Layer 3:
+
+testing rmse of layer: exact 0.410943 noisy 0.423614
+testing rmse of stack: exact 1.44175 noisy 1.43655
