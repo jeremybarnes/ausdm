@@ -32,7 +32,7 @@ endif
 
 
 LIBAUSDM_SOURCES := \
-	data.cc blender.cc boosting_blender.cc gated_blender.cc
+	data.cc blender.cc boosting_blender.cc gated_blender.cc decomposition.cc
 
 LIBAUSDM_LINK := \
 	utils ACE boost_date_time-mt db arch boosting svdlibc algebra

@@ -38,9 +38,12 @@
 #include "math/xdiv.h"
 #include "algebra/lapack.h"
 
+#include "decomposition.h"
 
 using namespace std;
 using namespace ML;
+using namespace ML::DB;
+
 
 void calc_W_updates(double k1, const double * x, double k2, const double * y,
                     const double * z, double * r, size_t n)
@@ -229,7 +232,7 @@ double train_example(const Twoway_Layer & layer,
                      int example_num,
                      const distribution<CFloat> & cleared_values,
                      distribution<double> & cleared_values_update,
-                     float prob_cleared,
+                     float max_prob_cleared,
                      Thread_Context & thread_context,
                      Twoway_Layer & updates,
                      int iter,
@@ -250,7 +253,13 @@ double train_example(const Twoway_Layer & layer,
     // Which ones had noise added?
     distribution<bool> was_cleared;
 
-    // Add noise
+    // Add noise up to the threshold
+    // We don't add a uniform amount as this causes a bias in things like the
+    // total.
+    //float prob_cleared = thread_context.random01() * max_prob_cleared;
+    //float prob_cleared = thread_context.random01() < 0.5 ? max_prob_cleared : 0.0;
+    float prob_cleared = max_prob_cleared;
+
     distribution<CFloat> noisy_input
         = add_noise(model_input, cleared_values, was_cleared, thread_context,
                     prob_cleared);
@@ -708,8 +717,9 @@ train_layer(Twoway_Layer & layer,
                 Train_Examples_Job job(layer,
                                        data,
                                        x2,
-                                       min(x + minibatch_size,
-                                           x2 + microbatch_size),
+                                       min<int>(nx,
+                                                min(x + minibatch_size,
+                                                    x2 + microbatch_size)),
                                        cleared_values, prob_cleared,
                                        thread_context,
                                        thread_context.random(),
@@ -1237,7 +1247,7 @@ int main(int argc, char ** argv)
 
     static const int nlayers = 4;
 
-    int layer_sizes[nlayers] = {200, 100, 80, 50};
+    int layer_sizes[nlayers] = {100, 80, 50, 30};
 
     vector<distribution<float> > layer_train(nx), layer_test(nxt);
 
@@ -1246,6 +1256,9 @@ int main(int argc, char ** argv)
 
     for (unsigned x = 0;  x < nxt;  ++x)
         layer_test[x] = 0.8f * testing_data.examples[x];
+
+    SVD_Decomposition svd;
+    svd.train(layer_train);
 
     // Learning rate is per-example
     learning_rate /= nx;
