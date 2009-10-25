@@ -256,8 +256,12 @@ int main(int argc, char ** argv)
         // Calculate the scores necessary for the job
         data_train.calc_scores();
 
-        if (decomposition)
+        if (decomposition) {
+            cerr << "applying decomposition" << endl;
             data_train.apply_decomposition(*decomposition);
+            cerr << "done." << endl;
+            
+        }
         data_train.stats();
         
         data_test.stats();

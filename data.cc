@@ -362,6 +362,8 @@ clear()
     model_ranking.clear();
     singular_targets.clear();
     target_stats.clear();
+    examples.clear();
+    decomposition = 0;
 }
 
 void
@@ -376,6 +378,8 @@ swap(Data & other)
     model_ranking.swap(other.model_ranking);
     singular_targets.swap(other.singular_targets);
     target_stats.swap(other.target_stats);
+    examples.swap(other.examples);
+    std::swap(decomposition, other.decomposition);
 }
 
 void
@@ -458,7 +462,8 @@ hold_out(Data & remove_to, float proportion,
 
     new_me.target = remove_to.target = target;
     new_me.model_names = remove_to.model_names = model_names;
-    
+    new_me.decomposition = remove_to.decomposition = decomposition;
+
     new_me.models.resize(model_names.size());
     remove_to.models.resize(model_names.size());
 
@@ -486,6 +491,7 @@ hold_out(Data & remove_to, float proportion,
             = remove_me[i] ? remove_to_example_weights : new_example_weights;
         add_to.targets.push_back(targets[i]);
         add_to.model_ids.push_back(model_ids[i]);
+        add_to.examples.push_back(examples[i]);
         weights.push_back(example_weights[i]);
 
         for (unsigned j = 0;  j < model_names.size();  ++j)

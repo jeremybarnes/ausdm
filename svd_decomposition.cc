@@ -8,6 +8,8 @@
 #include "svd_decomposition.h"
 #include "boosting/registry.h"
 #include "algebra/lapack.h"
+#include "stats/distribution_simd.h"
+#include "arch/simd_vector.h"
 
 
 using namespace std;
@@ -125,13 +127,13 @@ decompose(const distribution<float> & vals) const
         throw Exception("SVD_Decomposition::decompose(): wrong size");
 
     // First, get the singular vector for the model
-    distribution<double> target_singular(singular_values.size());
+    distribution<double> target_singular(singular_values_order.size());
         
     for (unsigned i = 0;  i < nm;  ++i)
-        target_singular += singular_models[i] * vals[i];
+        SIMD::vec_add(&target_singular[0], vals[i] / singular_values_order[i],
+                      &singular_models[i][0],
+                      &target_singular[0], singular_values_order.size());
         
-    target_singular /= singular_values;
-
     return distribution<float>(target_singular.begin(),
                                target_singular.end());
 }

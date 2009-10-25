@@ -264,9 +264,16 @@ train_conf(int model, const Data & training_data,
         const distribution<float> & model_outputs
             = training_data.examples[i];
         
+#if 0
+        cerr << "training_data.singular_targets.size() = "
+             << training_data.singular_targets.size() << endl;
+        cerr << "i = " << i << endl;
+        cerr << "training_data.nx() = " << training_data.nx() << endl;
+#endif
+
         distribution<double> target_singular
-            (training_data.singular_targets[i].begin(),
-             training_data.singular_targets[i].end());
+            (training_data.singular_targets.at(i).begin(),
+             training_data.singular_targets.at(i).end());
 
         distribution<float> features
             = get_conf_features(model, model_outputs, target_singular,
