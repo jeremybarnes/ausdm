@@ -54,7 +54,7 @@ int main(int argc, char ** argv)
     std::string decomposition_type;
 
     // What type of target do we predict?
-    //string target_type;
+    string target_type;
     {
         using namespace boost::program_options;
 
@@ -73,8 +73,8 @@ int main(int argc, char ** argv)
         options_description control_options("Control Options");
 
         control_options.add_options()
-            //("target-type,t", value<string>(&target_type),
-            // "select target type: auc or rmse")
+            ("target-type,t", value<string>(&target_type),
+             "select target type: auc or rmse")
             ("output-file,o",
              value<string>(&output_file),
              "dump output file to the given filename");
@@ -104,15 +104,10 @@ int main(int argc, char ** argv)
         }
     }
 
-#if 0
     Target target;
     if (target_type == "auc") target = AUC;
     else if (target_type == "rmse") target = RMSE;
     else throw Exception("target type " + target_type + " not known");
-
-    if (decomposer_name == "")
-        decomposer_name = target_type;
-#endif
 
     // Load up configuration
     Configuration config;
@@ -141,7 +136,7 @@ int main(int argc, char ** argv)
     // (Small only for the moment until we get the hang of it)
 
     for (unsigned i = 0;  i < 1;  ++i) {
-        for (unsigned j = 0;  j < 1;  ++j) {
+        for (unsigned j = target;  j <= target;  ++j) {
             for (unsigned k = 0;  k < 2;  ++k) {
                 string filename = format("download/%s_%s_%s.csv",
                                          size_names[i],
@@ -156,7 +151,7 @@ int main(int argc, char ** argv)
             }
         }
     }
-
+    
     cerr << "done" << endl;
 
     cerr << model_names.size() << " total models" << endl;

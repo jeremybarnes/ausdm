@@ -18,6 +18,7 @@
 #include <boost/tuple/tuple.hpp>
 
 #include "boosting/worker_task.h"
+#include "boosting/registry.h"
 
 #include "arch/timers.h"
 #include "utils/info.h"
@@ -44,6 +45,9 @@ void calc_W_updates(double k1, const double * x, double k2, const double * y,
 {
     return SIMD::vec_k1_x_plus_k2_y_z(k1, x, k2, y, z, r, n);
 }
+
+#define CHECK_NO_NAN(x) \
+    { for (unsigned i = 0;  i < x.size();  ++i) { if (isnan(x[i])) throw Exception(format("element %d of %s is Nan in %s %s:%d", i, #x, __PRETTY_FUNCTION__, __FILE__, __LINE__)); } }
 
 
 /*****************************************************************************/
@@ -81,6 +85,7 @@ distribution<double>
 Twoway_Layer::
 iapply(const distribution<double> & output) const
 {
+    CHECK_NO_NAN(output);
     distribution<double> activation = weights * output;
     activation += ibias;
     transfer(&activation[0], &activation[0], inputs(), transfer_function);
@@ -91,6 +96,7 @@ distribution<float>
 Twoway_Layer::
 iapply(const distribution<float> & output) const
 {
+    CHECK_NO_NAN(output);
     distribution<float> activation = multiply_r<float>(weights, output);
     activation += ibias;
     transfer(&activation[0], &activation[0], inputs(), transfer_function);
@@ -99,8 +105,23 @@ iapply(const distribution<float> & output) const
 
 distribution<double>
 Twoway_Layer::
+ipreprocess(const distribution<double> & input) const
+{
+    return input;
+}
+
+distribution<float>
+Twoway_Layer::
+ipreprocess(const distribution<float> & input) const
+{
+    return input;
+}
+
+distribution<double>
+Twoway_Layer::
 iactivation(const distribution<double> & output) const
 {
+    CHECK_NO_NAN(output);
     distribution<double> activation = weights * output;
     activation += ibias;
     return activation;
@@ -110,6 +131,7 @@ distribution<float>
 Twoway_Layer::
 iactivation(const distribution<float> & output) const
 {
+    CHECK_NO_NAN(output);
     distribution<float> activation = multiply_r<float>(weights, output);
     activation += ibias;
     return activation;
@@ -119,6 +141,7 @@ distribution<double>
 Twoway_Layer::
 itransfer(const distribution<double> & activation) const
 {
+    CHECK_NO_NAN(activation);
     int ni = inputs();
     if (activation.size() != ni)
         throw Exception("invalid sizes in itransfer");
@@ -131,6 +154,7 @@ distribution<float>
 Twoway_Layer::
 itransfer(const distribution<float> & activation) const
 {
+    CHECK_NO_NAN(activation);
     int ni = inputs();
     if (activation.size() != ni)
         throw Exception("invalid sizes in itransfer");
@@ -143,6 +167,7 @@ distribution<double>
 Twoway_Layer::
 iderivative(const distribution<double> & input) const
 {
+    CHECK_NO_NAN(input);
     if (input.size() != this->inputs())
         throw Exception("iderivative(): wrong size");
     int ni = this->inputs();
@@ -155,6 +180,7 @@ distribution<float>
 Twoway_Layer::
 iderivative(const distribution<float> & input) const
 {
+    CHECK_NO_NAN(input);
     if (input.size() != this->inputs())
         throw Exception("iderivative(): wrong size");
     int ni = this->inputs();
@@ -253,6 +279,8 @@ double train_example(const Twoway_Layer & layer,
     // Present this input
     distribution<CFloat> model_input(data.at(example_num));
 
+    CHECK_NO_NAN(model_input);
+    
     if (model_input.size() != ni) {
         cerr << "model_input.size() = " << model_input.size() << endl;
         cerr << "ni = " << ni << endl;
@@ -269,16 +297,25 @@ double train_example(const Twoway_Layer & layer,
     distribution<CFloat> noisy_input
         = add_noise(model_input, thread_context, prob_cleared);
 
-    distribution<CFloat> hidden_act
-        = layer.activation(noisy_input);
+    distribution<CFloat> noisy_pre
+        = layer.preprocess(noisy_input);
+
+    CHECK_NO_NAN(noisy_pre);
+    //distribution<CFloat> hidden_act
+    //    = layer.activation(noisy_pre);
             
     // Apply the layer
     distribution<CFloat> hidden_rep
         = layer.apply(noisy_input);
+
+    CHECK_NO_NAN(hidden_rep);
             
     // Reconstruct the input
     distribution<CFloat> denoised_input
         = layer.iapply(hidden_rep);
+
+
+    CHECK_NO_NAN(denoised_input);
             
     // Error signal
     distribution<CFloat> diff
@@ -365,6 +402,8 @@ double train_example(const Twoway_Layer & layer,
     distribution<CFloat> c_updates
         = -2 * diff * layer.iderivative(denoised_input);
 
+    CHECK_NO_NAN(c_updates);
+
 #if 0
     cerr << "c_updates = " << c_updates << endl;
 
@@ -400,13 +439,19 @@ double train_example(const Twoway_Layer & layer,
 #endif
 
     distribution<CFloat> hidden_activation
-        = multiply_r<CFloat>(noisy_input, W) + b.cast<CFloat>();
+        = multiply_r<CFloat>(noisy_pre, W) + b.cast<CFloat>();
+
+    CHECK_NO_NAN(hidden_activation);
 
     distribution<CFloat> hidden_deriv
         = layer.derivative(hidden_activation);
 
+    CHECK_NO_NAN(hidden_deriv);
+
     distribution<CFloat> b_updates
         = multiply_r<CFloat>(c_updates, W) * hidden_deriv;
+
+    CHECK_NO_NAN(b_updates);
 
 #if 0
     cerr << "b_updates = " << c_updates << endl;
@@ -420,7 +465,7 @@ double train_example(const Twoway_Layer & layer,
 
         // Apply the layer
         distribution<CFloat> hidden_act2
-            = layer.activation(noisy_input);
+            = layer.activation(noisy_pre);
 
         //cerr << "hidden_act[i] = " << hidden_act[i];
         hidden_act2[i] += epsilon;
@@ -499,8 +544,8 @@ double train_example(const Twoway_Layer & layer,
 
             // Apply the layer
             distribution<CFloat> hidden_act2
-                = layer.activation(noisy_input);
-            hidden_act2[j] += epsilon * noisy_input[i];
+                = layer.activation(noisy_pre);
+            hidden_act2[j] += epsilon * noisy_pre[i];
 
             //cerr << "noisy_input = " << noisy_input << endl;
             //cerr << "hidden_act = " << hidden_act << endl;
@@ -550,12 +595,12 @@ double train_example(const Twoway_Layer & layer,
     for (unsigned i = 0;  i < ni;  ++i) {
         double epsilon = 1e-6;
 
-        distribution<CFloat> noisy_input2 = noisy_input;
-        noisy_input2[i] += epsilon;
+        distribution<CFloat> noisy_pre2 = noisy_pre;
+        noisy_pre2[i] += epsilon;
 
         // Apply the layer
         distribution<CFloat> hidden_act2
-            = layer.activation(noisy_input2);
+            = layer.activation(noisy_pre2);
 
         distribution<CFloat> hidden_rep2
             = layer.transfer(hidden_act2);
@@ -1386,3 +1431,11 @@ train(const Data & training_data,
 
     stack.train(layer_train, layer_test, config, thread_context);
 }
+
+namespace {
+
+Register_Factory<Decomposition, DNAE_Decomposition>
+    DNAE_REGISTER("DNAE");
+
+} // file scope
+

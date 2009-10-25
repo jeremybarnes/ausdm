@@ -41,6 +41,9 @@ struct Twoway_Layer : public Dense_Layer<LFloat> {
     distribution<double> iapply(const distribution<double> & output) const;
     distribution<float> iapply(const distribution<float> & output) const;
 
+    distribution<double> ipreprocess(const distribution<double> & output) const;
+    distribution<float> ipreprocess(const distribution<float> & output) const;
+
     distribution<double> iactivation(const distribution<double> & output) const;
     distribution<float> iactivation(const distribution<float> & output) const;
 
