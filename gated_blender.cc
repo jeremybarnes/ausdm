@@ -228,10 +228,14 @@ train_conf(int model, const Data & training_data,
 {
     // Generate a matrix with the predictions
     int nx = training_data.nx();
+
+    if (nx == 0)
+        throw Exception("can't train with no examples");
+
     int nv = get_conf_features
         (model,
          training_data.examples[0],
-         training_data.singular_targets[0].cast<double>(),
+         training_data.singular_targets[0],
          Target_Stats())
         .size();
 
@@ -276,9 +280,8 @@ train_conf(int model, const Data & training_data,
         cerr << "training_data.nx() = " << training_data.nx() << endl;
 #endif
 
-        distribution<double> target_singular
-            (training_data.singular_targets.at(i).begin(),
-             training_data.singular_targets.at(i).end());
+        const distribution<float> & target_singular
+            = training_data.singular_targets[i];
 
         distribution<float> features
             = get_conf_features(model, model_outputs, target_singular,
@@ -474,6 +477,7 @@ init(const Data & training_data_in,
     int nv = get_blend_features
         (distribution<float>(nm),
          distribution<float>(nm),
+         blend_training_data.singular_targets[0],
          Target_Stats())
         .size();
 
@@ -526,14 +530,15 @@ init(const Data & training_data_in,
         const Target_Stats & target_stats
             = blend_training_data.target_stats[i];
         
-        distribution<double> target_singular
-            (blend_training_data.singular_targets[i].begin(),
-             blend_training_data.singular_targets[i].end());
+        const distribution<float> & target_singular
+            = blend_training_data.singular_targets[i];
 
-        distribution<float> conf = this->conf(model_outputs, target_stats);
+        distribution<float> conf
+            = this->conf(model_outputs, target_singular, target_stats);
 
         distribution<float> features
-            = get_blend_features(model_outputs, conf, target_stats);
+            = get_blend_features(model_outputs, conf, target_singular,
+                                 target_stats);
 
         if (features.size() != nv)
             throw Exception("nv is wrong");
@@ -621,7 +626,7 @@ distribution<float>
 Gated_Blender::
 get_conf_features(int model,
                   const distribution<float> & model_outputs,
-                  const distribution<double> & target_singular,
+                  const distribution<float> & target_singular,
                   const Target_Stats & target_stats) const
 {
     // Features:
@@ -696,12 +701,9 @@ get_conf_features(int model,
 distribution<float>
 Gated_Blender::
 conf(const ML::distribution<float> & models,
+     const ML::distribution<float> & target_singular,
      const Target_Stats & target_stats) const
 {
-    // First, get the singular vector for the model
-    distribution<float> target_singular
-        = data->apply_decomposition(models);
-
     int nm = models.size();
 
     // For each model, calculate a confidence
@@ -714,8 +716,7 @@ conf(const ML::distribution<float> & models,
         // What would we have predicted for this model?
 
         distribution<float> model_features
-            = get_conf_features(i, models, target_singular.cast<double>(),
-                                target_stats);
+            = get_conf_features(i, models, target_singular, target_stats);
 
         // Perform linear regression (in prediction mode)
         float output = model_features.dotprod(model_coefficients[i]);
@@ -758,6 +759,9 @@ blend_feature_space() const
         result->add_feature(s + "_diff_from_int", REAL);
     }
 
+    for (unsigned i = 0;  i < data->singular_targets[0].size();  ++i)
+        result->add_feature(format("pc%03d", i), REAL);
+
     result->add_feature("chosen_conf_min", REAL);
     result->add_feature("chosen_conf_max", REAL);
     result->add_feature("chosen_conf_avg", REAL);
@@ -786,6 +790,7 @@ distribution<float>
 Gated_Blender::
 get_blend_features(const distribution<float> & model_outputs,
                    const distribution<float> & model_conf,
+                   const distribution<float> & target_singular,
                    const Target_Stats & target_stats) const
 {
     distribution<float> result;
@@ -824,6 +829,7 @@ get_blend_features(const distribution<float> & model_outputs,
                                   fabs(real_prediction - floor(real_prediction))));
     }
 
+    result.insert(result.end(), target_singular.begin(), target_singular.end());
     result.push_back(dense_conf.min());
     result.push_back(dense_conf.max());
     result.push_back(dense_conf.total() / dense_conf.size());
@@ -857,6 +863,9 @@ float
 Gated_Blender::
 predict(const ML::distribution<float> & models) const
 {
+    distribution<float> target_singular
+        = data->apply_decomposition(models);
+
     bool debug = debug_predict;
 
     auto_ptr<Guard> guard;
@@ -870,7 +879,8 @@ predict(const ML::distribution<float> & models) const
     
     int nm = models.size();
 
-    distribution<float> conf = this->conf(models, target_stats);
+    distribution<float> conf = this->conf(models, target_singular,
+                                          target_stats);
     
     //float result = models.dotprod(conf) / conf.total();
 
@@ -883,7 +893,7 @@ predict(const ML::distribution<float> & models) const
     }
 
     distribution<float> blend_features
-        = get_blend_features(models, conf, target_stats);
+        = get_blend_features(models, conf, target_singular, target_stats);
 
 #if 0
     Link_Function blend_link_function
@@ -933,11 +943,15 @@ Gated_Blender::
 explain(const ML::distribution<float> & models) const
 {
     Target_Stats target_stats(models.begin(), models.end());
+
+    distribution<float> target_singular
+        = data->apply_decomposition(models);
     
-    distribution<float> conf = this->conf(models, target_stats);
+    distribution<float> conf = this->conf(models, target_singular,
+                                          target_stats);
     
     distribution<float> blend_features
-        = get_blend_features(models, conf, target_stats);
+        = get_blend_features(models, conf, target_singular, target_stats);
 
     blend_features.push_back(correct_prediction);
 

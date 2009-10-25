@@ -42,6 +42,7 @@ struct Gated_Blender : public Blender {
 
     virtual distribution<float>
     conf(const ML::distribution<float> & models,
+         const ML::distribution<float> & target_singular,
          const Target_Stats & stats) const;
     
     virtual float predict(const ML::distribution<float> & models) const;
@@ -54,12 +55,13 @@ struct Gated_Blender : public Blender {
     distribution<float>
     get_conf_features(int model,
                       const distribution<float> & model_outputs,
-                      const distribution<double> & target_singular,
+                      const distribution<float> & target_singular,
                       const Target_Stats & stats) const;
 
     distribution<float>
     get_blend_features(const distribution<float> & model_outputs,
                        const distribution<float> & model_conf,
+                       const distribution<float> & target_singular,
                        const Target_Stats & stats) const;
 
     ML::Link_Function link_function;
