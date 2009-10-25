@@ -27,13 +27,8 @@
 #include <boost/program_options/positional_options.hpp>
 #include <boost/program_options/parsers.hpp>
 #include <boost/program_options/variables_map.hpp>
-#include <boost/progress.hpp>
-#include <boost/tuple/tuple.hpp>
-#include <boost/bind.hpp>
 
 #include "decomposition.h"
-#include "svd_decomposition.h"
-#include "dnae_decomposition.h"
 
 
 using namespace std;
@@ -55,8 +50,8 @@ int main(int argc, char ** argv)
     // Extra configuration options
     vector<string> extra_config_options;
 
-    // Probability that it's cleared
-    float prob_cleared = 0.10;
+    // What type of decomposition?
+    std::string decomposition_type;
 
     // What type of target do we predict?
     //string target_type;
@@ -70,6 +65,8 @@ int main(int argc, char ** argv)
              "configuration file to read configuration options from")
             ("decomposer-name,n", value<string>(&decomposer_name),
              "name of decomposer in configuration file")
+            ("decomposer-type,t", value<string>(&decomposition_type),
+             "type of decomposition to train")
             ("extra-config-option", value<vector<string> >(&extra_config_options),
              "extra configuration option=value (can go directly on command line)");
 
@@ -124,15 +121,6 @@ int main(int argc, char ** argv)
     // Allow configuration to be overridden on the command line
     config.parse_command_line(extra_config_options);
 
-    double learning_rate = 0.75;
-    int minibatch_size = 256;
-    int niter = 50;
-
-    config.get(prob_cleared, "prob_cleared");
-    config.get(learning_rate, "learning_rate");
-    config.get(minibatch_size, "minibatch_size");
-    config.get(niter, "niter");
-
     // Load up the data
     Timer timer;
 
@@ -182,179 +170,14 @@ int main(int argc, char ** argv)
 
     const Data & training_data = data[0][0][0];
     const Data & testing_data  = data[0][0][1];
+
+    boost::shared_ptr<Decomposition> decomposition
+        = Decomposition::create(decomposition_type);
     
-    int nx = training_data.nx();
-    int nxt = testing_data.nx();
+    decomposition->train(training_data, testing_data, config);
 
-    Thread_Context thread_context;
-    
-    DNAE_Stack stack;
-    distribution<CFloat> cleared_values0;
-
-    static const int nlayers = 4;
-
-    int layer_sizes[nlayers] = {100, 80, 50, 30};
-
-    vector<distribution<float> > layer_train(nx), layer_test(nxt);
-
-    for (unsigned x = 0;  x < nx;  ++x)
-        layer_train[x] = 0.8f * training_data.examples[x];
-
-    for (unsigned x = 0;  x < nxt;  ++x)
-        layer_test[x] = 0.8f * testing_data.examples[x];
-
-    SVD_Decomposition svd;
-    svd.train(layer_train);
-
-    // Learning rate is per-example
-    learning_rate /= nx;
-
-    for (unsigned layer_num = 0;  layer_num < nlayers;  ++layer_num) {
-        cerr << endl << endl << endl << "--------- LAYER " << layer_num
-             << " ---------" << endl << endl;
-
-        vector<distribution<float> > next_layer_train, next_layer_test;
-
-        int ni
-            = layer_num == 0
-            ? training_data.nm()
-            : layer_sizes[layer_num - 1];
-
-        if (ni != layer_train[0].size())
-            throw Exception("ni is wrong");
-
-        int nh = layer_sizes[layer_num];
-
-        Twoway_Layer layer(ni, nh, TF_TANH, thread_context);
-        distribution<CFloat> cleared_values(ni);
-
-        if (ni == nh && false) {
-            //layer.zero_fill();
-            for (unsigned i = 0;  i < ni;  ++i) {
-                layer.weights[i][i] += 1.0;
-            }
-        }
-
-        for (unsigned iter = 0;  iter < niter;  ++iter) {
-            cerr << "iter " << iter << " training on " << nx << " examples"
-                 << endl;
-            Timer timer;
-
-            cerr << "weights: " << endl;
-            for (unsigned i = 0;  i < 10;  ++i) {
-                for (unsigned j = 0;  j < 10;  ++j) {
-                    cerr << format("%7.4f", layer.weights[i][j]);
-                }
-                cerr << endl;
-            }
-            
-            double max_abs_weight = 0.0;
-            double total_abs_weight = 0.0;
-            double total_weight_sqr = 0.0;
-            for (unsigned i = 0;  i < ni;  ++i) {
-                for (unsigned j = 0;  j < nh;  ++j) {
-                    double abs_weight = abs(layer.weights[i][j]);
-                    max_abs_weight = std::max(max_abs_weight, abs_weight);
-                    total_abs_weight += abs_weight;
-                    total_weight_sqr += abs_weight * abs_weight;
-                }
-            }
-
-            double avg_abs_weight = total_abs_weight / (ni * nh);
-            double rms_avg_weight = sqrt(total_weight_sqr / (ni * nh));
-
-            cerr << "max = " << max_abs_weight << " avg = "
-                 << avg_abs_weight << " rms avg = " << rms_avg_weight
-                 << endl;
-
-            distribution<LFloat> svalues(min(ni, nh));
-            boost::multi_array<LFloat, 2> layer2 = layer.weights;
-
-            int result = LAPack::gesdd("N",
-                                       layer2.shape()[1],
-                                       layer2.shape()[0],
-                                       layer2.data(), layer2.shape()[1], 
-                                       &svalues[0], 0, 1, 0, 1);
-            
-            if (result != 0)
-                throw Exception("error in SVD");
-
-            cerr << "svalues = " << svalues << endl;
-
-            double train_error
-                = train_layer(layer, cleared_values,
-                              layer_train, 0, nx, prob_cleared,
-                              thread_context, iter, minibatch_size,
-                              learning_rate);
-
-            cerr << "rmse of iteration: " << train_error << endl;
-            cerr << timer.elapsed() << endl;
-
-
-            timer.restart();
-            double test_error_exact = 0.0, test_error_noisy = 0.0;
-            
-            cerr << "testing on " << nxt << " examples"
-                 << endl;
-            boost::tie(test_error_exact, test_error_noisy)
-                = test_layer(layer, layer_test, next_layer_test, 0, nxt,
-                             cleared_values, prob_cleared, thread_context,
-                             iter);
-
-            cerr << "testing rmse of iteration: exact "
-                 << test_error_exact << " noisy " << test_error_noisy
-                 << endl;
-            cerr << timer.elapsed() << endl;
-        }
-
-        next_layer_train.resize(nx);
-        next_layer_test.resize(nxt);
-
-        // Calculate the inputs to the next layer
-        
-        cerr << "calculating next layer training inputs on "
-             << nx << " examples" << endl;
-        double train_error_exact = 0.0, train_error_noisy = 0.0;
-        boost::tie(train_error_exact, train_error_noisy)
-            = test_layer(layer, layer_train, next_layer_train, 0, nx,
-                         cleared_values, prob_cleared, thread_context,
-                         -1);
-
-        cerr << "training rmse of layer: exact "
-             << train_error_exact << " noisy " << train_error_noisy
-             << endl;
-
-        cerr << "calculating next layer testing inputs on "
-             << nxt << " examples" << endl;
-        double test_error_exact = 0.0, test_error_noisy = 0.0;
-        boost::tie(test_error_exact, test_error_noisy)
-            = test_layer(layer, layer_test, next_layer_test, 0, nxt,
-                         cleared_values, prob_cleared, thread_context,
-                         -1);
-        
-        cerr << "testing rmse of layer: exact "
-             << test_error_exact << " noisy " << test_error_noisy
-             << endl;
-
-        layer_train.swap(next_layer_train);
-        layer_test.swap(next_layer_test);
-
-        stack.push_back(layer);
-        if (layer_num == 0)
-            cleared_values0 = cleared_values;
-
-        // Test the layer stack
-        cerr << "calculating whole stack testing performance on "
-             << nxt << " examples" << endl;
-        boost::tie(test_error_exact, test_error_noisy)
-            = test_stack(stack, testing_data.examples, 0, nxt,
-                         cleared_values0, prob_cleared, thread_context,
-                         -1);
-        
-        cerr << "testing rmse of stack: exact "
-             << test_error_exact << " noisy " << test_error_noisy
-             << endl;
-    }
+    if (output_file != "")
+        decomposition->save(output_file);
 
     cerr << timer.elapsed() << endl;
 }

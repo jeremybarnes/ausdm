@@ -34,6 +34,13 @@ poly_reconstitute(ML::DB::Store_Reader & store)
     return Registry<Decomposition>::singleton().reconstitute(store);
 }
 
+boost::shared_ptr<Decomposition>
+Decomposition::
+create(const std::string & type)
+{
+    return Registry<Decomposition>::singleton().create(type);
+}
+
 void
 Decomposition::
 save(const std::string & filename) const

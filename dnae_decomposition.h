@@ -60,7 +60,34 @@ struct Twoway_Layer : public Dense_Layer<LFloat> {
 
     virtual void serialize(DB::Store_Writer & store) const;
     virtual void reconstitute(DB::Store_Reader & store);
+    
+    /** Trains a single iteration on the given data with the selected
+        parameters.  Returns a moving estimate of the RMSE on the
+        training set. */
+    double train_iter(const std::vector<distribution<float> > & data,
+                      float prob_cleared,
+                      Thread_Context & thread_context,
+                      int minibatch_size, float learning_rate);
 
+    /** Tests on the given dataset, returning the exact and noisy RMSE.  If
+        data_out is non-empty, then it will also fill it in with the
+        hidden representations for each of the inputs (with no noise added).
+        This information can be used to train the next layer. */
+    std::pair<double, double>
+    test_and_update(const std::vector<distribution<float> > & data_in,
+                    std::vector<distribution<float> > & data_out,
+                    float prob_cleared,
+                    Thread_Context & thread_context) const;
+
+    /** Tests on the given dataset, returning the exact and noisy RMSE. */
+    std::pair<double, double>
+    test(const std::vector<distribution<float> > & data,
+         float prob_cleared,
+         Thread_Context & thread_context) const
+    {
+        std::vector<distribution<float> > dummy;
+        return test_and_update(data, dummy, prob_cleared, thread_context);
+    }
 };
 
 
@@ -80,6 +107,11 @@ struct DNAE_Stack : public std::vector<Twoway_Layer> {
 
     void serialize(ML::DB::Store_Writer & store) const;
     void reconstitute(ML::DB::Store_Reader & store);
+
+    void train(const std::vector<distribution<float> > & training_data,
+               const std::vector<distribution<float> > & testing_data,
+               const Configuration & config,
+               ML::Thread_Context & thread_context);
 
     /** Tests on both pristine and noisy inputs.  The first returned is the
         error on pristine inputs.  The second is the error on noisy inputs.
@@ -115,6 +147,10 @@ struct DNAE_Decomposition : public Decomposition {
     virtual void reconstitute(ML::DB::Store_Reader & store);
 
     virtual std::string class_id() const;
+
+    virtual void train(const Data & training_data,
+                       const Data & testing_data,
+                       const ML::Configuration & config);
 };
 
 

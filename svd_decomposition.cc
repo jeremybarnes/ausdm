@@ -27,11 +27,23 @@ SVD_Decomposition()
 
 void
 SVD_Decomposition::
-train(const vector<distribution<float> > & data,
+train(const Data & training_data,
+      const Data & testing_data,
+      const ML::Configuration & config)
+{
+    int order = -1;
+    config.find(order, "order");
+
+    if (training_data.examples.empty()) return;
+
+    train(training_data.examples, order);
+}
+
+void
+SVD_Decomposition::
+train(const std::vector<distribution<float> > & data,
       int order)
 {
-    if (data.empty()) return;
-
     nm = data[0].size();
     nx = data.size();
         

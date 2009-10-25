@@ -6,6 +6,7 @@
 */
 
 #include "dnae_decomposition.h"
+#include "svd_decomposition.h"
 
 #include "algebra/matrix_ops.h"
 #include "math/xdiv.h"
@@ -14,6 +15,7 @@
 
 #include <boost/progress.hpp>
 #include <boost/bind.hpp>
+#include <boost/tuple/tuple.hpp>
 
 #include "boosting/worker_task.h"
 
@@ -195,6 +197,27 @@ zero_fill()
     Dense_Layer<LFloat>::zero_fill();
     ibias.fill(0.0);
 }
+
+void
+Twoway_Layer::
+serialize(DB::Store_Writer & store) const
+{
+    Dense_Layer<LFloat>::serialize(store);
+    store << ibias;
+}
+
+void
+Twoway_Layer::
+reconstitute(DB::Store_Reader & store)
+{
+    Dense_Layer<LFloat>::reconstitute(store);
+    store >> ibias;
+}
+
+
+/*****************************************************************************/
+/* DNAE_STACK                                                                */
+/*****************************************************************************/
 
 
 
@@ -644,19 +667,17 @@ struct Train_Examples_Job {
 };
 
 double
-train_layer(Twoway_Layer & layer,
-            const vector<distribution<float> > & data,
-            int first, int last,
-            float prob_cleared,
-            Thread_Context & thread_context,
-            int minibatch_size, float learning_rate)
+Twoway_Layer::
+train_iter(const vector<distribution<float> > & data,
+           float prob_cleared,
+           Thread_Context & thread_context,
+           int minibatch_size, float learning_rate)
 {
-    static Worker_Task & worker
-        = Worker_Task::instance(num_threads() - 1);
+    Worker_Task & worker = thread_context.worker();
 
     int nx = data.size();
-    int ni JML_UNUSED = layer.inputs();
-    int no JML_UNUSED= layer.outputs();
+    int ni JML_UNUSED = inputs();
+    int no JML_UNUSED = outputs();
 
     int microbatch_size = minibatch_size / (num_cpus() * 4);
             
@@ -687,7 +708,7 @@ train_layer(Twoway_Layer & layer,
             for (unsigned x2 = x;  x2 < nx && x2 < x + minibatch_size;
                  x2 += microbatch_size) {
                         
-                Train_Examples_Job job(layer,
+                Train_Examples_Job job(*this,
                                        data,
                                        x2,
                                        min<int>(nx,
@@ -707,7 +728,7 @@ train_layer(Twoway_Layer & layer,
                 
         worker.run_until_finished(group);
 
-        layer.update(updates, learning_rate);
+        update(updates, learning_rate);
     }
 
     return sqrt(total_mse / nx);
@@ -829,12 +850,11 @@ struct Test_Examples_Job {
 };
 
 pair<double, double>
-test_layer(const Twoway_Layer & layer,
-           const vector<distribution<float> > & data_in,
-           vector<distribution<float> > & data_out,
-           int first, int last,
-           float prob_cleared,
-           Thread_Context & thread_context)
+Twoway_Layer::
+test_and_update(const vector<distribution<float> > & data_in,
+                vector<distribution<float> > & data_out,
+                float prob_cleared,
+                Thread_Context & thread_context) const
 {
     Lock update_lock;
     double error_exact = 0.0;
@@ -844,8 +864,7 @@ test_layer(const Twoway_Layer & layer,
 
     boost::progress_display progress(nx, cerr);
 
-    static Worker_Task & worker
-        = Worker_Task::instance(num_threads() - 1);
+    Worker_Task & worker = thread_context.worker();
             
     // Now, submit it as jobs to the worker task to be done
     // multithreaded
@@ -866,7 +885,7 @@ test_layer(const Twoway_Layer & layer,
         
         for (unsigned x = 0; x < nx;  x += batch_size) {
             
-            Test_Examples_Job job(layer, data_in, data_out,
+            Test_Examples_Job job(*this, data_in, data_out,
                                   x, min<int>(x + batch_size, nx),
                                   prob_cleared,
                                   thread_context,
@@ -879,13 +898,12 @@ test_layer(const Twoway_Layer & layer,
             worker.add(job, "blend job", group);
         }
     }
-    
+
     worker.run_until_finished(group);
 
     return make_pair(sqrt(error_exact / nx),
                      sqrt(error_noisy / nx));
 }
-
 
 /*****************************************************************************/
 /* DNAE_STACK                                                                */
@@ -1127,6 +1145,185 @@ test(const vector<distribution<float> > & data,
                      sqrt(error_noisy / nx));
 }
 
+
+void
+DNAE_Stack::
+train(const std::vector<distribution<float> > & training_data,
+      const std::vector<distribution<float> > & testing_data,
+      const Configuration & config,
+      Thread_Context & thread_context)
+{
+    double learning_rate = 0.75;
+    int minibatch_size = 256;
+    int niter = 50;
+
+    /// Probability that each input is cleared
+    float prob_cleared = 0.10;
+
+
+    config.get(prob_cleared, "prob_cleared");
+    config.get(learning_rate, "learning_rate");
+    config.get(minibatch_size, "minibatch_size");
+    config.get(niter, "niter");
+
+    int nx = training_data.size();
+    int nxt = testing_data.size();
+
+    if (nx == 0)
+        throw Exception("can't train on no data");
+
+    static const int nlayers = 4;
+
+    int layer_sizes[nlayers] = {100, 80, 50, 30};
+
+    vector<distribution<float> > layer_train = training_data;
+    vector<distribution<float> > layer_test = testing_data;
+
+    // Do a SVD so that we can compare against it
+    SVD_Decomposition svd;
+    svd.train(training_data);
+
+    // Learning rate is per-example
+    learning_rate /= nx;
+
+    for (unsigned layer_num = 0;  layer_num < nlayers;  ++layer_num) {
+        cerr << endl << endl << endl << "--------- LAYER " << layer_num
+             << " ---------" << endl << endl;
+
+        vector<distribution<float> > next_layer_train, next_layer_test;
+
+        int ni
+            = layer_num == 0
+            ? training_data[0].size()
+            : layer_sizes[layer_num - 1];
+
+        if (ni != layer_train[0].size())
+            throw Exception("ni is wrong");
+
+        int nh = layer_sizes[layer_num];
+
+        Twoway_Layer layer(ni, nh, TF_TANH, thread_context);
+        distribution<CFloat> cleared_values(ni);
+
+        if (ni == nh && false) {
+            //layer.zero_fill();
+            for (unsigned i = 0;  i < ni;  ++i) {
+                layer.weights[i][i] += 1.0;
+            }
+        }
+
+        for (unsigned iter = 0;  iter < niter;  ++iter) {
+            cerr << "iter " << iter << " training on " << nx << " examples"
+                 << endl;
+            Timer timer;
+
+            cerr << "weights: " << endl;
+            for (unsigned i = 0;  i < 10;  ++i) {
+                for (unsigned j = 0;  j < 10;  ++j) {
+                    cerr << format("%7.4f", layer.weights[i][j]);
+                }
+                cerr << endl;
+            }
+            
+            double max_abs_weight = 0.0;
+            double total_abs_weight = 0.0;
+            double total_weight_sqr = 0.0;
+            for (unsigned i = 0;  i < ni;  ++i) {
+                for (unsigned j = 0;  j < nh;  ++j) {
+                    double abs_weight = abs(layer.weights[i][j]);
+                    max_abs_weight = std::max(max_abs_weight, abs_weight);
+                    total_abs_weight += abs_weight;
+                    total_weight_sqr += abs_weight * abs_weight;
+                }
+            }
+
+            double avg_abs_weight = total_abs_weight / (ni * nh);
+            double rms_avg_weight = sqrt(total_weight_sqr / (ni * nh));
+
+            cerr << "max = " << max_abs_weight << " avg = "
+                 << avg_abs_weight << " rms avg = " << rms_avg_weight
+                 << endl;
+
+            distribution<LFloat> svalues(min(ni, nh));
+            boost::multi_array<LFloat, 2> layer2 = layer.weights;
+
+            int result = LAPack::gesdd("N",
+                                       layer2.shape()[1],
+                                       layer2.shape()[0],
+                                       layer2.data(), layer2.shape()[1], 
+                                       &svalues[0], 0, 1, 0, 1);
+            
+            if (result != 0)
+                throw Exception("error in SVD");
+
+            cerr << "svalues = " << svalues << endl;
+
+            double train_error
+                = layer.train_iter(layer_train, prob_cleared, thread_context,
+                                   minibatch_size, learning_rate);
+
+            cerr << "rmse of iteration: " << train_error << endl;
+            cerr << timer.elapsed() << endl;
+
+
+            timer.restart();
+            double test_error_exact = 0.0, test_error_noisy = 0.0;
+            
+            cerr << "testing on " << nxt << " examples"
+                 << endl;
+            boost::tie(test_error_exact, test_error_noisy)
+                = layer.test(layer_test, prob_cleared, thread_context);
+
+            cerr << "testing rmse of iteration: exact "
+                 << test_error_exact << " noisy " << test_error_noisy
+                 << endl;
+            cerr << timer.elapsed() << endl;
+        }
+
+        next_layer_train.resize(nx);
+        next_layer_test.resize(nxt);
+
+        // Calculate the inputs to the next layer
+        
+        cerr << "calculating next layer training inputs on "
+             << nx << " examples" << endl;
+        double train_error_exact = 0.0, train_error_noisy = 0.0;
+        boost::tie(train_error_exact, train_error_noisy)
+            = layer.test_and_update(layer_train, next_layer_train,
+                                    prob_cleared, thread_context);
+
+        cerr << "training rmse of layer: exact "
+             << train_error_exact << " noisy " << train_error_noisy
+             << endl;
+
+        cerr << "calculating next layer testing inputs on "
+             << nxt << " examples" << endl;
+        double test_error_exact = 0.0, test_error_noisy = 0.0;
+        boost::tie(test_error_exact, test_error_noisy)
+            = layer.test_and_update(layer_test, next_layer_test,
+                                    prob_cleared, thread_context);
+        
+        cerr << "testing rmse of layer: exact "
+             << test_error_exact << " noisy " << test_error_noisy
+             << endl;
+
+        layer_train.swap(next_layer_train);
+        layer_test.swap(next_layer_test);
+
+        push_back(layer);
+
+        // Test the layer stack
+        cerr << "calculating whole stack testing performance on "
+             << nxt << " examples" << endl;
+        boost::tie(test_error_exact, test_error_noisy)
+            = test(testing_data, prob_cleared, thread_context);
+        
+        cerr << "testing rmse of stack: exact "
+             << test_error_exact << " noisy " << test_error_noisy
+             << endl;
+    }
+}
+
 } // namespace ML
 
 
@@ -1166,4 +1363,26 @@ DNAE_Decomposition::
 class_id() const
 {
     return "DNAE";
+}
+
+void
+DNAE_Decomposition::
+train(const Data & training_data,
+      const Data & testing_data,
+      const Configuration & config)
+{
+    Thread_Context thread_context;
+
+    int nx = training_data.nx();
+    int nxt = testing_data.nx();
+
+    vector<distribution<float> > layer_train(nx), layer_test(nxt);
+
+    for (unsigned x = 0;  x < nx;  ++x)
+        layer_train[x] = 0.8f * training_data.examples[x];
+
+    for (unsigned x = 0;  x < nxt;  ++x)
+        layer_test[x] = 0.8f * testing_data.examples[x];
+
+    stack.train(layer_train, layer_test, config, thread_context);
 }

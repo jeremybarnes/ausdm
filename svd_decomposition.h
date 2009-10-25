@@ -34,6 +34,10 @@ struct SVD_Decomposition : public Decomposition {
     /// Singular representation of each model; reduced to order
     std::vector<distribution<float> > singular_models;
 
+    virtual void train(const Data & training_data,
+                       const Data & testing_data,
+                       const ML::Configuration & config);
+
     void train(const std::vector<distribution<float> > & data,
                int order = -1);
 
