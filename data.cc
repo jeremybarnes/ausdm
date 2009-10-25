@@ -15,6 +15,9 @@
 #include "arch/timers.h"
 #include "arch/threads.h"
 #include "decomposition.h"
+#include "boosting/worker_task.h"
+#include "utils/guard.h"
+#include <boost/bind.hpp>
 
 
 using namespace std;
@@ -510,6 +513,30 @@ hold_out(Data & remove_to, float proportion,
     example_weights.swap(new_example_weights);
 }
 
+struct Decompose_Job {
+
+    vector<distribution<float> > & decompositions;
+    const vector<distribution<float> > & examples;
+    const Decomposition & decomposition;
+    int first;
+    int last;
+
+    Decompose_Job(vector<distribution<float> > & decompositions,
+                  const vector<distribution<float> > & examples,
+                  const Decomposition & decomposition,
+                  int first, int last)
+        : decompositions(decompositions), examples(examples),
+          decomposition(decomposition), first(first), last(last)
+    {
+    }
+
+    void operator () ()
+    {
+        for (unsigned x = first;  x < last;  ++x)
+            decompositions[x] = decomposition.decompose(examples[x]);
+    }
+};
+
 void
 Data::
 apply_decomposition(const Decomposition & decomposition)
@@ -518,8 +545,34 @@ apply_decomposition(const Decomposition & decomposition)
 
     singular_targets.resize(nx());
 
-    for (unsigned x = 0;  x < nx();  ++x)
-        singular_targets[x] = decomposition.decompose(examples[x]);
+    static Worker_Task & worker = Worker_Task::instance(num_threads() - 1);
+        
+    // Now, submit it as jobs to the worker task to be done multithreaded
+    int group;
+    {
+        int parent = -1;  // no parent group
+        group = worker.get_group(NO_JOB, "dump user results task", parent);
+        
+        // Make sure the group gets unlocked once we've populated
+        // everything
+        Call_Guard guard(boost::bind(&Worker_Task::unlock_group,
+                                     boost::ref(worker),
+                                     group));
+        
+        for (unsigned i = 0;  i < nx();  i += 100) {
+            int last = std::min<int>(nx(), i + 100);
+
+            Decompose_Job job(singular_targets,
+                              examples,
+                              decomposition,
+                              i, last);
+
+            worker.add(job, "decompose_job", group);
+        }
+    }
+        
+    // Add this thread to the thread pool until we're ready
+    worker.run_until_finished(group);
 }
 
 distribution<float>
