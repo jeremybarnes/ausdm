@@ -35,6 +35,8 @@ struct Decomposition {
     static boost::shared_ptr<Decomposition>
     create(const std::string & type);
 
+    static bool known_type(const std::string & type);
+
     virtual void serialize(ML::DB::Store_Writer & store) const = 0;
     virtual void reconstitute(ML::DB::Store_Reader & store) = 0;
 

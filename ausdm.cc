@@ -7,6 +7,7 @@
 
 #include "data.h"
 #include "blender.h"
+#include "decomposition.h"
 
 #include <fstream>
 #include <iterator>
@@ -120,8 +121,8 @@ int main(int argc, char ** argv)
     // Do we train on testing data?
     bool train_on_test = false;
 
-    // Do we avoid decomposigion?
-    bool no_decomposition = false;
+    // What is the decomposition?  Either a filename or a type.
+    string decomposition_name = "SVD";
 
     {
         using namespace boost::program_options;
@@ -149,8 +150,8 @@ int main(int argc, char ** argv)
              "select number of trials to perform")
             ("train-on-test", value<bool>(&train_on_test)->zero_tokens(),
              "train on testing data as well (to test biasing, etc)" )
-            ("no-decomposition", value<bool>(&no_decomposition)->zero_tokens(),
-             "don't perform a decomposition")
+            ("decomposition", value<string>(&decomposition_name),
+             "filename or name of decomposition; empty = none")
             ("output-file,o",
              value<string>(&output_file),
              "dump output file to the given filename");
@@ -209,8 +210,11 @@ int main(int argc, char ** argv)
     else throw Exception("unknown target type");
 
 
-    Data decompose_training_data;
-    if (!no_decomposition) {
+    boost::shared_ptr<Decomposition> decomposition;
+    if (Decomposition::known_type(decomposition_name)) {
+        decomposition = Decomposition::create(decomposition_name);
+        
+        Data decompose_training_data;
         decompose_training_data.load("download/S_"
                                      + targ_type_uc + "_Train.csv", target);
         decompose_training_data.load("download/S_"
@@ -218,9 +222,13 @@ int main(int argc, char ** argv)
                                      false);
         
         cerr << "training decomposition" << endl;
-        decompose_training_data.decompose();
+        decomposition->train(decompose_training_data,
+                             decompose_training_data,
+                             config);
         cerr << "done" << endl;
     }
+    else if (decomposition_name != "")
+        decomposition = Decomposition::load(decomposition_name);
 
     vector<double> trial_scores;
 
@@ -248,8 +256,8 @@ int main(int argc, char ** argv)
         // Calculate the scores necessary for the job
         data_train.calc_scores();
 
-        if (!no_decomposition)
-            data_train.apply_decomposition(decompose_training_data);
+        if (decomposition)
+            data_train.apply_decomposition(*decomposition);
         data_train.stats();
         
         data_test.stats();

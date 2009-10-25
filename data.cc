@@ -14,6 +14,7 @@
 #include "algebra/lapack.h"
 #include "arch/timers.h"
 #include "arch/threads.h"
+#include "decomposition.h"
 
 
 using namespace std;
@@ -359,8 +360,6 @@ clear()
     model_ids.clear();
     models.clear();
     model_ranking.clear();
-    singular_values.clear();
-    singular_models.clear();
     singular_targets.clear();
     target_stats.clear();
 }
@@ -375,8 +374,6 @@ swap(Data & other)
     model_ids.swap(other.model_ids);
     models.swap(other.models);
     model_ranking.swap(other.model_ranking);
-    singular_values.swap(other.singular_values);
-    singular_models.swap(other.singular_models);
     singular_targets.swap(other.singular_targets);
     target_stats.swap(other.target_stats);
 }
@@ -461,8 +458,6 @@ hold_out(Data & remove_to, float proportion,
 
     new_me.target = remove_to.target = target;
     new_me.model_names = remove_to.model_names = model_names;
-    new_me.singular_values = remove_to.singular_values = singular_values;
-    new_me.singular_models = remove_to.singular_models = singular_models;
     
     new_me.models.resize(model_names.size());
     remove_to.models.resize(model_names.size());
@@ -511,109 +506,22 @@ hold_out(Data & remove_to, float proportion,
 
 void
 Data::
-decompose()
+apply_decomposition(const Decomposition & decomposition)
 {
-    int m = nm();
-    int n = nx();
-
-    boost::multi_array<float, 2> values(boost::extents[n][m]);
-
-    for (unsigned i = 0;  i < m;  ++i)
-        for (unsigned j = 0;  j < n;  ++j)
-            values[j][i] = models[i][j];
-
-    int nvalues = std::min(m, n);
-
-    cerr << "n = " << n << " m = " << m << " nvalues = " << nvalues << endl;
-
-    distribution<float> svalues(nvalues);
-    boost::multi_array<float, 2> lvectorsT(boost::extents[nvalues][m]);
-    boost::multi_array<float, 2> rvectors(boost::extents[n][nvalues]);
-
-    int result = LAPack::gesdd("S", m, n,
-                               values.data(), m,
-                               &svalues[0],
-                               &lvectorsT[0][0], m,
-                               &rvectors[0][0], nvalues);
-
-    if (result != 0)
-        throw Exception("gesdd returned non-zero");
-
-    // Transpose rvectors
-    //boost::multi_array<float, 2> rvectors(boost::extents[nvalues][n]);
-    //for (unsigned i = 0;  i < nvalues;  ++i)
-    //    for (unsigned j = 0;  j < n;  ++j)
-    //        rvectors[i][j] = rvectorsT[j][i];
-
-    // Transpose lvectors
-    boost::multi_array<float, 2> lvectors(boost::extents[m][nvalues]);
-    for (unsigned i = 0;  i < m;  ++i)
-        for (unsigned j = 0;  j < nvalues;  ++j)
-            lvectors[i][j] = lvectorsT[j][i];
-
-    int nwanted = std::min(nvalues, 200);
-    //nwanted = 50;
-
-    singular_values
-        = distribution<float>(svalues.begin(), svalues.begin() + nwanted);
-
-    //cerr << "singular_values = " << singular_values << endl;
-
-    singular_models.resize(nm());
-    
-    for (unsigned i = 0;  i < nm();  ++i)
-        singular_models[i]
-            = distribution<float>(&lvectors[i][0],
-                                  &lvectors[i][nwanted - 1] + 1);
-
-    //cerr << "singular_models[0] = " << singular_models[0] << endl;
-    //cerr << "singular_models[1] = " << singular_models[1] << endl;
+    this->decomposition = &decomposition;
 
     singular_targets.resize(nx());
 
-    for (unsigned i = 0;  i < nx();  ++i)
-        singular_targets[i]
-            = distribution<float>(&rvectors[i][0],
-                                  &rvectors[i][nwanted - 1] + 1);
-
-    //cerr << "singular_targets[0] = " << singular_targets[0] << endl;
-    //cerr << "singular_targets[1] = " << singular_targets[1] << endl;
-}
-
-void
-Data::
-apply_decomposition(const Data & decomposed)
-{
-    singular_targets.resize(nx());
-
-    for (unsigned i = 0;  i < nx();  ++i) {
-        distribution<float> mvalues(nm());
-        for (unsigned j = 0;  j < nm();  ++j)
-            mvalues[j] = models[j][i];
-
-        singular_targets[i] = decomposed.apply_decomposition(mvalues);
-    }
-
-    singular_values = decomposed.singular_values;
-    singular_models = decomposed.singular_models;
+    for (unsigned x = 0;  x < nx();  ++x)
+        singular_targets[x] = decomposition.decompose(examples[x]);
 }
 
 distribution<float>
 Data::
-apply_decomposition(const distribution<float> & models) const
+apply_decomposition(const distribution<float> & example) const
 {
-    if (singular_values.empty())
-        throw Exception("apply_decomposition(): no decomposition was done");
-
-    // First, get the singular vector for the model
-    distribution<double> target_singular(singular_values.size());
-
-    for (unsigned i = 0;  i < nm();  ++i)
-        target_singular += singular_models[i] * models[i];
-    
-    target_singular /= singular_values;
-
-    return distribution<float>(target_singular.begin(), target_singular.end());
+    if (!decomposition) return distribution<float>();
+    return decomposition->decompose(example);
 }
 
 void

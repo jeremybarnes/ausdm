@@ -41,6 +41,13 @@ create(const std::string & type)
     return Registry<Decomposition>::singleton().create(type);
 }
 
+bool
+Decomposition::
+known_type(const std::string & type)
+{
+    return Registry<Decomposition>::singleton().known_type(type);
+}
+
 void
 Decomposition::
 save(const std::string & filename) const

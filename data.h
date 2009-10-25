@@ -12,6 +12,7 @@
 #include <vector>
 #include <string>
 #include "stats/distribution.h"
+#include <boost/shared_ptr.hpp>
 
 /// What kind of target are we calculating?
 enum Target {
@@ -21,6 +22,7 @@ enum Target {
 
 using ML::distribution;
 
+class Decomposition;
 
 /*****************************************************************************/
 /* DIFFICULTY                                                                */
@@ -154,6 +156,11 @@ struct Target_Stats {
 /** Data structure to contain the dataset that we are working on. */
 
 struct Data {
+    Data()
+        : decomposition(0)
+    {
+    }
+    
     void load(const std::string & filename, Target target,
               bool clear_first = true);
 
@@ -171,12 +178,10 @@ struct Data {
 
     void swap(Data & other);
 
-    void decompose();
-
-    void apply_decomposition(const Data & decomposed);
+    void apply_decomposition(const Decomposition & decomposition);
 
     distribution<float>
-    apply_decomposition(const distribution<float> & models) const;
+    apply_decomposition(const distribution<float> & example) const;
 
     void stats();
 
@@ -201,12 +206,6 @@ struct Data {
     /// Sorted list of models in order of score
     std::vector<int> model_ranking;
 
-    /// Singular values of SVD on rankings
-    distribution<float> singular_values;
-
-    /// Singular representation of each model
-    std::vector<distribution<float> > singular_models;
-
     /// Singular representation of each target
     std::vector<distribution<float> > singular_targets;
 
@@ -215,6 +214,8 @@ struct Data {
 
     /// Information about how difficult each one is
     std::vector<Difficulty> target_difficulty;
+
+    const Decomposition * decomposition;
 };
 
 #endif /* __ausdm__data_h__ */

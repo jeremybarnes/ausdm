@@ -225,8 +225,8 @@ train_conf(int model, const Data & training_data,
     int nx = training_data.nx();
     int nv = get_conf_features
         (model,
-         distribution<float>(training_data.nm()),
-         distribution<double>(training_data.singular_values.size()),
+         training_data.examples[0],
+         training_data.singular_targets[0].cast<double>(),
          Target_Stats())
         .size();
 
@@ -580,7 +580,7 @@ conf_feature_space() const
 
     result->add_feature("model_pred", REAL);
 
-    for (unsigned i = 0;  i < data->singular_values.size();  ++i)
+    for (unsigned i = 0;  i < data->singular_targets[0].size();  ++i)
         result->add_feature(format("pc%03d", i), REAL);
 
     result->add_feature("error_10", REAL);
@@ -620,6 +620,7 @@ get_conf_features(int model,
 
     float real_prediction = model_outputs[model];
     
+#if 0
     distribution<float> weights(data->singular_values.size());
     for (unsigned j = 0;  j < 10;  ++j)
         weights[j] = 1.0;
@@ -634,7 +635,11 @@ get_conf_features(int model,
     float model_prediction_50
         = (target_singular * data->singular_values)
         .dotprod(data->singular_models[model] * weights);
-    
+#else
+    float model_prediction_10 = 0.0;
+    float model_prediction_50 = 0.0;
+#endif
+
     distribution<float> result;
 
     result.push_back(1.0);  // bias
