@@ -1383,6 +1383,13 @@ decompose(const distribution<float> & vals) const
     return stack.apply(vals);
 }
 
+distribution<float>
+DNAE_Decomposition::
+recompose(const distribution<float> & decomposition, int order) const
+{
+    return stack.iapply(decomposition);
+}
+
 void
 DNAE_Decomposition::
 serialize(ML::DB::Store_Writer & store) const

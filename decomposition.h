@@ -24,6 +24,14 @@ struct Decomposition {
     virtual distribution<float>
     decompose(const distribution<float> & vals) const = 0;
 
+    /** Perform a decomposition to the given order (number of values) and
+        then reconstruct, returning the reconstructed version.  If order is
+        -1, then it will be done to the natural order of the decomposition.
+    */
+    virtual distribution<float>
+    recompose(const distribution<float> & decomposition,
+              int order = -1) const = 0;
+
     void poly_serialize(ML::DB::Store_Writer & store) const;
 
     static boost::shared_ptr<Decomposition>

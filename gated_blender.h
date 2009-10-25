@@ -68,6 +68,8 @@ struct Gated_Blender : public Blender {
     int num_models_to_train;
     bool debug_predict;
 
+    std::vector<int> recomposition_sizes;
+
     std::vector<ML::distribution<float> > model_coefficients;
     distribution<float> blend_coefficients;
     boost::shared_ptr<ML::Dense_Feature_Space> blender_fs;

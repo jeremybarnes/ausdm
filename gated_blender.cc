@@ -16,10 +16,11 @@
 #include "stats/distribution_ops.h"
 #include "utils/filter_streams.h"
 #include "boosting/classifier_generator.h"
-
+#include "decomposition.h"
 
 using namespace ML;
 using namespace ML::Stats;
+using ML::Stats::sqr;
 using namespace std;
 
 
@@ -62,6 +63,11 @@ configure(const ML::Configuration & config_,
     config.find(blender_trainer_name, "blender.trainer_name");
 
     this->target = target;
+
+    recomposition_sizes.push_back(10);
+    recomposition_sizes.push_back(20);
+    recomposition_sizes.push_back(50);
+    recomposition_sizes.push_back(100);
 }
 
 template<class Float>
@@ -600,8 +606,14 @@ conf_feature_space() const
     for (unsigned i = 0;  i < data->singular_targets[0].size();  ++i)
         result->add_feature(format("pc%03d", i), REAL);
 
-    result->add_feature("error_10", REAL);
-    result->add_feature("error_10_abs", REAL);
+    for (unsigned i = 0;  i < recomposition_sizes.size();  ++i) {
+        string s = format("error_%d", recomposition_sizes[i]);
+        result->add_feature(s, REAL);
+        result->add_feature(s + "_abs", REAL);
+        result->add_feature(s + "_sqr", REAL);
+        result->add_feature(s + "_rmse", REAL);
+    }
+
     result->add_feature("error_50", REAL);
     result->add_feature("error_50_abs", REAL);
 
@@ -622,6 +634,8 @@ conf_feature_space() const
     return result;
 }
 
+inline float sqr(float f) { return f * f; }
+
 distribution<float>
 Gated_Blender::
 get_conf_features(int model,
@@ -636,26 +650,6 @@ get_conf_features(int model,
     // 4.  Error with 50 models
 
     float real_prediction = model_outputs[model];
-    
-#if 0
-    distribution<float> weights(data->singular_values.size());
-    for (unsigned j = 0;  j < 10;  ++j)
-        weights[j] = 1.0;
-    
-    float model_prediction_10
-        = (target_singular * data->singular_values)
-        .dotprod(data->singular_models[model] * weights);
-    
-    for (unsigned j = 10;  j < 50;  ++j)
-        weights[j] = 1.0;
-    
-    float model_prediction_50
-        = (target_singular * data->singular_values)
-        .dotprod(data->singular_models[model] * weights);
-#else
-    float model_prediction_10 = 0.0;
-    float model_prediction_50 = 0.0;
-#endif
 
     distribution<float> result;
 
@@ -666,10 +660,20 @@ get_conf_features(int model,
                   target_singular.begin(), target_singular.end());
     //result.insert(result.end(),
     //              model_outputs.begin(), model_outputs.end());
-    result.push_back(model_prediction_10 - real_prediction);
-    result.push_back(fabs(result.back()));
-    result.push_back(model_prediction_50 - real_prediction);
-    result.push_back(fabs(result.back()));
+
+    for (unsigned i = 0;  i < recomposition_sizes.size();  ++i) {
+        int nr = recomposition_sizes[i];
+
+        // TODO: this is unnecessarily done for each of the models
+        distribution<float> reconst;
+        if (!data->decomposition) reconst = model_outputs;
+        else reconst = data->decomposition->recompose(target_singular, nr);
+
+        result.push_back(reconst[model] - model_outputs[model]);
+        result.push_back(abs(reconst[model] - model_outputs[model]));
+        result.push_back(sqr(reconst[model] - model_outputs[model]));
+        result.push_back((reconst - model_outputs).two_norm());
+    }
 
     // 5.  Target Mean output
     // 6.  Target standard deviation of output

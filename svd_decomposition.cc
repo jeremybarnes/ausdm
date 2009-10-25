@@ -130,15 +130,44 @@ decompose(const distribution<float> & vals) const
     distribution<double> target_singular(singular_values_order.size());
         
     for (unsigned i = 0;  i < nm;  ++i)
-        SIMD::vec_add(&target_singular[0], vals[i] / singular_values_order[i],
+        SIMD::vec_add(&target_singular[0], vals[i],
                       &singular_models[i][0],
                       &target_singular[0], singular_values_order.size());
+
+    target_singular /= singular_values_order;
 
     //cerr << "singular_values_order = " << singular_values_order << endl;
     //cerr << "singular for model: " << target_singular << endl;
         
     return distribution<float>(target_singular.begin(),
                                target_singular.end());
+}
+
+distribution<float>
+SVD_Decomposition::
+recompose(const distribution<float> & decomposition, int order) const
+{
+    if (order == -1 || order > decomposition.size())
+        order = decomposition.size();
+
+    if (decomposition.size() > this->order)
+        throw Exception("unknown decomposition");
+
+    if (singular_values.empty())
+        throw Exception("apply_decomposition(): no decomposition was done");
+        
+    distribution<float> scaled = decomposition;
+
+    for (unsigned i = 0;  i < order;  ++i)
+        scaled[i] *= singular_values_order[i];
+    
+    distribution<double> result(nm);
+    for (unsigned i = 0;  i < nm;  ++i)
+        result[i] = SIMD::vec_dotprod_dp(&scaled[0],
+                                         &singular_models[i][0],
+                                         order);
+
+    return result.cast<float>();
 }
 
 void

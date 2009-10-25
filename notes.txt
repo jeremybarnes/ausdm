@@ -641,3 +641,31 @@ Layer 3:
 
 testing rmse of layer: exact 0.410943 noisy 0.423614
 testing rmse of stack: exact 1.44175 noisy 1.43655
+
+
+-----------------------
+
+Various fixes (AUC), no reconstitutions:
+
+./build/x86_64/bin/ausdm -t auc -T 0.20
+
+score: 0.0571  baseline: 0.0597  diff: -0.00257
+category UNKNOWN: count 0 avg error 0 baseline avg error 0 avg improvement 0
+category AUTO: count 1792 avg error 0.0250538 baseline avg error 0.0277302 avg improvement 0.00267647
+category POSS: count 1046 avg error 0.0772795 baseline avg error 0.080278 avg improvement 0.0029985
+category IMP: count 162 avg error 0.281168 baseline avg error 0.279722 avg improvement -0.00144525
+overall: count 3000 avg error 0.0570933 baseline avg error 0.0596595 avg improvement 0.00256618
+0.0571 +/-    nan
+
+
+With the 4 sizes of reconstitutions:
+
+score: 0.0569  baseline: 0.0597  diff: -0.00276
+category UNKNOWN: count 0 avg error 0 baseline avg error 0 avg improvement 0
+category AUTO: count 1792 avg error 0.0249997 baseline avg error 0.0277302 avg improvement 0.00273057
+category POSS: count 1046 avg error 0.0774971 baseline avg error 0.080278 avg improvement 0.00278095
+category IMP: count 162 avg error 0.276724 baseline avg error 0.279722 avg improvement 0.00299887
+overall: count 3000 avg error 0.0568969 baseline avg error 0.0596595 avg improvement 0.00276262
+
+
+0.0569 +/-    nan
