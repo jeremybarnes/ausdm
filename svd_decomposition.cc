@@ -57,8 +57,8 @@ train(const std::vector<distribution<float> > & data,
         
     nvalues = std::min(nm, nx);
         
-    cerr << "nx = " << nx << " nm = " << nm
-         << " nvalues = " << nvalues << endl;
+    //cerr << "nx = " << nx << " nm = " << nm
+    //     << " nvalues = " << nvalues << endl;
         
     singular_values.resize(nvalues);
     distribution<float> svalues(nvalues);
@@ -76,7 +76,7 @@ train(const std::vector<distribution<float> > & data,
         throw Exception("gesdd returned non-zero");
         
     // Transpose lvectors
-    boost::multi_array<float, 2> lvectors(boost::extents[nm][nvalues]);
+    lvectors.resize(boost::extents[nm][nvalues]);
     for (unsigned i = 0;  i < nm;  ++i)
         for (unsigned j = 0;  j < nvalues;  ++j)
             lvectors[i][j] = lvectorsT[j][i];
@@ -109,7 +109,7 @@ extract_for_order(int order)
     singular_values_order
         = distribution<float>(singular_values.begin(),
                               singular_values.begin() + order);
-        
+    
     for (unsigned i = 0;  i < nm;  ++i)
         singular_models[i]
             = distribution<float>(&lvectors[i][0],
@@ -133,6 +133,9 @@ decompose(const distribution<float> & vals) const
         SIMD::vec_add(&target_singular[0], vals[i] / singular_values_order[i],
                       &singular_models[i][0],
                       &target_singular[0], singular_values_order.size());
+
+    //cerr << "singular_values_order = " << singular_values_order << endl;
+    //cerr << "singular for model: " << target_singular << endl;
         
     return distribution<float>(target_singular.begin(),
                                target_singular.end());

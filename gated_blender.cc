@@ -147,9 +147,14 @@ perform_irls(const distribution<Float> & correct,
     if (verify && svreduced < 0.001)
         throw Exception("not all linearly dependent columns were removed");
 
-    //cerr << "v.size() = " << w.size() << endl;
-    //cerr << "correct.size() = " << correct.size() << endl;
-    //cerr << "w.total() = " << w.total() << endl;
+#if 0
+    cerr << "v.size() = " << w.size() << endl;
+    cerr << "correct.size() = " << correct.size() << endl;
+    cerr << "w.total() = " << w.total() << endl;
+
+    cerr << "outputs_reduced: " << outputs_reduced.shape()[0] << "x"
+         << outputs_reduced.shape()[1] << endl;
+#endif
 
     Ridge_Regressor regressor(1e-5);
 
