@@ -658,7 +658,7 @@ overall: count 3000 avg error 0.0570933 baseline avg error 0.0596595 avg improve
 0.0571 +/-    nan
 
 
-With the 4 sizes of reconstitutions:
+With the 4 sizes of reconstitutions (makes it much slower due to inefficiencies in the :
 
 score: 0.0569  baseline: 0.0597  diff: -0.00276
 category UNKNOWN: count 0 avg error 0 baseline avg error 0 avg improvement 0
@@ -669,3 +669,28 @@ overall: count 3000 avg error 0.0568969 baseline avg error 0.0596595 avg improve
 
 
 0.0569 +/-    nan
+
+
+Question: why the bimodal distribution for the confidence values?
+
+model 64: before 0.0666467/0.374873 after 0.220815/0.333447
+model 7: before 0.0665869/0.368651 after 0.198176/0.325907
+model 71: before 0.0660204/0.379546 after 0.304334/0.229368
+model 65: before 0.066959/0.373087 after 0.271334/0.220748
+model 88: before 0.0658663/0.371858 after 0.267408/0.238292
+model 81: before 0.0654779/0.37622 after 0.269312/0.225575
+model 123: before 0.0643936/0.374808 after 0.329538/0.191075
+model 140: before 0.0658261/0.370029 after 0.18544/0.335682
+model 150: before 0.0655461/0.380835 after 0.202491/0.344179
+model 167: before 0.0658265/0.367942 after 0.18448/0.333779
+
+
+Success
+Gini = 0.87898462670556
+AUC = 0.93949231335278
+
+Not a great result.
+
+
+But what about all of the 0.3xxxxxx values above?
+

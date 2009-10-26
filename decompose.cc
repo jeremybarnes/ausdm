@@ -65,7 +65,7 @@ int main(int argc, char ** argv)
              "configuration file to read configuration options from")
             ("decomposer-name,n", value<string>(&decomposer_name),
              "name of decomposer in configuration file")
-            ("decomposer-type,t", value<string>(&decomposition_type),
+            ("decomposer-type,T", value<string>(&decomposition_type),
              "type of decomposition to train")
             ("extra-config-option", value<vector<string> >(&extra_config_options),
              "extra configuration option=value (can go directly on command line)");
@@ -163,8 +163,8 @@ int main(int argc, char ** argv)
     // Denoising auto encoder
     // We train a stack of layers, one at a time
 
-    const Data & training_data = data[0][0][0];
-    const Data & testing_data  = data[0][0][1];
+    const Data & training_data = data[0][target][0];
+    const Data & testing_data  = data[0][target][1];
 
     boost::shared_ptr<Decomposition> decomposition
         = Decomposition::create(decomposition_type);

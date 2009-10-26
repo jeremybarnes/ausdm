@@ -1020,10 +1020,13 @@ void
 DNAE_Stack::
 reconstitute(ML::DB::Store_Reader & store)
 {
-    char version;
+    int version;
     store >> version;
-    if (version != 1)
+    if (version != 1) {
+        cerr << "version = " << (int)version << endl;
+        cerr << "store.offset() = " << store.offset() << endl;
         throw Exception("DNAE_Stack::reconstitute(): invalid version");
+    }
     compact_size_t sz(store);
     resize(sz);
 
@@ -1402,7 +1405,7 @@ void
 DNAE_Decomposition::
 reconstitute(ML::DB::Store_Reader & store)
 {
-    char version;
+    int version;
     store >> version;
     if (version != 1)
         throw Exception("DNAE_Decomposition: version was wrong");

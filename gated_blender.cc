@@ -68,6 +68,7 @@ configure(const ML::Configuration & config_,
     recomposition_sizes.push_back(20);
     recomposition_sizes.push_back(50);
     recomposition_sizes.push_back(100);
+    //recomposition_sizes.push_back(200);
 }
 
 template<class Float>
@@ -222,7 +223,7 @@ perform_irls(const distribution<Float> & correct,
         }
     }
 
-    //cerr << "irls returned parameters " << parameters << endl;
+    cerr << "irls returned parameters " << parameters << endl;
 
     return parameters;
 }
@@ -292,6 +293,8 @@ train_conf(int model, const Data & training_data,
         distribution<float> features
             = get_conf_features(model, model_outputs, target_singular,
                                 training_data.target_stats[i]);
+
+        //cerr << "conf features: " << features << endl;
 
         if (features.size() != nv)
             throw Exception("nv is wrong");
@@ -643,19 +646,13 @@ get_conf_features(int model,
                   const distribution<float> & target_singular,
                   const Target_Stats & target_stats) const
 {
-    // Features:
-    // 1.  The current model's output
-    // 2.  Target singular values
-    // 3.  Error with 10 models
-    // 4.  Error with 50 models
-
-    float real_prediction = model_outputs[model];
-
     distribution<float> result;
 
     result.push_back(1.0);  // bias
 
+    float real_prediction = model_outputs[model];
     result.push_back(real_prediction);
+
     result.insert(result.end(),
                   target_singular.begin(), target_singular.end());
     //result.insert(result.end(),
@@ -668,6 +665,10 @@ get_conf_features(int model,
         distribution<float> reconst;
         if (!data->decomposition) reconst = model_outputs;
         else reconst = data->decomposition->recompose(target_singular, nr);
+
+        cerr << "reconstitution for order " << nr << " model "
+             << model << ": in " << model_outputs[model]
+             << " out: " << reconst[model] << endl;
 
         result.push_back(reconst[model] - model_outputs[model]);
         result.push_back(abs(reconst[model] - model_outputs[model]));
