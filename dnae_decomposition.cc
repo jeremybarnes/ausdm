@@ -701,8 +701,11 @@ train_example(const Twoway_Layer & layer,
     }
 #endif
 
+    distribution<CFloat> hidden_rep_e
+        = hidden_rep * e;
+
     distribution<CFloat> d_updates(ni);
-    d_updates = multiply_r<CFloat>(W, (hidden_rep * e)) * c_updates;
+    d_updates = multiply_r<CFloat>(W, hidden_rep_e) * c_updates;
 
     CHECK_NO_NAN(d_updates);
 
@@ -749,8 +752,10 @@ train_example(const Twoway_Layer & layer,
     }
 #endif
 
-    distribution<CFloat> e_updates(ni);
-    e_updates = multiply_r<CFloat>((c_updates * d), W) * hidden_rep;
+    distribution<CFloat> cupdates_d_W
+        = multiply_r<CFloat>((c_updates * d), W);
+    
+    distribution<CFloat> e_updates = cupdates_d_W * hidden_rep;
 
     if (!need_lock)
         updates.hscales += e_updates;
@@ -840,8 +845,7 @@ train_example(const Twoway_Layer & layer,
 
     CHECK_NO_NAN(hidden_deriv);
 
-    distribution<CFloat> b_updates
-        = multiply_r<CFloat>(c_updates * d, W) * hidden_deriv * e;
+    distribution<CFloat> b_updates = cupdates_d_W * hidden_deriv * e;
 
     CHECK_NO_NAN(b_updates);
 
@@ -895,10 +899,6 @@ train_example(const Twoway_Layer & layer,
                       &factor_totals[0], no);
 
     factor_totals *= e;
-
-
-    distribution<CFloat> hidden_rep_e
-        = hidden_rep * e;
 
 
     boost::multi_array<double, 2> W_updates;
@@ -1061,11 +1061,12 @@ train_example(const Twoway_Layer & layer,
 
     distribution<double> cleared_value_updates(ni);
     
-    if (!layer.use_dense_missing)
-        cleared_value_updates = W * b_updates;
+    if (!layer.use_dense_missing) {
+        cleared_value_updates = isnan(noisy_input) * W * b_updates;
 
-    if (!layer.use_dense_missing && !need_lock)
-        updates.missing_replacements += cleared_value_updates;
+        if (!need_lock)
+            updates.missing_replacements += cleared_value_updates;
+    }
 
 #if 0  // test numerically
     for (unsigned i = 0;  i < ni;  ++i) {

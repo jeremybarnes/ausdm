@@ -721,3 +721,22 @@ elapsed: [273.38s cpu, 116512.9294 mticks, 43.59s wall]
 266.91user 6.48system 0:43.62elapsed 626%CPU (0avgtext+0avgdata 0maxresident)k
 0inputs+0outputs (0major+2483249minor)pagefaults 0swaps
 
+Minibatch_size = 256:
+
+testing rmse of stack: exact 1.01475 noisy 1.06024
+elapsed: [293.03s cpu, 127530.4644 mticks, 47.72s wall]
+280.41user 12.63system 0:47.74elapsed 613%CPU (0avgtext+0avgdata 0maxresident)k
+0inputs+0outputs (0major+4758900minor)pagefaults 0swaps
+
+A bit slower, but probably worth it due to better convergence
+
+
+Simplified expressions to save computation:
+
+testing rmse of stack: exact 1.01475 noisy 1.06024
+elapsed: [278.62s cpu, 125761.3499 mticks, 47.05s wall]
+265.65user 12.98system 0:47.08elapsed 591%CPU (0avgtext+0avgdata 0maxresident)k
+0inputs+0outputs (0major+4776474minor)pagefaults 0swaps
+
+A bit better, not that much difference.
+
