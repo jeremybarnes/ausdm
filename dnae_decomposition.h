@@ -104,6 +104,7 @@ struct Twoway_Layer : public Twoway_Layer_Base {
 
     /// Scaling factors for the reverse direction
     distribution<LFloat> iscales;
+    distribution<LFloat> hscales;
 
     distribution<double> iapply(const distribution<double> & output) const;
     distribution<float> iapply(const distribution<float> & output) const;
