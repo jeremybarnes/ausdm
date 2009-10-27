@@ -51,6 +51,158 @@ void calc_W_updates(double k1, const double * x, double k2, const double * y,
 
 
 /*****************************************************************************/
+/* DENSE_MISSING_LAYER                                                       */
+/*****************************************************************************/
+
+Dense_Missing_Layer::
+Dense_Missing_Layer()
+    : use_dense_missing(true)
+{
+}
+
+Dense_Missing_Layer::
+Dense_Missing_Layer(bool use_dense_missing,
+                    size_t inputs, size_t outputs,
+                    Transfer_Function_Type transfer,
+                    Thread_Context & context,
+                    float limit)
+    : Base(inputs, outputs, transfer),
+      use_dense_missing(use_dense_missing),
+      missing_activations(inputs, distribution<LFloat>(outputs))
+{
+    if (limit == -1.0)
+        limit = 1.0 / sqrt(inputs);
+    random_fill(limit, context);
+}
+
+Dense_Missing_Layer::
+Dense_Missing_Layer(bool use_dense_missing,
+                    size_t inputs, size_t outputs,
+                    Transfer_Function_Type transfer)
+    : Base(inputs, outputs, transfer),
+      use_dense_missing(use_dense_missing),
+      missing_activations(inputs, distribution<LFloat>(outputs))
+{
+}
+
+void
+Dense_Missing_Layer::
+preprocess(const float * input,
+           float * preprocessed) const
+{
+    if (!use_dense_missing) Base::preprocess(input, preprocessed);
+    else Layer::preprocess(input, preprocessed);
+}
+
+void
+Dense_Missing_Layer::
+preprocess(const double * input,
+           double * preprocessed) const
+{
+    if (!use_dense_missing) Base::preprocess(input, preprocessed);
+    else Layer::preprocess(input, preprocessed);
+}
+
+void
+Dense_Missing_Layer::
+activation(const float * preprocessed,
+           float * activation) const
+{
+    if (!use_dense_missing) {
+        Base::activation(preprocessed, activation);
+        return;
+    }
+
+    int ni = inputs(), no = outputs();
+    double accum[no];  // Accumulate in double precision to improve rounding
+    std::copy(bias.begin(), bias.end(), accum);
+
+    for (unsigned i = 0;  i < ni;  ++i) {
+        const LFloat * w;
+        double input;
+        if (isnan(preprocessed[i])) {
+            input = 1.0;
+            w = &missing_activations[i][0];
+        }
+        else {
+            input = preprocessed[i];
+            w = &weights[i][0];
+        }
+
+        SIMD::vec_add(accum, input, w, accum, no);
+    }
+    
+    std::copy(accum, accum + no, activation);
+}
+
+void
+Dense_Missing_Layer::
+activation(const double * preprocessed,
+           double * activation) const
+{
+    if (!use_dense_missing) {
+        Base::activation(preprocessed, activation);
+        return;
+    }
+
+    int ni = inputs(), no = outputs();
+    double accum[no];  // Accumulate in double precision to improve rounding
+    std::copy(bias.begin(), bias.end(), accum);
+
+    for (unsigned i = 0;  i < ni;  ++i) {
+        const LFloat * w;
+        double input;
+        if (isnan(preprocessed[i])) {
+            input = 1.0;
+            w = &missing_activations[i][0];
+        }
+        else {
+            input = preprocessed[i];
+            w = &weights[i][0];
+        }
+
+        SIMD::vec_add(accum, input, w, accum, no);
+    }
+    
+    std::copy(accum, accum + no, activation);
+}
+
+void
+Dense_Missing_Layer::
+random_fill(float limit, Thread_Context & context)
+{
+    Base::random_fill(limit, context);
+
+    for (unsigned i = 0;  i < inputs();  ++i)
+        for (unsigned o = 0;  o < outputs();  ++o)
+            missing_activations[i][o]
+                = limit * (context.random01() * 2.0f - 1.0f);
+}
+
+void
+Dense_Missing_Layer::
+zero_fill()
+{
+    Base::zero_fill();
+    for (unsigned i = 0;  i < inputs();  ++i)
+        missing_activations[i].fill(0.0);
+}
+
+size_t
+Dense_Missing_Layer::
+parameter_count() const
+{
+    size_t result = Base::parameter_count();
+
+    if (use_dense_missing)
+        result += inputs() * (outputs() - 1);
+
+    return result;
+}
+
+
+
+/*****************************************************************************/
 /* TWOWAY_LAYER                                                              */
 /*****************************************************************************/
 
@@ -60,25 +212,24 @@ Twoway_Layer()
 }
 
 Twoway_Layer::
-Twoway_Layer(size_t inputs, size_t outputs,
+Twoway_Layer(bool use_dense_missing,
+             size_t inputs, size_t outputs,
              Transfer_Function_Type transfer,
              Thread_Context & context,
              float limit)
-    : Dense_Layer<LFloat>(inputs, outputs, transfer)
+    : Base(use_dense_missing, inputs, outputs, transfer), ibias(inputs)
 {
-    ibias.resize(inputs);
     if (limit == -1.0)
         limit = 1.0 / sqrt(inputs);
     random_fill(limit, context);
 }
 
 Twoway_Layer::
-Twoway_Layer(size_t inputs, size_t outputs,
+Twoway_Layer(bool use_dense_missing,
+             size_t inputs, size_t outputs,
              Transfer_Function_Type transfer)
-    : Dense_Layer<LFloat>(inputs, outputs, transfer)
+    : Base(use_dense_missing, inputs, outputs, transfer), ibias(inputs)
 {
-    ibias.resize(inputs);
-    ibias.fill(0.0);
 }
 
 distribution<double>
@@ -204,7 +355,16 @@ update(const Twoway_Layer & updates, double learning_rate)
                       &updates.weights[i][0],
                       &weights[i][0], no);
 
-    missing_replacements -= 100.0 * learning_rate * updates.missing_replacements;
+    if (use_dense_missing) {
+        for (unsigned i = 0;  i < ni;  ++i)
+            SIMD::vec_add(&missing_activations[i][0],
+                          -learning_rate,
+                          &updates.missing_activations[i][0],
+                          &missing_activations[i][0], no);
+    }
+    else 
+        missing_replacements
+            -= 100.0 * learning_rate * updates.missing_replacements;
 }
 
 void
@@ -265,13 +425,15 @@ add_noise(const distribution<Float> & inputs,
     return result;
 }
 
-double train_example(const Twoway_Layer & layer,
-                     const vector<distribution<float> > & data,
-                     int example_num,
-                     float max_prob_cleared,
-                     Thread_Context & thread_context,
-                     Twoway_Layer & updates,
-                     Lock & update_lock)
+pair<double, double>
+train_example(const Twoway_Layer & layer,
+              const vector<distribution<float> > & data,
+              int example_num,
+              float max_prob_cleared,
+              Thread_Context & thread_context,
+              Twoway_Layer & updates,
+              Lock & update_lock,
+              int verbosity)
 {
     int ni JML_UNUSED = layer.inputs();
     int no JML_UNUSED = layer.outputs();
@@ -300,20 +462,20 @@ double train_example(const Twoway_Layer & layer,
     distribution<CFloat> noisy_pre
         = layer.preprocess(noisy_input);
 
-    CHECK_NO_NAN(noisy_pre);
-    //distribution<CFloat> hidden_act
-    //    = layer.activation(noisy_pre);
+    distribution<CFloat> hidden_act
+        = layer.activation(noisy_pre);
+
+    CHECK_NO_NAN(hidden_act);
             
     // Apply the layer
     distribution<CFloat> hidden_rep
-        = layer.apply(noisy_input);
+        = layer.transfer(hidden_act);
 
     CHECK_NO_NAN(hidden_rep);
             
     // Reconstruct the input
     distribution<CFloat> denoised_input
         = layer.iapply(hidden_rep);
-
 
     CHECK_NO_NAN(denoised_input);
             
@@ -324,6 +486,9 @@ double train_example(const Twoway_Layer & layer,
     // Overall error
     double error = pow(diff.two_norm(), 2);
     
+
+    double error_exact = pow((model_input - layer.iapply(layer.apply(model_input))).two_norm(), 2);
+
     if (example_num < 10 && false) {
         cerr << " ex " << example_num << endl;
         cerr << "  input: " << distribution<float>(model_input.begin(),
@@ -396,7 +561,7 @@ double train_example(const Twoway_Layer & layer,
     const boost::multi_array<LFloat, 2> & W
         = layer.weights;
 
-    const distribution<LFloat> & b = layer.bias;
+    const distribution<LFloat> & b JML_UNUSED = layer.bias;
     const distribution<LFloat> & c JML_UNUSED = layer.ibias;
 
     distribution<CFloat> c_updates
@@ -405,23 +570,22 @@ double train_example(const Twoway_Layer & layer,
     CHECK_NO_NAN(c_updates);
 
 #if 0
-    cerr << "c_updates = " << c_updates << endl;
-
-    distribution<CFloat> c_updates_numeric(ni);
+    Twoway_Layer layer2 = layer;
 
     // Calculate numerically the c updates
     for (unsigned i = 0;  i < ni;  ++i) {
-        // Reconstruct the input
-        distribution<CFloat> denoised_activation2
-            = W * hidden_rep + c;
-                
-        float epsilon = 1e-4;
 
-        denoised_activation2[i] += epsilon;
+        float epsilon = 1e-8;
+        double old = layer2.ibias[i];
+        layer2.ibias[i] += epsilon;
 
-        distribution<CFloat> denoised_input2 = denoised_activation2;
-        layer.transfer(denoised_input2);
-            
+        // Apply the layer
+        distribution<CFloat> hidden_rep2
+            = layer2.apply(noisy_input);
+        
+        distribution<CFloat> denoised_input2
+            = layer2.iapply(hidden_rep2);
+
         // Error signal
         distribution<CFloat> diff2
             = model_input - denoised_input2;
@@ -431,20 +595,60 @@ double train_example(const Twoway_Layer & layer,
 
         double delta = error2 - error;
 
-        c_updates_numeric[i] = delta / epsilon;
-    }
+        double deriv  = c_updates[i];
+        double deriv2 = xdiv(delta, epsilon);
 
-    cerr << "c_updates_numeric = " << c_updates_numeric
-         << endl;
+        cerr << format("%3d %7.4f %9.5f %9.5f %9.5f %8.5f\n",
+                       i,
+                       100.0 * xdiv(abs(deriv - deriv2),
+                                    max(abs(deriv), abs(deriv2))),
+                       abs(deriv - deriv2),
+                       deriv, deriv2, noisy_input[i]);
+
+        layer2.ibias[i] = old;
+    }
 #endif
 
-    distribution<CFloat> hidden_activation
-        = multiply_r<CFloat>(noisy_pre, W) + b.cast<CFloat>();
-
-    CHECK_NO_NAN(hidden_activation);
-
     distribution<CFloat> hidden_deriv
-        = layer.derivative(hidden_activation);
+        = layer.derivative(hidden_rep);
+
+    // Check hidden_deriv numerically
+#if 0
+    distribution<CFloat> hidden_act2 = hidden_act;
+
+    cerr << "hidden_act = " << hidden_act << endl;
+    cerr << "hidden_deriv = " << hidden_deriv << endl;
+
+    // Calculate numerically the c updates
+    for (unsigned i = 0;  i < no;  ++i) {
+
+        float epsilon = 1e-8;
+        double old = hidden_act2[i];
+        hidden_act2[i] += epsilon;
+
+        // Apply the layer
+        distribution<CFloat> hidden_rep2
+            = layer.transfer(hidden_act2);
+        
+        // Error signal
+
+        // Overall error
+        double delta = hidden_rep2[i] - hidden_rep[i];
+
+        double deriv  = hidden_deriv[i];
+        double deriv2 = xdiv(delta, epsilon);
+
+        cerr << format("%3d %7.4f %9.5f %9.5f %9.5f %8.5f\n",
+                       i,
+                       100.0 * xdiv(abs(deriv - deriv2),
+                                    max(abs(deriv), abs(deriv2))),
+                       abs(deriv - deriv2),
+                       deriv, deriv2, hidden_act[i]);
+
+        hidden_act2[i] = old;
+    }
+#endif
+    
 
     CHECK_NO_NAN(hidden_deriv);
 
@@ -454,66 +658,48 @@ double train_example(const Twoway_Layer & layer,
     CHECK_NO_NAN(b_updates);
 
 #if 0
-    cerr << "b_updates = " << c_updates << endl;
-
-    distribution<CFloat> b_updates_numeric(no);
+    Twoway_Layer layer2 = layer;
 
     // Calculate numerically the c updates
     for (unsigned i = 0;  i < no;  ++i) {
 
-        double epsilon = 1e-9;
+        float epsilon = 1e-8;
+        double old = layer2.bias[i];
+        layer2.bias[i] += epsilon;
 
         // Apply the layer
-        distribution<CFloat> hidden_act2
-            = layer.activation(noisy_pre);
-
-        //cerr << "hidden_act[i] = " << hidden_act[i];
-        hidden_act2[i] += epsilon;
-
-        //cerr << " hidden_act2[i] = "
-        //     << hidden_act2[i] << endl;
-
-        //cerr << "hidden_act2 = " << hidden_act2 << endl;
-                
         distribution<CFloat> hidden_rep2
-            = layer.transfer(hidden_act2);
-                
-        //cerr << "hidden_rep = " << hidden_rep << endl;
-        //cerr << "hidden_rep2 = " << hidden_rep2 << endl;
-
+            = layer2.apply(noisy_input);
+        
         distribution<CFloat> denoised_input2
-            = layer.iapply(hidden_rep2);
-            
-        //cerr << "denoised_input = " << denoised_input << endl;
-        //cerr << "denoised_input2 = " << denoised_input2 << endl;
-                    
+            = layer2.iapply(hidden_rep2);
 
         // Error signal
         distribution<CFloat> diff2
             = model_input - denoised_input2;
             
-        //cerr << "diff = " << diff << endl;
-        //cerr << "diff2 = " << diff2 << endl;
-
         // Overall error
         double error2 = pow(diff2.two_norm(), 2);
 
         double delta = error2 - error;
 
-        b_updates_numeric[i] = xdiv(delta, epsilon);
+        double deriv  = b_updates[i];
+        double deriv2 = xdiv(delta, epsilon);
 
-        cerr << "error = " << error << " error2 = " << error2
-             << " delta = " << delta
-             << " diff " << b_updates[i]
-             << " diff2 " << b_updates_numeric[i] << endl;
+        cerr << format("%3d %7.4f %9.5f %9.5f %9.5f %8.5f\n",
+                       i,
+                       100.0 * xdiv(abs(deriv - deriv2),
+                                    max(abs(deriv), abs(deriv2))),
+                       abs(deriv - deriv2),
+                       deriv, deriv2, noisy_input[i]);
 
+        layer2.bias[i] = old;
     }
-
-    cerr << "b_updates_numeric = " << b_updates_numeric
-         << endl;
 #endif
 
     boost::multi_array<double, 2> W_updates(boost::extents[ni][no]);
+    vector<distribution<double> >
+        missing_act_updates(ni, distribution<double>(no));
 
     distribution<double> factor_totals(no);
 
@@ -521,50 +707,52 @@ double train_example(const Twoway_Layer & layer,
         SIMD::vec_add(&factor_totals[0], c_updates[i], &W[i][0],
                       &factor_totals[0], no);
 
-    // TODO: why the extra factor of 2?  It doesn't make any sense...
     for (unsigned i = 0;  i < ni;  ++i) {
-        calc_W_updates(c_updates[i] / 2.0,
-                       &hidden_rep[0],
-                       model_input[i] / 2.0,
-                       &factor_totals[0],
-                       &hidden_deriv[0],
-                       &W_updates[i][0],
-                       no);
+
+        if (!layer.use_dense_missing
+            || !isnan(noisy_input[i]))
+
+            // We use the W value for both the input and the output, so we
+            // need to accumulate it's total effect on the derivative
+            calc_W_updates(c_updates[i],
+                           &hidden_rep[0],
+                           model_input[i],
+                           &factor_totals[0],
+                           &hidden_deriv[0],
+                           &W_updates[i][0],
+                           no);
+        else {
+            // The weight updates are simpler, but we also have to calculate
+            // the missing activation updates
+
+            // W value only used on the way out; simpler calculation
+            SIMD::vec_add(&W_updates[i][0], c_updates[i],
+                          &hidden_rep[0], &W_updates[i][0], no);
+
+            // Missing values were used on the way in
+            missing_act_updates[i] = factor_totals * hidden_deriv;
+        }
     }
        
     
 #if 0  // test numerically
-    //boost::multi_array<double, 2> w2
-    //    = layer.weights;
+    Twoway_Layer layer2 = layer;
 
     for (unsigned i = 0;  i < ni;  ++i) {
 
         for (unsigned j = 0;  j < no;  ++j) {
-            double epsilon = 1e-6;
+            double epsilon = 1e-8;
+
+            double old_W = layer2.weights[i][j];
+            layer2.weights[i][j] += epsilon;
 
             // Apply the layer
-            distribution<CFloat> hidden_act2
-                = layer.activation(noisy_pre);
-            hidden_act2[j] += epsilon * noisy_pre[i];
-
-            //cerr << "noisy_input = " << noisy_input << endl;
-            //cerr << "hidden_act = " << hidden_act << endl;
-            //cerr << "hidden_act2 = " << hidden_act2 << endl;
-
-            //cerr << "diff = " << (hidden_act - hidden_act2) << endl;
-
             distribution<CFloat> hidden_rep2
-                = layer.transfer(hidden_act2);
-                    
-            //cerr << "hidden_rep = " << hidden_rep << endl;
-            //cerr << "hidden_rep2 = " << hidden_rep2 << endl;
-                    
-            distribution<CFloat> denoised_input2
-                = layer.iapply(hidden_rep2);
-                    
-            //cerr << "denoised_input = " << denoised_input << endl;
-            //cerr << "denoised_input2 = " << denoised_input2 << endl;
+                = layer2.apply(noisy_input);
 
+            distribution<CFloat> denoised_input2
+                = layer2.iapply(hidden_rep2);
+            
             // Error signal
             distribution<CFloat> diff2
                 = model_input - denoised_input2;
@@ -579,17 +767,77 @@ double train_example(const Twoway_Layer & layer,
 
             double deriv2 = xdiv(delta, epsilon);
 
-            cerr << "error = " << error << " error2 = " << error2
-                 << " delta = " << delta
-                 << " deriv " << W_updates[i][j]
-                 << " deriv2 " << deriv2 << endl;
+            double deriv = W_updates[i][j];
 
+            cerr << format("%3d %3d %7.4f %9.5f %9.5f %9.5f %8.5f\n",
+                           i, j,
+                           100.0 * xdiv(abs(deriv - deriv2),
+                                        max(abs(deriv), abs(deriv2))),
+                           abs(deriv - deriv2),
+                           deriv, deriv2, noisy_input[i]);
+
+            //cerr << "error = " << error << " error2 = " << error2
+            //     << " delta = " << delta
+            //    << " deriv " << W_updates[i][j]
+            //     << " deriv2 " << deriv2 << endl;
+
+
+            layer2.weights[i][j] = old_W;
         }
     }
 #endif  // if one/zero
 
-    distribution<double> cleared_value_updates
-        = W * b_updates;
+#if 0  // test numerically the missing activations
+    Twoway_Layer layer2 = layer;
+
+    for (unsigned i = 0;  i < ni;  ++i) {
+        if (!isnan(noisy_input[i])) continue;  // will be zero
+
+        for (unsigned j = 0;  j < no;  ++j) {
+            double epsilon = 1e-8;
+
+            double old_W = layer2.missing_activations[i][j];
+            layer2.missing_activations[i][j] += epsilon;
+
+            // Apply the layer
+            distribution<CFloat> hidden_rep2
+                = layer2.apply(noisy_input);
+
+            distribution<CFloat> denoised_input2
+                = layer2.iapply(hidden_rep2);
+            
+            // Error signal
+            distribution<CFloat> diff2
+                = model_input - denoised_input2;
+                    
+            //cerr << "diff = " << diff << endl;
+            //cerr << "diff2 = " << diff2 << endl;
+                    
+            // Overall error
+            double error2 = pow(diff2.two_norm(), 2);
+                    
+            double delta = error2 - error;
+
+            double deriv2 = xdiv(delta, epsilon);
+
+            double deriv = missing_act_updates[i][j];
+
+            cerr << format("%3d %3d %7.4f %9.5f %9.5f %9.5f %8.5f\n",
+                           i, j,
+                           100.0 * xdiv(abs(deriv - deriv2),
+                                        max(abs(deriv), abs(deriv2))),
+                           abs(deriv - deriv2),
+                           deriv, deriv2, noisy_input[i]);
+
+            layer2.missing_activations[i][j] = old_W;
+        }
+    }
+#endif  // if one/zero
+
+    distribution<double> cleared_value_updates(ni);
+    
+    if (!layer.use_dense_missing)
+        cleared_value_updates = W * b_updates;
 
 #if 0  // test numerically
     for (unsigned i = 0;  i < ni;  ++i) {
@@ -643,24 +891,35 @@ double train_example(const Twoway_Layer & layer,
         updates.bias += b_updates;
         updates.ibias += c_updates;
         
-        for (unsigned i = 0;  i < ni;  ++i)
+        for (unsigned i = 0;  i < ni;  ++i) {
             SIMD::vec_add(&updates.weights[i][0],
                           &W_updates[i][0],
                           &updates.weights[i][0], no);
+            
+            if (layer.use_dense_missing && isnan(noisy_input[i]))
+                updates.missing_activations[i] += missing_act_updates[i];
+        }
     }
     else {
         for (unsigned i = 0;  i < ni;  ++i)
             if (isnan(noisy_input[i]))
                 atomic_accumulate(updates.missing_replacements[i],
                                   cleared_value_updates[i]);
+
         atomic_accumulate(&updates.bias[0], &b_updates[0], no);
         atomic_accumulate(&updates.ibias[0], &c_updates[0], ni);
 
-        for (unsigned i = 0;  i < ni;  ++i)
+        for (unsigned i = 0;  i < ni;  ++i) {
             atomic_accumulate(&updates.weights[i][0], &W_updates[i][0], no);
+
+            if (layer.use_dense_missing && isnan(noisy_input[i]))
+                atomic_accumulate(&updates.missing_activations[i][0],
+                                  &missing_act_updates[i][0],
+                                  no);
+        }
     }
 
-    return error;
+    return make_pair(error_exact, error);
 }
 
 struct Train_Examples_Job {
@@ -674,8 +933,10 @@ struct Train_Examples_Job {
     int random_seed;
     Twoway_Layer & updates;
     Lock & update_lock;
-    double & error;
-    boost::progress_display & progress;
+    double & error_exact;
+    double & error_noisy;
+    boost::progress_display * progress;
+    int verbosity;
 
     Train_Examples_Job(const Twoway_Layer & layer,
                        const vector<distribution<float> > & data,
@@ -685,12 +946,16 @@ struct Train_Examples_Job {
                        int random_seed,
                        Twoway_Layer & updates,
                        Lock & update_lock,
-                       double & error,
-                       boost::progress_display & progress)
+                       double & error_exact,
+                       double & error_noisy,
+                       boost::progress_display * progress,
+                       int verbosity)
         : layer(layer), data(data), first(first), last(last),
           prob_cleared(prob_cleared),
           context(context), random_seed(random_seed), updates(updates),
-          update_lock(update_lock), error(error), progress(progress)
+          update_lock(update_lock),
+          error_exact(error_exact), error_noisy(error_noisy),
+          progress(progress), verbosity(verbosity)
     {
     }
 
@@ -699,24 +964,36 @@ struct Train_Examples_Job {
         Thread_Context thread_context(context);
         thread_context.seed(random_seed);
 
-        double total_error = 0.0;
-        for (unsigned x = first;  x < last;  ++x)
-            total_error += train_example(layer, data, x,
-                                         prob_cleared, thread_context,
-                                         updates, update_lock);
+        double total_error_exact = 0.0, total_error_noisy = 0.0;
+        for (unsigned x = first;  x < last;  ++x) {
+            double eex, eno;
+            boost::tie(eex, eno)
+                = train_example(layer, data, x,
+                                prob_cleared, thread_context,
+                                updates, update_lock,
+                                verbosity);
+
+            total_error_exact += eex;
+            total_error_noisy += eno;
+        }
 
         Guard guard(update_lock);
-        error += total_error;
-        progress += (last - first);
+        error_exact += total_error_exact;
+        error_noisy += total_error_noisy;
+        
+
+        if (progress && verbosity >= 3)
+            (*progress) += (last - first);
     }
 };
 
-double
+std::pair<double, double>
 Twoway_Layer::
 train_iter(const vector<distribution<float> > & data,
            float prob_cleared,
            Thread_Context & thread_context,
-           int minibatch_size, float learning_rate)
+           int minibatch_size, float learning_rate,
+           int verbosity)
 {
     Worker_Task & worker = thread_context.worker();
 
@@ -726,14 +1003,15 @@ train_iter(const vector<distribution<float> > & data,
 
     int microbatch_size = minibatch_size / (num_cpus() * 4);
             
-    boost::progress_display progress(nx, cerr);
-    Lock progress_lock;
+    std::auto_ptr<boost::progress_display> progress;
+    if (verbosity >= 3) progress.reset(new boost::progress_display(nx, cerr));
+    Lock update_lock;
 
-    double total_mse = 0.0;
+    double total_mse_exact = 0.0, total_mse_noisy = 0.0;
     
     for (unsigned x = 0;  x < nx;  x += minibatch_size) {
                 
-        Twoway_Layer updates(ni, no, TF_IDENTITY);
+        Twoway_Layer updates(use_dense_missing, ni, no, TF_IDENTITY);
                 
         // Now, submit it as jobs to the worker task to be done
         // multithreaded
@@ -763,9 +1041,11 @@ train_iter(const vector<distribution<float> > & data,
                                        thread_context,
                                        thread_context.random(),
                                        updates,
-                                       progress_lock,
-                                       total_mse,
-                                       progress);
+                                       update_lock,
+                                       total_mse_exact,
+                                       total_mse_noisy,
+                                       progress.get(),
+                                       verbosity);
                 // Send it to a thread to be processed
                 worker.add(job, "blend job", group);
             }
@@ -776,7 +1056,7 @@ train_iter(const vector<distribution<float> > & data,
         update(updates, learning_rate);
     }
 
-    return sqrt(total_mse / nx);
+    return make_pair(sqrt(total_mse_exact / nx), sqrt(total_mse_noisy / nx));
 }
 
 struct Test_Examples_Job {
@@ -792,7 +1072,8 @@ struct Test_Examples_Job {
     Lock & update_lock;
     double & error_exact;
     double & error_noisy;
-    boost::progress_display & progress;
+    boost::progress_display * progress;
+    int verbosity;
 
     Test_Examples_Job(const Twoway_Layer & layer,
                       const vector<distribution<float> > & data_in,
@@ -804,14 +1085,15 @@ struct Test_Examples_Job {
                       Lock & update_lock,
                       double & error_exact,
                       double & error_noisy,
-                      boost::progress_display & progress)
+                      boost::progress_display * progress,
+                      int verbosity)
         : layer(layer), data_in(data_in), data_out(data_out),
           first(first), last(last),
           prob_cleared(prob_cleared),
           context(context), random_seed(random_seed),
           update_lock(update_lock),
           error_exact(error_exact), error_noisy(error_noisy),
-          progress(progress)
+          progress(progress), verbosity(verbosity)
     {
     }
 
@@ -890,7 +1172,8 @@ struct Test_Examples_Job {
         Guard guard(update_lock);
         error_exact += test_error_exact;
         error_noisy += test_error_noisy;
-        progress += (last - first);
+        if (progress && verbosity >= 3)
+            (*progress) += (last - first);
     }
 };
 
@@ -899,7 +1182,8 @@ Twoway_Layer::
 test_and_update(const vector<distribution<float> > & data_in,
                 vector<distribution<float> > & data_out,
                 float prob_cleared,
-                Thread_Context & thread_context) const
+                Thread_Context & thread_context,
+                int verbosity) const
 {
     Lock update_lock;
     double error_exact = 0.0;
@@ -907,7 +1191,8 @@ test_and_update(const vector<distribution<float> > & data_in,
 
     int nx = data_in.size();
 
-    boost::progress_display progress(nx, cerr);
+    std::auto_ptr<boost::progress_display> progress;
+    if (verbosity >= 3) progress.reset(new boost::progress_display(nx, cerr));
 
     Worker_Task & worker = thread_context.worker();
             
@@ -937,7 +1222,8 @@ test_and_update(const vector<distribution<float> > & data_in,
                                   thread_context.random(),
                                   update_lock,
                                   error_exact, error_noisy,
-                                  progress);
+                                  progress.get(),
+                                  verbosity);
             
             // Send it to a thread to be processed
             worker.add(job, "blend job", group);
@@ -1024,7 +1310,6 @@ reconstitute(ML::DB::Store_Reader & store)
     store >> version;
     if (version != 1) {
         cerr << "version = " << (int)version << endl;
-        cerr << "store.offset() = " << store.offset() << endl;
         throw Exception("DNAE_Stack::reconstitute(): invalid version");
     }
     compact_size_t sz(store);
@@ -1046,7 +1331,8 @@ struct Test_Stack_Job {
     Lock & update_lock;
     double & error_exact;
     double & error_noisy;
-    boost::progress_display & progress;
+    boost::progress_display * progress;
+    int verbosity;
 
     Test_Stack_Job(const DNAE_Stack & stack,
                    const vector<distribution<float> > & data,
@@ -1057,14 +1343,14 @@ struct Test_Stack_Job {
                    Lock & update_lock,
                    double & error_exact,
                    double & error_noisy,
-                   boost::progress_display & progress)
+                   boost::progress_display * progress, int verbosity)
         : stack(stack), data(data),
           first(first), last(last),
           prob_cleared(prob_cleared),
           context(context), random_seed(random_seed),
           update_lock(update_lock),
           error_exact(error_exact), error_noisy(error_noisy),
-          progress(progress)
+          progress(progress), verbosity(verbosity)
     {
     }
 
@@ -1077,30 +1363,20 @@ struct Test_Stack_Job {
 
         for (unsigned x = first;  x < last;  ++x) {
 
-            distribution<CFloat> input(0.8 * data[x]);
-
-            distribution<bool> was_cleared;
+            distribution<CFloat> input(data[x]);
 
             // Add noise
             distribution<CFloat> noisy_input
                 = add_noise(input, thread_context, prob_cleared);
             
-            distribution<CFloat> output = input, noisy_output = noisy_input;
+            distribution<CFloat>
+                rep = stack.apply(input),
+                noisy_rep = stack.apply(noisy_input);
 
-            // Go down the stack
-            for (unsigned l = 0;  l < stack.size();  ++l) {
-                output = stack[l].apply(output);
-                noisy_output = stack[l].apply(noisy_output);
-            }
+            distribution<CFloat>
+                output = stack.iapply(rep),
+                noisy_output = stack.iapply(noisy_rep);
 
-            distribution<CFloat> rep = output, noisy_rep = output;
-
-            // Go back up the stack
-            for (int l = stack.size() - 1;  l >= 0;  --l) {
-                output = stack[l].iapply(output);
-                noisy_output = stack[l].iapply(noisy_output);
-            }
-            
             // Error signal
             distribution<CFloat> diff
                 = input - noisy_output;
@@ -1134,7 +1410,7 @@ struct Test_Stack_Job {
         Guard guard(update_lock);
         error_exact += test_error_exact;
         error_noisy += test_error_noisy;
-        progress += (last - first);
+        if (progress && verbosity >= 3) (*progress) += (last - first);
     }
 };
 
@@ -1142,7 +1418,8 @@ pair<double, double>
 DNAE_Stack::
 test(const vector<distribution<float> > & data,
      float prob_cleared,
-     Thread_Context & thread_context) const
+     Thread_Context & thread_context,
+     int verbosity) const
 {
     Lock update_lock;
     double error_exact = 0.0;
@@ -1150,7 +1427,8 @@ test(const vector<distribution<float> > & data,
 
     int nx = data.size();
 
-    boost::progress_display progress(nx, cerr);
+    std::auto_ptr<boost::progress_display> progress;
+    if (verbosity >= 3) progress.reset(new boost::progress_display(nx, cerr));
 
     Worker_Task & worker = thread_context.worker();
             
@@ -1180,7 +1458,8 @@ test(const vector<distribution<float> > & data,
                                thread_context.random(),
                                update_lock,
                                error_exact, error_noisy,
-                               progress);
+                               progress.get(),
+                               verbosity);
             
             // Send it to a thread to be processed
             worker.add(job, "blend job", group);
@@ -1208,11 +1487,16 @@ train(const std::vector<distribution<float> > & training_data,
     /// Probability that each input is cleared
     float prob_cleared = 0.10;
 
+    int verbosity = 2;
+
+    Transfer_Function_Type transfer_function = TF_TANH;
 
     config.get(prob_cleared, "prob_cleared");
     config.get(learning_rate, "learning_rate");
     config.get(minibatch_size, "minibatch_size");
     config.get(niter, "niter");
+    config.get(verbosity, "verbosity");
+    config.find(transfer_function, "transfer_function");
 
     int nx = training_data.size();
     int nxt = testing_data.size();
@@ -1222,17 +1506,15 @@ train(const std::vector<distribution<float> > & training_data,
 
     static const int nlayers = 4;
 
-    int layer_sizes[nlayers] = {100, 80, 50, 30};
+    int layer_sizes[nlayers] = {195, 100, 50, 30};
 
     vector<distribution<float> > layer_train = training_data;
     vector<distribution<float> > layer_test = testing_data;
 
-    // Do a SVD so that we can compare against it
-    SVD_Decomposition svd;
-    svd.train(training_data);
-
     // Learning rate is per-example
     learning_rate /= nx;
+
+    bool use_dense_missing = true;
 
     for (unsigned layer_num = 0;  layer_num < nlayers;  ++layer_num) {
         cerr << endl << endl << endl << "--------- LAYER " << layer_num
@@ -1250,7 +1532,8 @@ train(const std::vector<distribution<float> > & training_data,
 
         int nh = layer_sizes[layer_num];
 
-        Twoway_Layer layer(ni, nh, TF_TANH, thread_context);
+        Twoway_Layer layer(use_dense_missing, ni, nh, transfer_function,
+                           thread_context);
         distribution<CFloat> cleared_values(ni);
 
         if (ni == nh && false) {
@@ -1260,11 +1543,39 @@ train(const std::vector<distribution<float> > & training_data,
             }
         }
 
+        // Initialize with an SVD
+        SVD_Decomposition init;
+        init.train(layer_train, nh);
+
+        for (unsigned i = 0;  i < ni;  ++i) {
+            distribution<CFloat> init_i(&init.lvectors[i][0],
+                                       &init.lvectors[i][0] + nh);
+            //init_i *= init.singular_values_order / init.singular_values_order[0];
+
+            std::copy(init_i.begin(), init_i.end(),
+                      &layer.weights[i][0]);
+            layer.bias.fill(0.0);
+            layer.ibias.fill(0.0);
+        }
+
+        cerr << "layer.weights: " << print_size(layer.weights) << endl;
+        cerr << "init.lvectors: " << print_size(init.lvectors) << endl;
+
+        //layer.weights = transpose(init.lvectors);
+
+        if (verbosity == 2)
+            cerr << "iter  ---- train ----  ---- test -----\n"
+                 << "        exact   noisy    exact   noisy\n";
+
         for (unsigned iter = 0;  iter < niter;  ++iter) {
-            cerr << "iter " << iter << " training on " << nx << " examples"
-                 << endl;
+            if (verbosity >= 3)
+                cerr << "iter " << iter << " training on " << nx << " examples"
+                     << endl;
+            else if (verbosity >= 2)
+                cerr << format("%4d", iter) << flush;
             Timer timer;
 
+#if 0
             cerr << "weights: " << endl;
             for (unsigned i = 0;  i < 10;  ++i) {
                 for (unsigned j = 0;  j < 10;  ++j) {
@@ -1291,41 +1602,77 @@ train(const std::vector<distribution<float> > & training_data,
             cerr << "max = " << max_abs_weight << " avg = "
                  << avg_abs_weight << " rms avg = " << rms_avg_weight
                  << endl;
+#endif
 
             distribution<LFloat> svalues(min(ni, nh));
             boost::multi_array<LFloat, 2> layer2 = layer.weights;
+            int nvalues = std::min(ni, nh);
+        
+            boost::multi_array<double, 2> rvectors(boost::extents[ni][nvalues]);
+            boost::multi_array<double, 2> lvectorsT(boost::extents[nvalues][nh]);
 
-            int result = LAPack::gesdd("N",
-                                       layer2.shape()[1],
-                                       layer2.shape()[0],
-                                       layer2.data(), layer2.shape()[1], 
-                                       &svalues[0], 0, 1, 0, 1);
-            
+            int result = LAPack::gesdd("S", nh, ni,
+                                       layer2.data(), nh,
+                                       &svalues[0],
+                                       &lvectorsT[0][0], nh,
+                                       &rvectors[0][0], nvalues);
             if (result != 0)
-                throw Exception("error in SVD");
+                throw Exception("gesdd returned non-zero");
+        
 
-            cerr << "svalues = " << svalues << endl;
+            if (false) {
+                boost::multi_array<double, 2> weights2
+                    = rvectors * diag(svalues) * lvectorsT;
+                
+                cerr << "weights2: " << endl;
+                for (unsigned i = 0;  i < 10;  ++i) {
+                    for (unsigned j = 0;  j < 10;  ++j) {
+                        cerr << format("%7.4f", weights2[i][j]);
+                    }
+                    cerr << endl;
+                }
+            }
 
-            double train_error
+            //if (iter == 0) layer.weights = rvectors * lvectorsT;
+
+            //cerr << "svalues = " << svalues << endl;
+
+            double train_error_exact, train_error_noisy;
+            boost::tie(train_error_exact, train_error_noisy)
                 = layer.train_iter(layer_train, prob_cleared, thread_context,
-                                   minibatch_size, learning_rate);
+                                   minibatch_size, learning_rate,
+                                   verbosity);
 
-            cerr << "rmse of iteration: " << train_error << endl;
-            cerr << timer.elapsed() << endl;
-
+            if (verbosity >= 3) {
+                cerr << "rmse of iteration: exact " << train_error_exact
+                     << " noisy " << train_error_noisy << endl;
+                if (verbosity >= 3) cerr << timer.elapsed() << endl;
+            }
+            else if (verbosity == 2)
+                cerr << format("  %7.5f %7.5f",
+                               train_error_exact, train_error_noisy)
+                     << flush;
 
             timer.restart();
             double test_error_exact = 0.0, test_error_noisy = 0.0;
             
-            cerr << "testing on " << nxt << " examples"
-                 << endl;
+            if (verbosity >= 3)
+                cerr << "testing on " << nxt << " examples"
+                     << endl;
             boost::tie(test_error_exact, test_error_noisy)
-                = layer.test(layer_test, prob_cleared, thread_context);
+                = layer.test(layer_test, prob_cleared, thread_context,
+                             verbosity);
 
-            cerr << "testing rmse of iteration: exact "
-                 << test_error_exact << " noisy " << test_error_noisy
-                 << endl;
-            cerr << timer.elapsed() << endl;
+            if (verbosity >= 3) {
+                cerr << "testing rmse of iteration: exact "
+                     << test_error_exact << " noisy " << test_error_noisy
+                     << endl;
+                cerr << timer.elapsed() << endl;
+            }
+            else if (verbosity == 2)
+                cerr << format("  %7.5f %7.5f",
+                               test_error_exact, test_error_noisy)
+                     << endl;
         }
 
         next_layer_train.resize(nx);
@@ -1333,27 +1680,33 @@ train(const std::vector<distribution<float> > & training_data,
 
         // Calculate the inputs to the next layer
         
-        cerr << "calculating next layer training inputs on "
-             << nx << " examples" << endl;
+        if (verbosity >= 3)
+            cerr << "calculating next layer training inputs on "
+                 << nx << " examples" << endl;
         double train_error_exact = 0.0, train_error_noisy = 0.0;
         boost::tie(train_error_exact, train_error_noisy)
             = layer.test_and_update(layer_train, next_layer_train,
-                                    prob_cleared, thread_context);
+                                    prob_cleared, thread_context,
+                                    verbosity);
 
-        cerr << "training rmse of layer: exact "
-             << train_error_exact << " noisy " << train_error_noisy
-             << endl;
-
-        cerr << "calculating next layer testing inputs on "
-             << nxt << " examples" << endl;
+        if (verbosity >= 2)
+            cerr << "training rmse of layer: exact "
+                 << train_error_exact << " noisy " << train_error_noisy
+                 << endl;
+        
+        if (verbosity >= 3)
+            cerr << "calculating next layer testing inputs on "
+                 << nxt << " examples" << endl;
         double test_error_exact = 0.0, test_error_noisy = 0.0;
         boost::tie(test_error_exact, test_error_noisy)
             = layer.test_and_update(layer_test, next_layer_test,
-                                    prob_cleared, thread_context);
+                                    prob_cleared, thread_context,
+                                    verbosity);
         
-        cerr << "testing rmse of layer: exact "
-             << test_error_exact << " noisy " << test_error_noisy
-             << endl;
+        if (verbosity >= 2)
+            cerr << "testing rmse of layer: exact "
+                 << test_error_exact << " noisy " << test_error_noisy
+                 << endl;
 
         layer_train.swap(next_layer_train);
         layer_test.swap(next_layer_test);
@@ -1361,14 +1714,16 @@ train(const std::vector<distribution<float> > & training_data,
         push_back(layer);
 
         // Test the layer stack
-        cerr << "calculating whole stack testing performance on "
-             << nxt << " examples" << endl;
+        if (verbosity >= 3)
+            cerr << "calculating whole stack testing performance on "
+                 << nxt << " examples" << endl;
         boost::tie(test_error_exact, test_error_noisy)
-            = test(testing_data, prob_cleared, thread_context);
+            = test(testing_data, prob_cleared, thread_context, verbosity);
         
-        cerr << "testing rmse of stack: exact "
-             << test_error_exact << " noisy " << test_error_noisy
-             << endl;
+        if (verbosity >= 2)
+            cerr << "testing rmse of stack: exact "
+                 << test_error_exact << " noisy " << test_error_noisy
+                 << endl;
     }
 }
 
