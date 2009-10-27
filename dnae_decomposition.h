@@ -64,6 +64,11 @@ struct Dense_Missing_Layer : public Dense_Layer<LFloat> {
 
     virtual size_t parameter_count() const;
 
+    virtual void serialize(DB::Store_Writer & store) const;
+    virtual void reconstitute(DB::Store_Reader & store);
+
+    virtual std::string print() const;
+
     virtual Dense_Missing_Layer * make_copy() const
     {
         return new Dense_Missing_Layer(*this);
@@ -131,7 +136,10 @@ struct Twoway_Layer : public Twoway_Layer_Base {
 
     virtual void serialize(DB::Store_Writer & store) const;
     virtual void reconstitute(DB::Store_Reader & store);
-    
+
+    /** Dump as ASCII.  This will be big. */
+    virtual std::string print() const;
+        
     /** Trains a single iteration on the given data with the selected
         parameters.  Returns a moving estimate of the RMSE on the
         training set. */
@@ -140,7 +148,8 @@ struct Twoway_Layer : public Twoway_Layer_Base {
                float prob_cleared,
                Thread_Context & thread_context,
                int minibatch_size, float learning_rate,
-               int verbosity);
+               int verbosity,
+               float sample_proportion);
 
     /** Tests on the given dataset, returning the exact and noisy RMSE.  If
         data_out is non-empty, then it will also fill it in with the

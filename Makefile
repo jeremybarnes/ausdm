@@ -46,6 +46,8 @@ $(eval $(call program,ausdm,ausdm utils ACE boost_program_options-mt db arch boo
 
 $(eval $(call program,decompose,ausdm utils ACE boost_program_options-mt db arch boosting svdlibc,decompose.cc exception_hook.cc,tools))
 
+$(eval $(call program,dnae_decomposition_test,ausdm utils ACE boost_program_options-mt db arch boosting svdlibc,dnae_decomposition_test.cc exception_hook.cc,tools))
+
 $(eval $(call include_sub_makes,svdlibc))
 
 include loadbuild.mk

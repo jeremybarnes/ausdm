@@ -694,3 +694,30 @@ Not a great result.
 
 But what about all of the 0.3xxxxxx values above?
 
+
+-------------------
+
+Profiling:
+10 iterations
+Note that 80% of samples were used and randomization was on.
+
+/usr/bin/time ./build/x86_64/bin/decompose niter=10 prob_cleared=0.1 -t auc -T DNAE layer_sizes=400
+
+testing rmse of stack: exact 1.01475 noisy 1.06024
+elapsed: [398.46s cpu, 210256.1773 mticks, 78.67s wall]
+322.70user 75.78system 1:18.69elapsed 506%CPU (0avgtext+0avgdata 0maxresident)k
+
+
+With local updates:
+
+testing rmse of stack: exact 0.911403 noisy 1.18857
+elapsed: [451.66s cpu, 187340.3646 mticks, 70.09s wall]
+379.47user 72.21system 1:10.11elapsed 644%CPU (0avgtext+0avgdata 0maxresident
+
+Removed useless extra weight updating steps:
+
+testing rmse of stack: exact 0.911403 noisy 1.18857
+elapsed: [273.38s cpu, 116512.9294 mticks, 43.59s wall]
+266.91user 6.48system 0:43.62elapsed 626%CPU (0avgtext+0avgdata 0maxresident)k
+0inputs+0outputs (0major+2483249minor)pagefaults 0swaps
+
