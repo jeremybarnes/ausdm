@@ -217,7 +217,8 @@ Twoway_Layer(bool use_dense_missing,
              Transfer_Function_Type transfer,
              Thread_Context & context,
              float limit)
-    : Base(use_dense_missing, inputs, outputs, transfer), ibias(inputs)
+    : Base(use_dense_missing, inputs, outputs, transfer), ibias(inputs),
+      iscales(inputs)
 {
     if (limit == -1.0)
         limit = 1.0 / sqrt(inputs);
@@ -228,7 +229,8 @@ Twoway_Layer::
 Twoway_Layer(bool use_dense_missing,
              size_t inputs, size_t outputs,
              Transfer_Function_Type transfer)
-    : Base(use_dense_missing, inputs, outputs, transfer), ibias(inputs)
+    : Base(use_dense_missing, inputs, outputs, transfer), ibias(inputs),
+      iscales(inputs)
 {
 }
 
@@ -237,7 +239,7 @@ Twoway_Layer::
 iapply(const distribution<double> & output) const
 {
     CHECK_NO_NAN(output);
-    distribution<double> activation = weights * output;
+    distribution<double> activation = (weights * output) * iscales;
     activation += ibias;
     transfer(&activation[0], &activation[0], inputs(), transfer_function);
     return activation;
@@ -248,7 +250,8 @@ Twoway_Layer::
 iapply(const distribution<float> & output) const
 {
     CHECK_NO_NAN(output);
-    distribution<float> activation = multiply_r<float>(weights, output);
+    distribution<float> activation
+        = multiply_r<float>(weights, output) * iscales;
     activation += ibias;
     transfer(&activation[0], &activation[0], inputs(), transfer_function);
     return activation;
@@ -273,7 +276,7 @@ Twoway_Layer::
 iactivation(const distribution<double> & output) const
 {
     CHECK_NO_NAN(output);
-    distribution<double> activation = weights * output;
+    distribution<double> activation = (weights * output) * iscales;
     activation += ibias;
     return activation;
 }
@@ -283,7 +286,8 @@ Twoway_Layer::
 iactivation(const distribution<float> & output) const
 {
     CHECK_NO_NAN(output);
-    distribution<float> activation = multiply_r<float>(weights, output);
+    distribution<float> activation
+        = multiply_r<float>(weights, output) * iscales;
     activation += ibias;
     return activation;
 }
@@ -349,7 +353,8 @@ update(const Twoway_Layer & updates, double learning_rate)
     
     ibias -= learning_rate * updates.ibias;
     bias -= learning_rate * updates.bias;
-    
+    iscales -= 10.0 * learning_rate * updates.iscales;
+
     for (unsigned i = 0;  i < ni;  ++i)
         SIMD::vec_add(&weights[i][0], -learning_rate,
                       &updates.weights[i][0],
@@ -372,8 +377,11 @@ Twoway_Layer::
 random_fill(float limit, Thread_Context & context)
 {
     Dense_Layer<LFloat>::random_fill(limit, context);
-    for (unsigned i = 0;  i < ibias.size();  ++i)
+    for (unsigned i = 0;  i < ibias.size();  ++i) {
         ibias[i] = limit * (context.random01() * 2.0f - 1.0f);
+        iscales[i] = context.random01();
+    }
+    iscales.fill(1.0);
 }
 
 void
@@ -382,6 +390,7 @@ zero_fill()
 {
     Dense_Layer<LFloat>::zero_fill();
     ibias.fill(0.0);
+    iscales.fill(1.0);
 }
 
 void
@@ -389,7 +398,7 @@ Twoway_Layer::
 serialize(DB::Store_Writer & store) const
 {
     Dense_Layer<LFloat>::serialize(store);
-    store << ibias;
+    store << ibias << iscales;
 }
 
 void
@@ -397,7 +406,7 @@ Twoway_Layer::
 reconstitute(DB::Store_Reader & store)
 {
     Dense_Layer<LFloat>::reconstitute(store);
-    store >> ibias;
+    store >> ibias >> iscales;
 }
 
 
@@ -508,6 +517,7 @@ train_example(const Twoway_Layer & layer,
         
     }
         
+    // NOTE: OUT OF DATE, NEEDS CORRECTIONS
     // Now we solve for the gradient direction for the two biases as
     // well as for the weights matrix
     //
@@ -554,6 +564,7 @@ train_example(const Twoway_Layer & layer,
     //
     // Since we want to minimise the reconstruction error, we use the
     // negative of the gradient.
+    // END OUT OF DATE
 
     // NOTE: here, the activation function for the input and the output
     // are the same.
@@ -563,6 +574,7 @@ train_example(const Twoway_Layer & layer,
 
     const distribution<LFloat> & b JML_UNUSED = layer.bias;
     const distribution<LFloat> & c JML_UNUSED = layer.ibias;
+    const distribution<LFloat> & d JML_UNUSED = layer.iscales;
 
     distribution<CFloat> c_updates
         = -2 * diff * layer.iderivative(denoised_input);
@@ -609,6 +621,54 @@ train_example(const Twoway_Layer & layer,
     }
 #endif
 
+    distribution<CFloat> d_updates(ni);
+    d_updates = multiply_r<CFloat>(W, hidden_rep) * c_updates;
+
+#if 0
+    cerr << "d_updates.size() = " << d_updates.size() << endl;
+    cerr << "d.size() = " << d.size() << endl;
+
+    cerr << "d = " << d << endl;
+
+    Twoway_Layer layer2 = layer;
+
+    // Calculate numerically the c updates
+    for (unsigned i = 0;  i < ni;  ++i) {
+
+        float epsilon = 1e-8;
+        double old = layer2.iscales[i];
+        layer2.iscales[i] += epsilon;
+
+        // Apply the layer
+        distribution<CFloat> hidden_rep2
+            = layer2.apply(noisy_input);
+        
+        distribution<CFloat> denoised_input2
+            = layer2.iapply(hidden_rep2);
+
+        // Error signal
+        distribution<CFloat> diff2
+            = model_input - denoised_input2;
+            
+        // Overall error
+        double error2 = pow(diff2.two_norm(), 2);
+
+        double delta = error2 - error;
+
+        double deriv  = d_updates[i];
+        double deriv2 = xdiv(delta, epsilon);
+
+        cerr << format("%3d %7.4f %9.5f %9.5f %9.5f %8.5f\n",
+                       i,
+                       100.0 * xdiv(abs(deriv - deriv2),
+                                    max(abs(deriv), abs(deriv2))),
+                       abs(deriv - deriv2),
+                       deriv, deriv2, noisy_input[i]);
+
+        layer2.iscales[i] = old;
+    }
+#endif
+
     distribution<CFloat> hidden_deriv
         = layer.derivative(hidden_rep);
 
@@ -616,8 +676,8 @@ train_example(const Twoway_Layer & layer,
 #if 0
     distribution<CFloat> hidden_act2 = hidden_act;
 
-    cerr << "hidden_act = " << hidden_act << endl;
-    cerr << "hidden_deriv = " << hidden_deriv << endl;
+    //cerr << "hidden_act = " << hidden_act << endl;
+    //cerr << "hidden_deriv = " << hidden_deriv << endl;
 
     // Calculate numerically the c updates
     for (unsigned i = 0;  i < no;  ++i) {
@@ -653,7 +713,7 @@ train_example(const Twoway_Layer & layer,
     CHECK_NO_NAN(hidden_deriv);
 
     distribution<CFloat> b_updates
-        = multiply_r<CFloat>(c_updates, W) * hidden_deriv;
+        = multiply_r<CFloat>(c_updates * d, W) * hidden_deriv;
 
     CHECK_NO_NAN(b_updates);
 
@@ -704,7 +764,7 @@ train_example(const Twoway_Layer & layer,
     distribution<double> factor_totals(no);
 
     for (unsigned i = 0;  i < ni;  ++i)
-        SIMD::vec_add(&factor_totals[0], c_updates[i], &W[i][0],
+        SIMD::vec_add(&factor_totals[0], c_updates[i] * d[i], &W[i][0],
                       &factor_totals[0], no);
 
     for (unsigned i = 0;  i < ni;  ++i) {
@@ -714,7 +774,7 @@ train_example(const Twoway_Layer & layer,
 
             // We use the W value for both the input and the output, so we
             // need to accumulate it's total effect on the derivative
-            calc_W_updates(c_updates[i],
+            calc_W_updates(c_updates[i] * d[i],
                            &hidden_rep[0],
                            model_input[i],
                            &factor_totals[0],
@@ -726,7 +786,7 @@ train_example(const Twoway_Layer & layer,
             // the missing activation updates
 
             // W value only used on the way out; simpler calculation
-            SIMD::vec_add(&W_updates[i][0], c_updates[i],
+            SIMD::vec_add(&W_updates[i][0], c_updates[i] * d[i],
                           &hidden_rep[0], &W_updates[i][0], no);
 
             // Missing values were used on the way in
@@ -890,6 +950,7 @@ train_example(const Twoway_Layer & layer,
         
         updates.bias += b_updates;
         updates.ibias += c_updates;
+        updates.iscales += d_updates;
         
         for (unsigned i = 0;  i < ni;  ++i) {
             SIMD::vec_add(&updates.weights[i][0],
@@ -908,7 +969,8 @@ train_example(const Twoway_Layer & layer,
 
         atomic_accumulate(&updates.bias[0], &b_updates[0], no);
         atomic_accumulate(&updates.ibias[0], &c_updates[0], ni);
-
+        atomic_accumulate(&updates.iscales[0], &d_updates[0], ni);
+        
         for (unsigned i = 0;  i < ni;  ++i) {
             atomic_accumulate(&updates.weights[i][0], &W_updates[i][0], no);
 
@@ -1558,11 +1620,6 @@ train(const std::vector<distribution<float> > & training_data,
             layer.ibias.fill(0.0);
         }
 
-        cerr << "layer.weights: " << print_size(layer.weights) << endl;
-        cerr << "init.lvectors: " << print_size(init.lvectors) << endl;
-
-        //layer.weights = transpose(init.lvectors);
-
         if (verbosity == 2)
             cerr << "iter  ---- train ----  ---- test -----\n"
                  << "        exact   noisy    exact   noisy\n";
@@ -1603,6 +1660,8 @@ train(const std::vector<distribution<float> > & training_data,
                  << avg_abs_weight << " rms avg = " << rms_avg_weight
                  << endl;
 #endif
+
+            cerr << "iscales: " << layer.iscales << endl;
 
             distribution<LFloat> svalues(min(ni, nh));
             boost::multi_array<LFloat, 2> layer2 = layer.weights;

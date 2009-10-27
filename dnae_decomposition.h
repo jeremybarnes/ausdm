@@ -80,8 +80,8 @@ typedef Dense_Missing_Layer Twoway_Layer_Base;
 /*****************************************************************************/
 
 /** A perceptron layer that has both a forward and a reverse direction.  It's
-    as suck both a discriminative model (in the forward direction) and a
-    generative model (in the reverse direction).
+    both a discriminative model (in the forward direction) and a generative
+    model (in the reverse direction).
 */
 
 struct Twoway_Layer : public Twoway_Layer_Base {
@@ -101,6 +101,9 @@ struct Twoway_Layer : public Twoway_Layer_Base {
 
     /// Bias for the reverse direction
     distribution<LFloat> ibias;
+
+    /// Scaling factors for the reverse direction
+    distribution<LFloat> iscales;
 
     distribution<double> iapply(const distribution<double> & output) const;
     distribution<float> iapply(const distribution<float> & output) const;
