@@ -685,6 +685,8 @@ model 150: before 0.0655461/0.380835 after 0.202491/0.344179
 model 167: before 0.0658265/0.367942 after 0.18448/0.333779
 
 
+model 64: before 0.0700761/0.387666 after 0.452996/0.12874
+
 Success
 Gini = 0.87898462670556
 AUC = 0.93949231335278
@@ -780,4 +782,28 @@ testing rmse of stack: exact 1.07445 noisy 1.20471
 elapsed: [219.84s cpu, 95791.8669 mticks, 35.84s wall]
 204.45user 15.40system 0:35.86elapsed 613%CPU (0avgtext+0avgdata 0maxresident)k
 0inputs+0outputs (0major+5173133minor)pagefaults 0swaps
+
+
+With singular value equalization:
+
+
+testing rmse of stack: exact 1.03395 noisy 1.40583
+elapsed: [219.58s cpu, 97414.3006 mticks, 36.45s wall]
+204.32user 15.26system 0:36.47elapsed 602%CPU (0avgtext+0avgdata 0maxresident)k
+0inputs+0outputs (0major+5118235minor)pagefaults 0swaps
+
+Training for AUC:
+
+/usr/bin/time ./build/x86_64/bin/decompose niter=500 prob_cleared=0.1 -t auc -T DNAE layer_sizes=250,150,100,50 minibatch_size=256 test_every=10 sample_proportion=0.8 minibatch_size=256 -o auc_decomposed_4.bin 2>&1 | tee log auc_decomposed_4.log
+
+Added in that 50% of examples have zero missing:
+
+/usr/bin/time ./build/x86_64/bin/decompose niter=500 prob_cleared=0.1 -t auc -T DNAE layer_sizes=250,150,100,50 minibatch_size=256 test_every=10 sample_proportion=0.8 minibatch_size=256 -o auc_decomposed_5.bin 2>&1 | tee log auc_decomposed_5.log
+
+jeremy@jeremy-desktop:~/projects/ausdm$ ./build/x86_64/bin/ausdm -t auc --decomposition auc_decomposed_5.bin -o auc.txt
+
+Success
+Gini = 0.8757558999216
+AUC = 0.9378779499608
+
 

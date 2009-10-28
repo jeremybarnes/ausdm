@@ -36,18 +36,18 @@ LIBAUSDM_SOURCES := \
 	decomposition.cc svd_decomposition.cc dnae_decomposition.cc
 
 LIBAUSDM_LINK := \
-	utils ACE boost_date_time-mt db arch boosting svdlibc algebra
+	utils ACE boost_date_time-mt db arch boosting algebra
 
 $(eval $(call library,ausdm,$(LIBAUSDM_SOURCES),$(LIBAUSDM_LINK)))
 
 $(eval $(call add_sources,exception_hook.cc))
 
-$(eval $(call program,ausdm,ausdm utils ACE boost_program_options-mt db arch boosting svdlibc,ausdm.cc exception_hook.cc,tools))
+$(eval $(call program,ausdm,ausdm utils ACE boost_program_options-mt db arch boosting,ausdm.cc exception_hook.cc,tools))
 
-$(eval $(call program,decompose,ausdm utils ACE boost_program_options-mt db arch boosting svdlibc,decompose.cc exception_hook.cc,tools))
+$(eval $(call program,decompose,ausdm utils ACE boost_program_options-mt db arch boosting,decompose.cc exception_hook.cc,tools))
 
-$(eval $(call program,dnae_decomposition_test,ausdm utils ACE boost_program_options-mt db arch boosting svdlibc,dnae_decomposition_test.cc exception_hook.cc,tools))
+$(eval $(call program,dnae_decomposition_test,ausdm utils ACE boost_program_options-mt db arch boosting,dnae_decomposition_test.cc exception_hook.cc,tools))
 
-$(eval $(call include_sub_makes,svdlibc))
+$(eval $(call test,dnae_unit_tests,ausdm,boost))
 
 include loadbuild.mk

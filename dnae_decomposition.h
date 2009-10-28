@@ -73,8 +73,11 @@ struct Dense_Missing_Layer : public Dense_Layer<LFloat> {
     {
         return new Dense_Missing_Layer(*this);
     }
+
+    bool operator == (const Dense_Missing_Layer & other) const;
 };
 
+IMPL_SERIALIZE_RECONSTITUTE(Dense_Missing_Layer);
 
 
 typedef Dense_Missing_Layer Twoway_Layer_Base;
@@ -151,7 +154,8 @@ struct Twoway_Layer : public Twoway_Layer_Base {
                Thread_Context & thread_context,
                int minibatch_size, float learning_rate,
                int verbosity,
-               float sample_proportion);
+               float sample_proportion,
+               bool randomize_order);
 
     /** Tests on the given dataset, returning the exact and noisy RMSE.  If
         data_out is non-empty, then it will also fill it in with the
@@ -175,7 +179,11 @@ struct Twoway_Layer : public Twoway_Layer_Base {
         return test_and_update(data, dummy, prob_cleared, thread_context,
                                verbosity);
     }
+
+    bool operator == (const Twoway_Layer & other) const;
 };
+
+IMPL_SERIALIZE_RECONSTITUTE(Twoway_Layer);
 
 
 /*****************************************************************************/
@@ -210,7 +218,12 @@ struct DNAE_Stack : public std::vector<Twoway_Layer> {
          float prob_cleared,
          ML::Thread_Context & thread_context,
          int verbosity) const;
+
+    bool operator == (const DNAE_Stack & other) const;
 };
+
+
+IMPL_SERIALIZE_RECONSTITUTE(DNAE_Stack);
 
 } // namespace ML
 
@@ -243,6 +256,8 @@ struct DNAE_Decomposition : public Decomposition {
     virtual void train(const Data & training_data,
                        const Data & testing_data,
                        const ML::Configuration & config);
+
+    bool operator == (const DNAE_Decomposition & other) const;
 };
 
 

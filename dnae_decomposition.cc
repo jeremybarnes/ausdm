@@ -236,8 +236,14 @@ reconstitute(DB::Store_Reader & store)
 {
     Base::reconstitute(store);
     store >> use_dense_missing;
+    cerr << "store.offset() = " << store.offset() << endl;
     if (use_dense_missing)
         store >> missing_activations;
+    cerr << "use_dense_missing = " << use_dense_missing << endl;
+    cerr << "missing_activations.size() = " << missing_activations.size()
+         << endl;
+    cerr << "missing_activations[0] = "
+         << missing_activations[0] << endl;
 }
 
 std::string
@@ -256,6 +262,41 @@ print() const
         result += " ]\n";
     }
     return result;
+}
+
+template<typename X>
+bool equivalent(const X & x1, const X & x2)
+{
+    return x1 == x2;
+}
+
+template<typename X, class U>
+bool equivalent(const distribution<X, U> & x1,
+                const distribution<X, U> & x2)
+{
+    if (x1.size() != x2.size()) return false;
+    for (unsigned i = 0;  i < x1.size();  ++i)
+        if (!equivalent(x1[i], x2[i])) return false;
+    return true;
+}
+
+template<typename X>
+bool equivalent(const std::vector<X> & x1, const std::vector<X> & x2)
+{
+    if (x1.size() != x2.size()) return false;
+    for (unsigned i = 0;  i < x1.size();  ++i)
+        if (!equivalent(x1[i], x2[i])) return false;
+    return true;
+}
+
+bool
+Dense_Missing_Layer::
+operator == (const Dense_Missing_Layer & other) const
+{
+    return (Base::operator == (other)
+            && use_dense_missing == other.use_dense_missing
+            && missing_activations.size() == other.missing_activations.size()
+            && equivalent(missing_activations, other.missing_activations));
 }
 
 
@@ -604,6 +645,7 @@ reconstitute(DB::Store_Reader & store)
 {
     Base::reconstitute(store);
     store >> ibias >> iscales >> hscales;
+    cerr << "finished twoway layer" << endl;
 }
 
 std::string
@@ -630,6 +672,16 @@ print() const
     result += " ]\n";
 
     return result;
+}
+
+bool
+Twoway_Layer::
+operator == (const Twoway_Layer & other) const
+{
+    if (!Base::operator == (other)) return false;
+    return equivalent(ibias, other.ibias)
+        && equivalent(iscales, other.iscales)
+        && equivalent(hscales, other.hscales);
 }
 
 
@@ -691,8 +743,11 @@ train_example(const Twoway_Layer & layer,
     //float prob_cleared = thread_context.random01() < 0.5 ? max_prob_cleared : 0.0;
     float prob_cleared = max_prob_cleared;
 
-    distribution<CFloat> noisy_input
-        = add_noise(model_input, thread_context, prob_cleared);
+    distribution<CFloat> noisy_input;
+
+    if (thread_context.random01() < 0.5)
+        noisy_input = add_noise(model_input, thread_context, prob_cleared);
+    else noisy_input = model_input;
 
     distribution<CFloat> noisy_pre
         = layer.preprocess(noisy_input);
@@ -1327,6 +1382,7 @@ struct Train_Examples_Job {
     const vector<distribution<float> > & data;
     int first;
     int last;
+    const vector<int> & examples;
     float prob_cleared;
     const Thread_Context & context;
     int random_seed;
@@ -1336,11 +1392,11 @@ struct Train_Examples_Job {
     double & error_noisy;
     boost::progress_display * progress;
     int verbosity;
-    float sample_proportion;
 
     Train_Examples_Job(const Twoway_Layer & layer,
                        const vector<distribution<float> > & data,
                        int first, int last,
+                       const vector<int> & examples,
                        float prob_cleared,
                        const Thread_Context & context,
                        int random_seed,
@@ -1349,15 +1405,13 @@ struct Train_Examples_Job {
                        double & error_exact,
                        double & error_noisy,
                        boost::progress_display * progress,
-                       int verbosity,
-                       float sample_proportion)
+                       int verbosity)
         : layer(layer), data(data), first(first), last(last),
-          prob_cleared(prob_cleared),
+          examples(examples), prob_cleared(prob_cleared),
           context(context), random_seed(random_seed), updates(updates),
           update_lock(update_lock),
           error_exact(error_exact), error_noisy(error_noisy),
-          progress(progress), verbosity(verbosity),
-          sample_proportion(sample_proportion)
+          progress(progress), verbosity(verbosity)
     {
     }
 
@@ -1372,9 +1426,6 @@ struct Train_Examples_Job {
                                            layer.inputs(), layer.outputs());
 
         for (unsigned x = first;  x < last;  ++x) {
-
-            // Randomly exclude some samples
-            if (thread_context.random01() >= sample_proportion) continue;
 
             double eex, eno;
             boost::tie(eex, eno)
@@ -1409,7 +1460,8 @@ train_iter(const vector<distribution<float> > & data,
            Thread_Context & thread_context,
            int minibatch_size, float learning_rate,
            int verbosity,
-           float sample_proportion)
+           float sample_proportion,
+           bool randomize_order)
 {
     Worker_Task & worker = thread_context.worker();
 
@@ -1419,13 +1471,29 @@ train_iter(const vector<distribution<float> > & data,
 
     int microbatch_size = minibatch_size / (num_cpus() * 4);
             
-    std::auto_ptr<boost::progress_display> progress;
-    if (verbosity >= 3) progress.reset(new boost::progress_display(nx, cerr));
     Lock update_lock;
 
     double total_mse_exact = 0.0, total_mse_noisy = 0.0;
     
-    for (unsigned x = 0;  x < nx;  x += minibatch_size) {
+    vector<int> examples;
+    for (unsigned x = 0;  x < nx;  ++x) {
+        // Randomly exclude some samples
+        if (thread_context.random01() >= sample_proportion)
+            continue;
+        examples.push_back(x);
+    }
+    
+    if (randomize_order) {
+        Thread_Context::RNG_Type rng = thread_context.rng();
+        std::random_shuffle(examples.begin(), examples.end(), rng);
+    }
+    
+    int nx2 = examples.size();
+
+    std::auto_ptr<boost::progress_display> progress;
+    if (verbosity >= 3) progress.reset(new boost::progress_display(nx2, cerr));
+
+    for (unsigned x = 0;  x < nx2;  x += minibatch_size) {
                 
         Twoway_Layer_Updates updates(use_dense_missing, ni, no);
                 
@@ -1444,15 +1512,16 @@ train_iter(const vector<distribution<float> > & data,
                                          group));
                     
                     
-            for (unsigned x2 = x;  x2 < nx && x2 < x + minibatch_size;
+            for (unsigned x2 = x;  x2 < nx2 && x2 < x + minibatch_size;
                  x2 += microbatch_size) {
                         
                 Train_Examples_Job job(*this,
                                        data,
                                        x2,
-                                       min<int>(nx,
+                                       min<int>(nx2,
                                                 min(x + minibatch_size,
                                                     x2 + microbatch_size)),
+                                       examples,
                                        prob_cleared,
                                        thread_context,
                                        thread_context.random(),
@@ -1461,8 +1530,7 @@ train_iter(const vector<distribution<float> > & data,
                                        total_mse_exact,
                                        total_mse_noisy,
                                        progress.get(),
-                                       verbosity,
-                                       sample_proportion);
+                                       verbosity);
                 // Send it to a thread to be processed
                 worker.add(job, "blend job", group);
             }
@@ -1475,7 +1543,7 @@ train_iter(const vector<distribution<float> > & data,
         update(updates, learning_rate);
     }
 
-    return make_pair(sqrt(total_mse_exact / nx), sqrt(total_mse_noisy / nx));
+    return make_pair(sqrt(total_mse_exact / nx2), sqrt(total_mse_noisy / nx2));
 }
 
 struct Test_Examples_Job {
@@ -1725,7 +1793,7 @@ void
 DNAE_Stack::
 reconstitute(ML::DB::Store_Reader & store)
 {
-    int version;
+    char version;
     store >> version;
     if (version != 1) {
         cerr << "version = " << (int)version << endl;
@@ -1949,6 +2017,9 @@ train(const std::vector<distribution<float> > & training_data,
     // Learning rate is per-example
     learning_rate /= nx;
 
+    // Compensate for the example proportion
+    learning_rate /= sample_proportion;
+
     for (unsigned layer_num = 0;  layer_num < nlayers;  ++layer_num) {
         cerr << endl << endl << endl << "--------- LAYER " << layer_num
              << " ---------" << endl << endl;
@@ -2127,13 +2198,16 @@ train(const std::vector<distribution<float> > & training_data,
 
             //if (iter == 0) layer.weights = rvectors * lvectorsT;
 
+            //if (iter == 0) layer.weights = rvectors * lvectorsT;
+
             //cerr << "svalues = " << svalues << endl;
 
             double train_error_exact, train_error_noisy;
             boost::tie(train_error_exact, train_error_noisy)
                 = layer.train_iter(layer_train, prob_cleared, thread_context,
                                    minibatch_size, learning_rate,
-                                   verbosity, sample_proportion);
+                                   verbosity, sample_proportion,
+                                   randomize_order);
 
             if (verbosity >= 3) {
                 cerr << "rmse of iteration: exact " << train_error_exact
@@ -2169,12 +2243,6 @@ train(const std::vector<distribution<float> > & training_data,
             }
 
             if (verbosity == 2) cerr << endl;
-
-            if (randomize_order) {
-                Thread_Context::RNG_Type rng = thread_context.rng();
-                std::random_shuffle(layer_train.begin(), layer_train.end(),
-                                    rng);
-            }
         }
 
         next_layer_train.resize(nx);
@@ -2262,7 +2330,7 @@ void
 DNAE_Decomposition::
 reconstitute(ML::DB::Store_Reader & store)
 {
-    int version;
+    char version;
     store >> version;
     if (version != 1)
         throw Exception("DNAE_Decomposition: version was wrong");

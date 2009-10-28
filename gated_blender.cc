@@ -666,9 +666,9 @@ get_conf_features(int model,
         if (!data->decomposition) reconst = model_outputs;
         else reconst = data->decomposition->recompose(target_singular, nr);
 
-        cerr << "reconstitution for order " << nr << " model "
-             << model << ": in " << model_outputs[model]
-             << " out: " << reconst[model] << endl;
+        //cerr << "reconstitution for order " << nr << " model "
+        //     << model << ": in " << model_outputs[model]
+        //     << " out: " << reconst[model] << endl;
 
         result.push_back(reconst[model] - model_outputs[model]);
         result.push_back(abs(reconst[model] - model_outputs[model]));
