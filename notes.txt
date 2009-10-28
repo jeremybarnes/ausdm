@@ -765,3 +765,19 @@ elapsed: [288.74s cpu, 120263.9041 mticks, 45.00s wall]
 
 Worth it!
 
+Weights stored as double precision:
+
+testing rmse of stack: exact 1.13037 noisy 1.20409
+elapsed: [290.79s cpu, 124378.5799 mticks, 46.54s wall]
+275.77user 15.04system 0:46.57elapsed 624%CPU (0avgtext+0avgdata 0maxresident)k
+0inputs+0outputs (0major+4796407minor)pagefaults 0swaps
+
+Very marginally worse; doesn't make much of a difference
+
+With test_every=5 and some junk removed:
+
+testing rmse of stack: exact 1.07445 noisy 1.20471
+elapsed: [219.84s cpu, 95791.8669 mticks, 35.84s wall]
+204.45user 15.40system 0:35.86elapsed 613%CPU (0avgtext+0avgdata 0maxresident)k
+0inputs+0outputs (0major+5173133minor)pagefaults 0swaps
+

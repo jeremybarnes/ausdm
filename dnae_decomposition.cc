@@ -1917,6 +1917,8 @@ train(const std::vector<distribution<float> > & training_data,
 
     float sample_proportion = 0.8;
 
+    int test_every = 1;
+
     vector<int> layer_sizes
         = boost::assign::list_of<int>(250)(150)(100)(50);
     
@@ -1931,6 +1933,7 @@ train(const std::vector<distribution<float> > & training_data,
     config.get(layer_sizes, "layer_sizes");
     config.get(randomize_order, "randomize_order");
     config.get(sample_proportion, "sample_proportion");
+    config.get(test_every, "test_every");
 
     int nx = training_data.size();
     int nxt = testing_data.size();
@@ -2024,6 +2027,7 @@ train(const std::vector<distribution<float> > & training_data,
                                     prob_cleared, thread_context,
                                     verbosity);
 
+#if 0
         push_back(layer);
 
         // Test the layer stack
@@ -2044,7 +2048,7 @@ train(const std::vector<distribution<float> > & training_data,
                  << endl;
 
         pop_back();
-
+#endif
 
         if (verbosity == 2)
             cerr << "iter  ---- train ----  ---- test -----\n"
@@ -2141,26 +2145,30 @@ train(const std::vector<distribution<float> > & training_data,
                                train_error_exact, train_error_noisy)
                      << flush;
 
-            timer.restart();
-            double test_error_exact = 0.0, test_error_noisy = 0.0;
-            
-            if (verbosity >= 3)
-                cerr << "testing on " << nxt << " examples"
-                     << endl;
-            boost::tie(test_error_exact, test_error_noisy)
-                = layer.test(layer_test, prob_cleared, thread_context,
-                             verbosity);
-
-            if (verbosity >= 3) {
-                cerr << "testing rmse of iteration: exact "
-                     << test_error_exact << " noisy " << test_error_noisy
-                     << endl;
-                cerr << timer.elapsed() << endl;
+            if (iter % test_every == (test_every - 1)
+                || iter == niter - 1) {
+                timer.restart();
+                double test_error_exact = 0.0, test_error_noisy = 0.0;
+                
+                if (verbosity >= 3)
+                    cerr << "testing on " << nxt << " examples"
+                         << endl;
+                boost::tie(test_error_exact, test_error_noisy)
+                    = layer.test(layer_test, prob_cleared, thread_context,
+                                 verbosity);
+                
+                if (verbosity >= 3) {
+                    cerr << "testing rmse of iteration: exact "
+                         << test_error_exact << " noisy " << test_error_noisy
+                         << endl;
+                    cerr << timer.elapsed() << endl;
+                }
+                else if (verbosity == 2)
+                    cerr << format("  %7.5f %7.5f",
+                                   test_error_exact, test_error_noisy);
             }
-            else if (verbosity == 2)
-                cerr << format("  %7.5f %7.5f",
-                               test_error_exact, test_error_noisy)
-                     << endl;
+
+            if (verbosity == 2) cerr << endl;
 
             if (randomize_order) {
                 Thread_Context::RNG_Type rng = thread_context.rng();
