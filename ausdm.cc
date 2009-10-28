@@ -215,11 +215,10 @@ int main(int argc, char ** argv)
         decomposition = Decomposition::create(decomposition_name);
         
         Data decompose_training_data;
+        //decompose_training_data.load("download/S_"
+        //                             + targ_type_uc + "_Train.csv", target);
         decompose_training_data.load("download/S_"
-                                     + targ_type_uc + "_Train.csv", target);
-        decompose_training_data.load("download/S_"
-                                     + targ_type_uc + "_Score.csv", target,
-                                     false);
+                                     + targ_type_uc + "_Score.csv", target);
         
         cerr << "training decomposition" << endl;
         decomposition->train(decompose_training_data,

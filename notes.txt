@@ -800,6 +800,11 @@ Added in that 50% of examples have zero missing:
 
 /usr/bin/time ./build/x86_64/bin/decompose niter=500 prob_cleared=0.1 -t auc -T DNAE layer_sizes=250,150,100,50 minibatch_size=256 test_every=10 sample_proportion=0.8 minibatch_size=256 -o auc_decomposed_5.bin 2>&1 | tee log auc_decomposed_5.log
 
+--------
+
+New submission
+
+
 jeremy@jeremy-desktop:~/projects/ausdm$ ./build/x86_64/bin/ausdm -t auc --decomposition auc_decomposed_5.bin -o auc.txt
 
 Success
@@ -807,3 +812,113 @@ Gini = 0.8757558999216
 AUC = 0.9378779499608
 
 
+-----
+
+SVD:
+
+model 7: before 0.06852/0.384003 after 0.229559/0.335661
+model 64: before 0.0700761/0.387666 after 0.302785/0.215156
+model 65: before 0.0689352/0.387611 after 0.30091/0.215864
+model 71: before 0.0680365/0.39421 after 0.313383/0.222036
+model 81: before 0.0677772/0.389624 after 0.296709/0.226068
+model 88: before 0.068651/0.387245 after 0.223344/0.337744
+model 123: before 0.0668508/0.389111 after 0.22569/0.338291
+model 140: before 0.0688745/0.385887 after 0.226641/0.334532
+model 150: before 0.0678839/0.393203 after 0.302427/0.225582
+model 167: before 0.0683845/0.383097 after 0.209152/0.337951
+
+score: 0.0569  baseline: 0.0597  diff: -0.00276
+category UNKNOWN: count 0 avg error 0 baseline avg error 0 avg improvement 0
+category AUTO: count 1792 avg error 0.0249997 baseline avg error 0.0277302 avg improvement 0.00273057
+category POSS: count 1046 avg error 0.0774971 baseline avg error 0.080278 avg improvement 0.00278095
+category IMP: count 162 avg error 0.276724 baseline avg error 0.279722 avg improvement 0.00299887
+overall: count 3000 avg error 0.0568969 baseline avg error 0.0596595 avg improvement 0.00276262
+
+
+0.0569 +/-    nan
+
+
+With all models as features:
+
+score: 0.0575  baseline: 0.0597  diff: -0.00217
+category UNKNOWN: count 0 avg error 0 baseline avg error 0 avg improvement 0
+category AUTO: count 1792 avg error 0.0255618 baseline avg error 0.0277302 avg improvement 0.00216845
+category POSS: count 1046 avg error 0.0780009 baseline avg error 0.080278 avg improvement 0.00227712
+category IMP: count 162 avg error 0.278175 baseline avg error 0.279722 avg improvement 0.00154763
+overall: count 3000 avg error 0.0574867 baseline avg error 0.0596595 avg improvement 0.00217282
+
+0.0575 +/-    nan
+
+
+So that's not a good idea.
+
+model 7: before 0.06852/0.384003 after 0.235083/0.332969
+model 64: before 0.0700761/0.387666 after 0.316355/0.19513
+model 65: before 0.0689352/0.387611 after 0.312144/0.19573
+model 71: before 0.0680365/0.39421 after 0.307778/0.245703
+model 81: before 0.0677772/0.389624 after 0.252069/0.335179
+model 88: before 0.068651/0.387245 after 0.213997/0.336884
+model 123: before 0.0668508/0.389111 after 0.24284/0.336533
+model 140: before 0.0688745/0.385887 after 0.217393/0.333598
+model 150: before 0.0678839/0.393203 after 0.331594/0.194509
+model 167: before 0.0683845/0.383097 after 0.211377/0.338049
+
+
+Training the SVD only on the testing data:
+
+/build/x86_64/bin/ausdm -t auc --decomposition SVD -T 0.20
+
+category UNKNOWN: count 0 avg error 0 baseline avg error 0 avg improvement 0
+category AUTO: count 1792 avg error 0.02465 baseline avg error 0.0277302 avg improvement 0.00308023
+category POSS: count 1046 avg error 0.0772276 baseline avg error 0.080278 avg improvement 0.00305043
+category IMP: count 162 avg error 0.274658 baseline avg error 0.279722 avg improvement 0.00506434
+overall: count 3000 avg error 0.0564825 baseline avg error 0.0596595 avg improvement 0.00317698
+
+0.0565 +/-    nan
+
+
+Seems to be a good idea; probably does something to stop overfitting
+
+----
+
+Trying to train another decomposition:
+
+jeremy@jeremy-desktop:~/projects/ausdm$ /usr/bin/time ./build/x86_64/bin/decompose niter=500 prob_cleared=0.1 -t auc -T DNAE layer_sizes=250,150,100,50 minibatch_size=256 test_every=10 sample_proportion=0.8 minibatch_size=256 -o auc_decomposed_6.bin 2>&1 | tee log auc_decomposed_6.log
+
+
+score: 0.0577  baseline: 0.0597  diff: -0.00196
+category UNKNOWN: count 0 avg error 0 baseline avg error 0 avg improvement 0
+category AUTO: count 1792 avg error 0.0257383 baseline avg error 0.0277302 avg improvement 0.00199198
+category POSS: count 1046 avg error 0.0784031 baseline avg error 0.080278 avg improvement 0.00187492
+category IMP: count 162 avg error 0.277497 baseline avg error 0.279722 avg improvement 0.00222539
+overall: count 3000 avg error 0.0576957 baseline avg error 0.0596595 avg improvement 0.00196377
+
+
+---------
+
+
+With one single IRLS:
+
+model 7: before 0.06852/0.384003 after 0.42331/0.128117
+model 64: before 0.0700761/0.387666 after 0.45695/0.12374
+model 65: before 0.0689352/0.387611 after 0.451618/0.128038
+model 71: before 0.0680365/0.39421 after 0.461487/0.132416
+model 81: before 0.0677772/0.389624 after 0.459428/0.130617
+model 88: before 0.068651/0.387245 after 0.449637/0.126693
+model 123: before 0.0668508/0.389111 after 0.459812/0.131259
+model 140: before 0.0688745/0.385887 after 0.450065/0.125641
+model 150: before 0.0678839/0.393203 after 0.462587/0.133776
+model 167: before 0.0683845/0.383097 after 0.444729/0.125012
+
+With 10 IRLS:
+
+model 7: before 0.06852/0.384003 after 0.461492/0.125508
+model 64: before 0.0700761/0.387666 after 0.476979/0.125067
+model 65: before 0.0689352/0.387611 after 0.473917/0.129824
+model 71: before 0.0680365/0.39421 after 0.478801/0.133164
+model 81: before 0.0677772/0.389624 after 0.480303/0.132256
+model 88: before 0.068651/0.387245 after 0.46412/0.127911
+model 123: before 0.0668508/0.389111 after 0.473596/0.131626
+model 140: before 0.0688745/0.385887 after 0.46605/0.126157
+model 150: before 0.0678839/0.393203 after 0.481739/0.134856
+model 167: before 0.0683845/0.383097 after 0.460483/0.126257

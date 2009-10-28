@@ -2308,14 +2308,14 @@ distribution<float>
 DNAE_Decomposition::
 decompose(const distribution<float> & vals) const
 {
-    return stack.apply(vals);
+    return stack.apply(0.8 * vals);
 }
 
 distribution<float>
 DNAE_Decomposition::
 recompose(const distribution<float> & decomposition, int order) const
 {
-    return stack.iapply(decomposition);
+    return 1.25 * stack.iapply(decomposition);
 }
 
 void

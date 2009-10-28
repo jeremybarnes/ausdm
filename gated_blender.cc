@@ -223,7 +223,7 @@ perform_irls(const distribution<Float> & correct,
         }
     }
 
-    cerr << "irls returned parameters " << parameters << endl;
+    //cerr << "irls returned parameters " << parameters << endl;
 
     return parameters;
 }
@@ -264,7 +264,7 @@ train_conf(int model, const Data & training_data,
             float pred = training_data.models[model][i];
             float margin = pred * training_data.targets[i];
             
-            correct[i] = (margin >= 0.0);
+            correct[i] = (margin >= 0.2);
             //correct[i] = training_data.targets[i] > 0.0;
             //correct[i] = (margin * 0.5) + 0.5;
         }
@@ -303,8 +303,41 @@ train_conf(int model, const Data & training_data,
             outputs[j][i] = features[j];
     }
 
-    distribution<Float> parameters
-        = perform_irls(correct, outputs, w, link_function);
+    distribution<Float> parameters(nv);
+
+    Thread_Context context;
+
+    int n_irls = 10;
+    for (unsigned i = 0;  i < n_irls;  ++i) {
+        
+        float p_in = min(1.0, 2.0 / n_irls);
+
+        vector<int> examples;
+        for (unsigned x = 0;  x < nx;  ++x) {
+            if (context.random01() >= p_in) continue;
+            examples.push_back(x);
+        }
+
+        int nx2 = examples.size();
+
+        distribution<Float> correct2(nx2);
+        boost::multi_array<Float, 2> outputs2(boost::extents[nv][nx2]);
+        distribution<Float> w2(nx2);
+
+        for (unsigned v = 0;  v < nv;  ++v)
+            for (unsigned i = 0;  i < nx2;  ++i)
+                outputs2[v][i] = outputs[v][examples[i]];
+
+        for (unsigned i = 0;  i < nx2;  ++i) {
+            int x = examples[i];
+            correct2[i] = correct[x];
+            w2[i] = w[x];
+        }
+
+        parameters
+            += 1.0 / n_irls
+            * perform_irls(correct2, outputs2, w2, link_function);
+    }
     
     //cerr << "parameters for model " << model << ": " << parameters << endl;
 
@@ -764,6 +797,9 @@ blend_feature_space() const
         result->add_feature(s + "_diff_from_int", REAL);
     }
 
+    //for (unsigned i = 0;  i < data->nm();  ++i)
+    //    result->add_feature(data->model_names[i], REAL);
+
     for (unsigned i = 0;  i < data->singular_targets[0].size();  ++i)
         result->add_feature(format("pc%03d", i), REAL);
 
@@ -833,6 +869,8 @@ get_blend_features(const distribution<float> & model_outputs,
         result.push_back(std::min(fabs(real_prediction - ceil(real_prediction)),
                                   fabs(real_prediction - floor(real_prediction))));
     }
+    
+    //result.insert(result.end(), model_outputs.begin(), model_outputs.end());
 
     result.insert(result.end(), target_singular.begin(), target_singular.end());
     result.push_back(dense_conf.min());

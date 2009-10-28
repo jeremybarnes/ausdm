@@ -163,8 +163,10 @@ int main(int argc, char ** argv)
     // Denoising auto encoder
     // We train a stack of layers, one at a time
 
-    const Data & training_data = data[0][target][0];
-    const Data & testing_data  = data[0][target][1];
+    // NOTE: these are reversed on purpose; we don't want to overfit our
+    // training data
+    const Data & training_data = data[0][target][1];
+    const Data & testing_data  = data[0][target][0];
 
     boost::shared_ptr<Decomposition> decomposition
         = Decomposition::create(decomposition_type);
