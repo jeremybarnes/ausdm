@@ -11,7 +11,7 @@
 #include "decomposition.h"
 #include "boosting/layer.h"
 
-typedef double LFloat;
+typedef float LFloat;
 
 
 namespace ML {
@@ -79,6 +79,8 @@ struct Dense_Missing_Layer : public Dense_Layer<LFloat> {
 
 typedef Dense_Missing_Layer Twoway_Layer_Base;
 
+class Twoway_Layer_Updates;
+
 
 /*****************************************************************************/
 /* TWOWAY_LAYER                                                              */
@@ -128,7 +130,7 @@ struct Twoway_Layer : public Twoway_Layer_Base {
     distribution<double> iderivative(const distribution<double> & input) const;
     distribution<float> iderivative(const distribution<float> & input) const;
 
-    void update(const Twoway_Layer & updates, double learning_rate);
+    void update(const Twoway_Layer_Updates & updates, double learning_rate);
 
     virtual void random_fill(float limit, Thread_Context & context);
 

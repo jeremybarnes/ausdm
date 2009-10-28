@@ -51,8 +51,22 @@ void calc_W_updates(double k1, const double * x, double k2, const double * y,
     return SIMD::vec_k1_x_plus_k2_y_z(k1, x, k2, y, z, r, n);
 }
 
-#define CHECK_NO_NAN(x) \
+void calc_W_updates(float k1, const float * x, float k2, const float * y,
+                    const float * z, float * r, size_t n)
+{
+    return SIMD::vec_k1_x_plus_k2_y_z(k1, x, k2, y, z, r, n);
+}
+
+#if 0
+#  define CHECK_NO_NAN(x) \
     { for (unsigned i = 0;  i < x.size();  ++i) { if (isnan(x[i])) throw Exception(format("element %d of %s is Nan in %s %s:%d", i, #x, __PRETTY_FUNCTION__, __FILE__, __LINE__)); } }
+
+#  define CHECK_NO_NAN_RANGE(begin, end)           \
+    { for (typeof(begin) it = begin;  it != end;  ++it) { if (isnan(*it)) throw Exception(format("element %d of range %s-%s is Nan in %s %s:%d", std::distance(begin, it), #begin, #end, __PRETTY_FUNCTION__, __FILE__, __LINE__)); } }
+#else
+#  define CHECK_NO_NAN(x)
+#  define CHECK_NO_NAN_RANGE(begin, end)
+#endif
 
 
 /*****************************************************************************/
@@ -178,10 +192,11 @@ random_fill(float limit, Thread_Context & context)
 {
     Base::random_fill(limit, context);
 
-    for (unsigned i = 0;  i < inputs();  ++i)
+    for (unsigned i = 0;  i < inputs();  ++i) {
         for (unsigned o = 0;  o < outputs();  ++o)
             missing_activations[i][o]
                 = limit * (context.random01() * 2.0f - 1.0f);
+    }
 }
 
 void
@@ -245,6 +260,128 @@ print() const
 
 
 /*****************************************************************************/
+/* TWOWAY_LAYER_UPDATES                                                      */
+/*****************************************************************************/
+
+struct Twoway_Layer_Updates {
+
+    Twoway_Layer_Updates()
+        : use_dense_missing(false)
+    {
+        init(0, 0);
+    }
+
+    Twoway_Layer_Updates(bool use_dense_missing, int inputs, int outputs)
+        : use_dense_missing(use_dense_missing)
+    {
+        init(inputs, outputs);
+    }
+
+    void zero_fill()
+    {
+        std::fill(weights.data(), weights.data() + weights.num_elements(),
+                  0.0);
+        bias.fill(0.0);
+        missing_replacements.fill(0.0);
+        if (use_dense_missing)
+            for (unsigned i = 0;  i < missing_activations.size();  ++i)
+                missing_activations[i].fill(0.0);
+        ibias.fill(0.0);
+        iscales.fill(0.0);
+        hscales.fill(0.0);
+    }
+
+    void init(int inputs, int outputs)
+    {
+        weights.resize(boost::extents[inputs][outputs]);
+        bias.resize(outputs);
+        missing_replacements.resize(inputs);
+
+        if (use_dense_missing)
+            missing_activations.resize(inputs, distribution<double>(outputs));
+        ibias.resize(inputs);
+        iscales.resize(inputs);
+        hscales.resize(outputs);
+
+        zero_fill();
+    }
+
+    int inputs() const { return weights.shape()[0]; }
+    int outputs() const { return weights.shape()[1]; }
+
+    Twoway_Layer_Updates & operator += (const Twoway_Layer_Updates & other)
+    {
+        int ni = inputs();
+        int no = outputs();
+    
+        //cerr << "ni = " << ni << " no = " << no << endl;
+
+        if (ni != other.inputs() || no != other.outputs()
+            || use_dense_missing != other.use_dense_missing)
+            throw Exception("incompatible update objects");
+
+        ibias += other.ibias;
+        bias += other.bias;
+        iscales += other.iscales;
+        hscales += other.hscales;
+        
+        CHECK_NO_NAN(ibias);
+        CHECK_NO_NAN(other.ibias);
+        CHECK_NO_NAN(bias);
+        CHECK_NO_NAN(other.bias);
+        CHECK_NO_NAN(iscales);
+        CHECK_NO_NAN(other.iscales);
+        CHECK_NO_NAN(hscales);
+        CHECK_NO_NAN(other.hscales);
+
+        for (unsigned i = 0;  i < ni;  ++i) {
+            SIMD::vec_add(&weights[i][0],
+                          &other.weights[i][0],
+                          &weights[i][0], no);
+            CHECK_NO_NAN_RANGE(&other.weights[i][0], &other.weights[i][0] + no);
+            CHECK_NO_NAN_RANGE(&weights[i][0], &weights[i][0] + no);
+        }
+        
+        if (use_dense_missing) {
+            if (missing_activations.size() != ni
+                || other.missing_activations.size() != ni) {
+                throw Exception("wrong missing activation size");
+            }
+
+            for (unsigned i = 0;  i < ni;  ++i) {
+                if (missing_activations[i].size() != no
+                    || other.missing_activations[i].size() != no)
+                    throw Exception("wrong inner missing activation size");
+
+                const distribution<double> & me JML_UNUSED
+                    = missing_activations[i];
+                CHECK_NO_NAN(me);
+                const distribution<double> & them JML_UNUSED
+                    = missing_activations[i];
+                CHECK_NO_NAN(them);
+
+                SIMD::vec_add(&missing_activations[i][0],
+                              &other.missing_activations[i][0],
+                              &missing_activations[i][0], no);
+            }
+        }
+        else missing_replacements += other.missing_replacements;
+
+        return *this;
+    }
+
+    bool use_dense_missing;
+    boost::multi_array<double, 2> weights;
+    distribution<double> bias;
+    distribution<double> missing_replacements;
+    std::vector<distribution<double> > missing_activations;
+    distribution<double> ibias;
+    distribution<double> iscales;
+    distribution<double> hscales;
+};
+
+
+/*****************************************************************************/
 /* TWOWAY_LAYER                                                              */
 /*****************************************************************************/
 
@@ -281,7 +418,8 @@ Twoway_Layer::
 iapply(const distribution<double> & output) const
 {
     CHECK_NO_NAN(output);
-    distribution<double> activation = (weights * (hscales * output)) * iscales;
+    distribution<double> activation
+        = multiply_r<double>(weights, (hscales * output)) * iscales;
     activation += ibias;
     transfer(&activation[0], &activation[0], inputs(), transfer_function);
     return activation;
@@ -318,7 +456,8 @@ Twoway_Layer::
 iactivation(const distribution<double> & output) const
 {
     CHECK_NO_NAN(output);
-    distribution<double> activation = (weights * (hscales * output)) * iscales;
+    distribution<double> activation
+        = multiply_r<double>(weights, (hscales * output)) * iscales;
     activation += ibias;
     return activation;
 }
@@ -388,12 +527,18 @@ iderivative(const distribution<float> & input) const
 
 void
 Twoway_Layer::
-update(const Twoway_Layer & updates, double learning_rate)
+update(const Twoway_Layer_Updates & updates, double learning_rate)
 {
+    //cerr << "------------ BEFORE -------------" << endl;
+    //cerr << print();
+
     int ni = inputs();
     int no = outputs();
     
     //cerr << "updates.ibias = " << updates.ibias << endl;
+
+    if (use_dense_missing != updates.use_dense_missing)
+        throw Exception("use_dense_missing mismatch");
 
     ibias -= learning_rate * updates.ibias;
     bias -= learning_rate * updates.bias;
@@ -415,13 +560,16 @@ update(const Twoway_Layer & updates, double learning_rate)
     else 
         missing_replacements
             -= learning_rate * updates.missing_replacements;
+
+    //cerr << "------------ AFTER -------------" << endl;
+    //cerr << print();
 }
 
 void
 Twoway_Layer::
 random_fill(float limit, Thread_Context & context)
 {
-    Dense_Layer<LFloat>::random_fill(limit, context);
+    Base::random_fill(limit, context);
     for (unsigned i = 0;  i < ibias.size();  ++i) {
         ibias[i] = limit * (context.random01() * 2.0f - 1.0f);
         iscales[i] = context.random01();
@@ -436,7 +584,7 @@ void
 Twoway_Layer::
 zero_fill()
 {
-    Dense_Layer<LFloat>::zero_fill();
+    Base::zero_fill();
     ibias.fill(0.0);
     iscales.fill(0.0);
     hscales.fill(0.0);
@@ -492,7 +640,7 @@ print() const
 
 
 // Float type to use for calculations
-typedef double CFloat;
+typedef float CFloat;
 
 template<typename Float>
 distribution<Float>
@@ -515,11 +663,13 @@ train_example(const Twoway_Layer & layer,
               int example_num,
               float max_prob_cleared,
               Thread_Context & thread_context,
-              Twoway_Layer & updates,
+              Twoway_Layer_Updates & updates,
               Lock & update_lock,
               bool need_lock,
               int verbosity)
 {
+    //cerr << "training example " << example_num << endl;
+
     int ni JML_UNUSED = layer.inputs();
     int no JML_UNUSED = layer.outputs();
 
@@ -549,6 +699,9 @@ train_example(const Twoway_Layer & layer,
 
     distribution<CFloat> hidden_act
         = layer.activation(noisy_pre);
+
+    //cerr << "noisy_pre = " << noisy_pre << " hidden_act = "
+    //     << hidden_act << endl;
 
     CHECK_NO_NAN(hidden_act);
             
@@ -892,17 +1045,19 @@ train_example(const Twoway_Layer & layer,
     }
 #endif
 
-    distribution<double> factor_totals(no);
+    distribution<double> factor_totals_accum(no);
 
     for (unsigned i = 0;  i < ni;  ++i)
-        SIMD::vec_add(&factor_totals[0], c_updates[i] * d[i], &W[i][0],
-                      &factor_totals[0], no);
+        SIMD::vec_add(&factor_totals_accum[0], c_updates[i] * d[i], &W[i][0],
+                      &factor_totals_accum[0], no);
 
-    factor_totals *= e;
+    distribution<CFloat> factor_totals
+        = factor_totals_accum.cast<CFloat>() * e;
 
-
-    boost::multi_array<double, 2> W_updates;
+    boost::multi_array<float, 2> W_updates;
     vector<distribution<double> > missing_act_updates;
+
+    distribution<double> hidden_rep_ed(hidden_rep_e);
 
     if (need_lock) {
         W_updates.resize(boost::extents[ni][no]);
@@ -914,7 +1069,7 @@ train_example(const Twoway_Layer & layer,
         if (!layer.use_dense_missing
             || !isnan(noisy_input[i])) {
             
-            CFloat W_updates_row[no];
+            float W_updates_row[no];
             
             // We use the W value for both the input and the output, so we
             // need to accumulate it's total effect on the derivative
@@ -927,21 +1082,24 @@ train_example(const Twoway_Layer & layer,
                            (need_lock ? &W_updates[i][0] : W_updates_row),
                            no);
             
-            if (!need_lock)
+            if (!need_lock) {
+                CHECK_NO_NAN_RANGE(&W_updates_row[0], &W_updates_row[0] + no);
                 SIMD::vec_add(&updates.weights[i][0], W_updates_row,
                               &updates.weights[i][0], no);
+            }
         }
         else {
             // The weight updates are simpler, but we also have to calculate
             // the missing activation updates
 
-            double * to_update
-                = (need_lock ? &W_updates[i][0] : &updates.weights[i][0]);
-            
             // W value only used on the way out; simpler calculation
-            SIMD::vec_add(to_update, c_updates[i] * d[i],
-                          &hidden_rep_e[0], to_update, no);
 
+            if (need_lock)
+                SIMD::vec_add(&W_updates[i][0], c_updates[i] * d[i],
+                              &hidden_rep_e[0], &W_updates[i][0], no);
+            else
+                SIMD::vec_add(&updates.weights[i][0], c_updates[i] * d[i],
+                              &hidden_rep_e[0], &updates.weights[i][0], no);
 
             distribution<CFloat> mau_updates
                 = factor_totals * hidden_deriv;
@@ -1172,7 +1330,7 @@ struct Train_Examples_Job {
     float prob_cleared;
     const Thread_Context & context;
     int random_seed;
-    Twoway_Layer & updates;
+    Twoway_Layer_Updates & updates;
     Lock & update_lock;
     double & error_exact;
     double & error_noisy;
@@ -1186,7 +1344,7 @@ struct Train_Examples_Job {
                        float prob_cleared,
                        const Thread_Context & context,
                        int random_seed,
-                       Twoway_Layer & updates,
+                       Twoway_Layer_Updates & updates,
                        Lock & update_lock,
                        double & error_exact,
                        double & error_noisy,
@@ -1207,12 +1365,11 @@ struct Train_Examples_Job {
     {
         Thread_Context thread_context(context);
         thread_context.seed(random_seed);
-
+        
         double total_error_exact = 0.0, total_error_noisy = 0.0;
 
-        Twoway_Layer local_updates(layer.use_dense_missing,
-                                   layer.inputs(), layer.outputs(),
-                                   layer.transfer_function);
+        Twoway_Layer_Updates local_updates(layer.use_dense_missing,
+                                           layer.inputs(), layer.outputs());
 
         for (unsigned x = first;  x < last;  ++x) {
 
@@ -1233,7 +1390,8 @@ struct Train_Examples_Job {
 
         Guard guard(update_lock);
 
-        updates.update(local_updates, -1.0);
+        //cerr << "applying local updates" << endl;
+        updates += local_updates;
 
         error_exact += total_error_exact;
         error_noisy += total_error_noisy;
@@ -1269,7 +1427,7 @@ train_iter(const vector<distribution<float> > & data,
     
     for (unsigned x = 0;  x < nx;  x += minibatch_size) {
                 
-        Twoway_Layer updates(use_dense_missing, ni, no, TF_IDENTITY);
+        Twoway_Layer_Updates updates(use_dense_missing, ni, no);
                 
         // Now, submit it as jobs to the worker task to be done
         // multithreaded
@@ -1312,6 +1470,8 @@ train_iter(const vector<distribution<float> > & data,
                 
         worker.run_until_finished(group);
 
+        //cerr << "applying minibatch updates" << endl;
+        
         update(updates, learning_rate);
     }
 
@@ -1936,8 +2096,8 @@ train(const std::vector<distribution<float> > & training_data,
             boost::multi_array<LFloat, 2> layer2 = layer.weights;
             int nvalues = std::min(ni, nh);
         
-            boost::multi_array<double, 2> rvectors(boost::extents[ni][nvalues]);
-            boost::multi_array<double, 2> lvectorsT(boost::extents[nvalues][nh]);
+            boost::multi_array<LFloat, 2> rvectors(boost::extents[ni][nvalues]);
+            boost::multi_array<LFloat, 2> lvectorsT(boost::extents[nvalues][nh]);
 
             int result = LAPack::gesdd("S", nh, ni,
                                        layer2.data(), nh,
@@ -1949,7 +2109,7 @@ train(const std::vector<distribution<float> > & training_data,
         
 
             if (false) {
-                boost::multi_array<double, 2> weights2
+                boost::multi_array<LFloat, 2> weights2
                     = rvectors * diag(svalues) * lvectorsT;
                 
                 cerr << "weights2: " << endl;

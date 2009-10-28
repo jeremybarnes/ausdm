@@ -740,3 +740,19 @@ elapsed: [278.62s cpu, 125761.3499 mticks, 47.05s wall]
 
 A bit better, not that much difference.
 
+Moving everything over to float (1):
+
+testing rmse of stack: exact 1.68017 noisy 1.66399
+elapsed: [295.06s cpu, 131455.3340 mticks, 49.18s wall]
+281.95user 13.13system 0:49.21elapsed 599%CPU (0avgtext+0avgdata 0maxresident)k
+0inputs+0outputs (0major+5337325minor)pagefaults 0swaps
+
+Slower, AND less accurate!
+
+With NaN checking off:
+
+testing rmse of stack: exact 1.68017 noisy 1.66399
+elapsed: [284.89s cpu, 114519.3964 mticks, 42.85s wall]
+269.58user 15.32system 0:42.87elapsed 664%CPU (0avgtext+0avgdata 0maxresident)k
+0inputs+0outputs (0major+5054820minor)pagefaults 0swaps
+
