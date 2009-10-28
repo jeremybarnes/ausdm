@@ -756,3 +756,12 @@ elapsed: [284.89s cpu, 114519.3964 mticks, 42.85s wall]
 269.58user 15.32system 0:42.87elapsed 664%CPU (0avgtext+0avgdata 0maxresident)k
 0inputs+0outputs (0major+5054820minor)pagefaults 0swaps
 
+Internal calculations in double precision:
+
+testing rmse of stack: exact 1.13037 noisy 1.20409
+elapsed: [288.74s cpu, 120263.9041 mticks, 45.00s wall]
+273.25user 15.52system 0:45.02elapsed 641%CPU (0avgtext+0avgdata 0maxresident)k
+0inputs+0outputs (0major+5106862minor)pagefaults 0swaps
+
+Worth it!
+

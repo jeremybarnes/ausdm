@@ -640,7 +640,7 @@ print() const
 
 
 // Float type to use for calculations
-typedef float CFloat;
+typedef double CFloat;
 
 template<typename Float>
 distribution<Float>
@@ -1054,7 +1054,7 @@ train_example(const Twoway_Layer & layer,
     distribution<CFloat> factor_totals
         = factor_totals_accum.cast<CFloat>() * e;
 
-    boost::multi_array<float, 2> W_updates;
+    boost::multi_array<CFloat, 2> W_updates;
     vector<distribution<double> > missing_act_updates;
 
     distribution<double> hidden_rep_ed(hidden_rep_e);
@@ -1069,7 +1069,7 @@ train_example(const Twoway_Layer & layer,
         if (!layer.use_dense_missing
             || !isnan(noisy_input[i])) {
             
-            float W_updates_row[no];
+            CFloat W_updates_row[no];
             
             // We use the W value for both the input and the output, so we
             // need to accumulate it's total effect on the derivative
