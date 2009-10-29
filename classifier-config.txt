@@ -94,6 +94,13 @@ glz {
     normalize=false;
 }
 
+bglz {
+    type=bagging;
+    num_bags=100;
+    weak_learner : glz {
+    }
+}
+
 # Boosted stumps
 bs {
     type=boosted_stumps;

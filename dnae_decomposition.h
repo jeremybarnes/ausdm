@@ -144,7 +144,15 @@ struct Twoway_Layer : public Twoway_Layer_Base {
 
     /** Dump as ASCII.  This will be big. */
     virtual std::string print() const;
-        
+    
+    /** Backpropagate the given example.  The gradient will be acculmulated in
+        the output.  Fills in the errors for the next stage at input_errors. */
+    void backprop_example(const distribution<double> & outputs,
+                          const distribution<double> & output_deltas,
+                          const distribution<double> & inputs,
+                          distribution<double> & input_deltas,
+                          Twoway_Layer_Updates & updates) const;
+
     /** Trains a single iteration on the given data with the selected
         parameters.  Returns a moving estimate of the RMSE on the
         training set. */
@@ -203,10 +211,29 @@ struct DNAE_Stack : public std::vector<Twoway_Layer> {
     void serialize(ML::DB::Store_Writer & store) const;
     void reconstitute(ML::DB::Store_Reader & store);
 
-    void train(const std::vector<distribution<float> > & training_data,
-               const std::vector<distribution<float> > & testing_data,
-               const Configuration & config,
-               ML::Thread_Context & thread_context);
+    /** Perform backpropagation given an error gradient.  Note that doing
+        so will adversely affect the performance of the autoencoder. */
+    void train_discrim(const std::vector<distribution<float> > & training_data,
+                       const std::vector<float> & training_labels,
+                       const std::vector<distribution<float> > & testing_data,
+                       const std::vector<float> & testing_labels,
+                       const Configuration & config,
+                       ML::Thread_Context & thread_context);
+    
+    /** Test the discriminative power of the network.  Returns the RMS error
+        or AUC depending upon whether it's a regression or classification
+        task.
+    */
+    double test_discrim(const std::vector<distribution<float> > & training_data,
+                        const std::vector<float> & training_labels,
+                        ML::Thread_Context & thread_context);
+
+
+    /** Train (unsupervised) as a stack of denoising autoencoders. */
+    void train_dnae(const std::vector<distribution<float> > & training_data,
+                    const std::vector<distribution<float> > & testing_data,
+                    const Configuration & config,
+                    ML::Thread_Context & thread_context);
 
     /** Tests on both pristine and noisy inputs.  The first returned is the
         error on pristine inputs.  The second is the error on noisy inputs.
@@ -214,11 +241,11 @@ struct DNAE_Stack : public std::vector<Twoway_Layer> {
         be added to any given input.
     */
     std::pair<double, double>
-    test(const std::vector<distribution<float> > & data,
-         float prob_cleared,
-         ML::Thread_Context & thread_context,
-         int verbosity) const;
-
+    test_dnae(const std::vector<distribution<float> > & data,
+              float prob_cleared,
+              ML::Thread_Context & thread_context,
+              int verbosity) const;
+    
     bool operator == (const DNAE_Stack & other) const;
 };
 

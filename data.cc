@@ -624,6 +624,7 @@ stats()
         }
     }
 
+#if 0
     cerr << "mean_neg = " << total_mean_neg / num_neg
          << " mean_pos = " << total_mean_pos / num_pos
          << " min = " << minval << " max = " << maxval
@@ -631,4 +632,5 @@ stats()
 
     cerr << "auto " << nautomatic << " imp " << nimpossible << " poss "
          << npossible << endl;
+#endif
 }

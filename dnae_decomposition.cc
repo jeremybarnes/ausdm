@@ -236,14 +236,8 @@ reconstitute(DB::Store_Reader & store)
 {
     Base::reconstitute(store);
     store >> use_dense_missing;
-    cerr << "store.offset() = " << store.offset() << endl;
     if (use_dense_missing)
         store >> missing_activations;
-    cerr << "use_dense_missing = " << use_dense_missing << endl;
-    cerr << "missing_activations.size() = " << missing_activations.size()
-         << endl;
-    cerr << "missing_activations[0] = "
-         << missing_activations[0] << endl;
 }
 
 std::string
@@ -645,7 +639,6 @@ reconstitute(DB::Store_Reader & store)
 {
     Base::reconstitute(store);
     store >> ibias >> iscales >> hscales;
-    cerr << "finished twoway layer" << endl;
 }
 
 std::string
@@ -685,14 +678,39 @@ operator == (const Twoway_Layer & other) const
 }
 
 
-/*****************************************************************************/
-/* DNAE_STACK                                                                */
-/*****************************************************************************/
-
-
-
 // Float type to use for calculations
 typedef double CFloat;
+
+
+/** Backpropagate the given example.  The gradient will be acculmulated in
+    the output.  Fills in the errors for the next stage at input_errors. */
+void
+Twoway_Layer::
+backprop_example(const distribution<double> & outputs,
+                 const distribution<double> & output_deltas,
+                 const distribution<double> & inputs,
+                 distribution<double> & input_deltas,
+                 Twoway_Layer_Updates & updates) const
+{
+    distribution<double> dbias = derivative(outputs) * output_deltas;
+
+    updates.bias += dbias;
+
+    // Assuming that there were no missing inputs
+
+    int ni = this->inputs(), no = this->outputs();
+
+    for (unsigned i = 0;  i < ni;  ++i)
+        SIMD::vec_add(&updates.weights[i][0], inputs[i], &dbias[0],
+                      &updates.weights[i][0], no);
+
+    input_deltas = dbias * weights;
+}
+
+
+
+
+
 
 template<typename Float>
 distribution<Float>
@@ -1903,10 +1921,10 @@ struct Test_Stack_Job {
 
 pair<double, double>
 DNAE_Stack::
-test(const vector<distribution<float> > & data,
-     float prob_cleared,
-     Thread_Context & thread_context,
-     int verbosity) const
+test_dnae(const vector<distribution<float> > & data,
+          float prob_cleared,
+          Thread_Context & thread_context,
+          int verbosity) const
 {
     Lock update_lock;
     double error_exact = 0.0;
@@ -1962,10 +1980,10 @@ test(const vector<distribution<float> > & data,
 
 void
 DNAE_Stack::
-train(const std::vector<distribution<float> > & training_data,
-      const std::vector<distribution<float> > & testing_data,
-      const Configuration & config,
-      Thread_Context & thread_context)
+train_dnae(const std::vector<distribution<float> > & training_data,
+           const std::vector<distribution<float> > & testing_data,
+           const Configuration & config,
+           Thread_Context & thread_context)
 {
     double learning_rate = 0.75;
     int minibatch_size = 512;
@@ -2288,7 +2306,7 @@ train(const std::vector<distribution<float> > & training_data,
             cerr << "calculating whole stack testing performance on "
                  << nxt << " examples" << endl;
         boost::tie(test_error_exact, test_error_noisy)
-            = test(testing_data, prob_cleared, thread_context, verbosity);
+            = test_dnae(testing_data, prob_cleared, thread_context, verbosity);
         
         if (verbosity >= 2)
             cerr << "testing rmse of stack: exact "
@@ -2308,14 +2326,28 @@ distribution<float>
 DNAE_Decomposition::
 decompose(const distribution<float> & vals) const
 {
-    return stack.apply(0.8 * vals);
+    distribution<float> output = 0.8 * vals, result;
+    
+    // Go down the stack
+    for (unsigned l = 0;  l < stack.size();  ++l) {
+        output = stack[l].apply(output);
+        if (l >= stack.size() - 2)
+            result.insert(result.begin(), output.begin(), output.end());
+    }
+    
+    return result;
+
+    //return stack.apply(0.8 * vals);
 }
 
 distribution<float>
 DNAE_Decomposition::
 recompose(const distribution<float> & decomposition, int order) const
 {
-    return 1.25 * stack.iapply(decomposition);
+    distribution<float> vals = 1.25 * decomposition;
+    vals.resize(stack.back().outputs());
+    return 1.25 * stack.iapply(vals);
+    //return 1.25 * stack.iapply(decomposition);
 }
 
 void
@@ -2364,7 +2396,7 @@ train(const Data & training_data,
     for (unsigned x = 0;  x < nxt;  ++x)
         layer_test[x] = 0.8f * testing_data.examples[x];
 
-    stack.train(layer_train, layer_test, config, thread_context);
+    stack.train_dnae(layer_train, layer_test, config, thread_context);
 }
 
 namespace {

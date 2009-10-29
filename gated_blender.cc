@@ -174,7 +174,7 @@ perform_irls(const distribution<Float> & correct,
             parameters[v] = trained[new_loc[v]];
     
 
-    if (abs(parameters).max() > 1000.0 || true) {
+    if (abs(parameters).max() > 1000.0) {
 
         distribution<Float> svalues_reduced
             (std::min(outputs_reduced.shape()[0],
@@ -208,8 +208,11 @@ perform_irls(const distribution<Float> & correct,
                                    &svalues_reduced[0], 0, 1, 0, 1);
 
         //cerr << "model = " << model << endl;
-        //cerr << "trained = " << trained << endl;
-        //cerr << "svalues_reduced = " << svalues_reduced << endl;
+        cerr << "trained = " << trained << endl;
+        cerr << "svalues_reduced = " << svalues_reduced << endl;
+
+        cerr << "parameters.two_norm() = " << parameters.two_norm()
+             << endl;
 
         if (result != 0)
             throw Exception("gesdd returned error");
@@ -218,9 +221,11 @@ perform_irls(const distribution<Float> & correct,
             throw Exception("didn't remove all linearly dependent");
         }
 
-        if (abs(parameters).max() > 1000.0) {
-            throw Exception("IRLS returned inplausibly high weights");
-        }
+        // We reject this later
+        //if (abs(parameters).max() > 1000.0) {
+        //    throw Exception("IRLS returned inplausibly high weights");
+        //}
+        
     }
 
     //cerr << "irls returned parameters " << parameters << endl;
@@ -304,10 +309,11 @@ train_conf(int model, const Data & training_data,
     }
 
     distribution<Float> parameters(nv);
+    int num_good = 0;
 
     Thread_Context context;
 
-    int n_irls = 10;
+    int n_irls = 50;
     for (unsigned i = 0;  i < n_irls;  ++i) {
         
         float p_in = min(1.0, 2.0 / n_irls);
@@ -334,11 +340,21 @@ train_conf(int model, const Data & training_data,
             w2[i] = w[x];
         }
 
-        parameters
-            += 1.0 / n_irls
-            * perform_irls(correct2, outputs2, w2, link_function);
+        distribution<Float> trained_params
+            = perform_irls(correct2, outputs2, w2, link_function);
+
+        if (trained_params.two_norm() > 200.0) {
+            cerr << format("trained_params.two_norm() = %f\n",
+                           trained_params.two_norm());
+            continue;
+        }
+        
+        parameters += trained_params;
+        ++num_good;
     }
-    
+
+    parameters /= num_good;
+
     //cerr << "parameters for model " << model << ": " << parameters << endl;
 
     Model_Output before, after;

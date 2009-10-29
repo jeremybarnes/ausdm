@@ -94,7 +94,7 @@ int main(int argc, char ** argv)
     
     Thread_Context context;
 
-    stack.train(data, data, config, context);
+    stack.train_dnae(data, data, config, context);
 
     cerr << stack[0].print() << endl;
 
