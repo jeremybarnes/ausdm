@@ -301,15 +301,21 @@ operator == (const Dense_Missing_Layer & other) const
 struct Twoway_Layer_Updates {
 
     Twoway_Layer_Updates()
-        : use_dense_missing(false)
     {
-        init(0, 0);
+        init(false, false, 0, 0);
     }
 
-    Twoway_Layer_Updates(bool use_dense_missing, int inputs, int outputs)
-        : use_dense_missing(use_dense_missing)
+    Twoway_Layer_Updates(bool train_generative,
+                         const Twoway_Layer & layer)
     {
-        init(inputs, outputs);
+        init(train_generative, layer);
+    }
+
+    Twoway_Layer_Updates(bool use_dense_missing,
+                         bool train_generative,
+                         int inputs, int outputs)
+    {
+        init(use_dense_missing, train_generative, inputs, outputs);
     }
 
     void zero_fill()
@@ -326,14 +332,26 @@ struct Twoway_Layer_Updates {
         hscales.fill(0.0);
     }
 
-    void init(int inputs, int outputs)
+    void init(bool train_generative,
+              const Twoway_Layer & layer)
     {
+        init(layer.use_dense_missing, train_generative,
+             layer.inputs(), layer.outputs());
+    }
+
+    void init(bool use_dense_missing, bool train_generative,
+              int inputs, int outputs)
+    {
+        this->use_dense_missing = use_dense_missing;
+        this->train_generative = train_generative;
+
         weights.resize(boost::extents[inputs][outputs]);
         bias.resize(outputs);
         missing_replacements.resize(inputs);
 
         if (use_dense_missing)
             missing_activations.resize(inputs, distribution<double>(outputs));
+
         ibias.resize(inputs);
         iscales.resize(inputs);
         hscales.resize(outputs);
@@ -406,6 +424,7 @@ struct Twoway_Layer_Updates {
     }
 
     bool use_dense_missing;
+    bool train_generative;
     boost::multi_array<double, 2> weights;
     distribution<double> bias;
     distribution<double> missing_replacements;
@@ -704,13 +723,8 @@ backprop_example(const distribution<double> & outputs,
         SIMD::vec_add(&updates.weights[i][0], inputs[i], &dbias[0],
                       &updates.weights[i][0], no);
 
-    input_deltas = dbias * weights;
+    input_deltas = weights * dbias;
 }
-
-
-
-
-
 
 template<typename Float>
 distribution<Float>
@@ -1440,8 +1454,7 @@ struct Train_Examples_Job {
         
         double total_error_exact = 0.0, total_error_noisy = 0.0;
 
-        Twoway_Layer_Updates local_updates(layer.use_dense_missing,
-                                           layer.inputs(), layer.outputs());
+        Twoway_Layer_Updates local_updates(true /* train_generative */, layer);
 
         for (unsigned x = first;  x < last;  ++x) {
 
@@ -1513,7 +1526,7 @@ train_iter(const vector<distribution<float> > & data,
 
     for (unsigned x = 0;  x < nx2;  x += minibatch_size) {
                 
-        Twoway_Layer_Updates updates(use_dense_missing, ni, no);
+        Twoway_Layer_Updates updates(true /* train_generative */, *this);
                 
         // Now, submit it as jobs to the worker task to be done
         // multithreaded
@@ -1742,6 +1755,41 @@ test_and_update(const vector<distribution<float> > & data_in,
 }
 
 /*****************************************************************************/
+/* DNAE_STACK_UPDATES                                                        */
+/*****************************************************************************/
+
+struct DNAE_Stack_Updates : public std::vector<Twoway_Layer_Updates> {
+
+    DNAE_Stack_Updates()
+    {
+    }
+
+    DNAE_Stack_Updates(const DNAE_Stack & stack)
+    {
+        init(stack);
+    }
+
+    void init(const DNAE_Stack & stack)
+    {
+        resize(stack.size());
+        for (unsigned i = 0;  i < size();  ++i)
+            (*this)[i].init(false /* train_generative */, stack[i]);
+    }
+
+    DNAE_Stack_Updates & operator += (const DNAE_Stack_Updates & updates)
+    {
+        if (updates.size() != size())
+            throw Exception("DNAE_Stack_Updates: out of sync");
+
+        for (unsigned i = 0;  i < size();  ++i)
+            (*this)[i] += updates[i];
+        
+        return *this;
+    }
+};
+
+
+/*****************************************************************************/
 /* DNAE_STACK                                                                */
 /*****************************************************************************/
 
@@ -1822,6 +1870,432 @@ reconstitute(ML::DB::Store_Reader & store)
 
     for (unsigned i = 0;  i < sz;  ++i)
         (*this)[i].reconstitute(store);
+}
+
+pair<double, double>
+DNAE_Stack::
+train_discrim_example(const distribution<float> & data,
+                      float label,
+                      DNAE_Stack_Updates & updates) const
+{
+    /* fprop */
+
+    vector<distribution<double> > outputs(size() + 1);
+    outputs[0] = data;
+
+    for (unsigned i = 0;  i < size();  ++i)
+        outputs[i + 1] = (*this)[i].apply(outputs[i]);
+
+    /* errors */
+    distribution<double> errors = (label - outputs.back());
+    double error = errors.dotprod(errors);
+    distribution<double> derrors = -2.0 * errors;
+    distribution<double> new_derrors;
+
+    /* bprop */
+    for (int i = size() - 1;  i >= 0;  --i) {
+        (*this)[i].backprop_example(outputs[i + 1],
+                                    derrors,
+                                    outputs[i],
+                                    new_derrors,
+                                    updates[i]);
+        derrors.swap(new_derrors);
+    }
+
+    return make_pair(sqrt(error), outputs.back()[0]);
+}
+
+struct Train_Discrim_Examples_Job {
+
+    const DNAE_Stack & stack;
+    const std::vector<distribution<float> > & data;
+    const std::vector<float> & labels;
+    Thread_Context & thread_context;
+    const vector<int> & examples;
+    int first;
+    int last;
+    DNAE_Stack_Updates & updates;
+    vector<float> & outputs;
+    double & total_rmse;
+    Lock & updates_lock;
+    boost::progress_display * progress;
+    int verbosity;
+
+    Train_Discrim_Examples_Job(const DNAE_Stack & stack,
+                               const std::vector<distribution<float> > & data,
+                               const std::vector<float> & labels,
+                               Thread_Context & thread_context,
+                               const vector<int> & examples,
+                               int first, int last,
+                               DNAE_Stack_Updates & updates,
+                               vector<float> & outputs,
+                               double & total_rmse,
+                               Lock & updates_lock,
+                               boost::progress_display * progress,
+                               int verbosity)
+        : stack(stack), data(data), labels(labels),
+          thread_context(thread_context), examples(examples),
+          first(first), last(last), updates(updates), outputs(outputs),
+          total_rmse(total_rmse), updates_lock(updates_lock),
+          progress(progress), verbosity(verbosity)
+    {
+    }
+
+    void operator () ()
+    {
+        DNAE_Stack_Updates local_updates(stack);
+
+        double total_rmse_local = 0.0;
+
+        for (unsigned ix = first; ix < last;  ++ix) {
+            int x = examples[ix];
+
+            double rmse_contribution;
+            double output;
+
+            boost::tie(rmse_contribution, output)
+                = stack.train_discrim_example(data[x],
+                                              labels[x],
+                                              local_updates);
+
+            outputs[ix] = output;
+            total_rmse_local += rmse_contribution;
+        }
+
+        Guard guard(updates_lock);
+        total_rmse += total_rmse_local;
+        updates += local_updates;
+        if (progress) progress += (last - first);
+    }
+};
+
+std::pair<double, double>
+DNAE_Stack::
+train_discrim_iter(const std::vector<distribution<float> > & data,
+                   const std::vector<float> & labels,
+                   Thread_Context & thread_context,
+                   int minibatch_size, float learning_rate,
+                   int verbosity,
+                   float sample_proportion,
+                   bool randomize_order)
+{
+    Worker_Task & worker = thread_context.worker();
+
+    int nx = data.size();
+
+    int microbatch_size = minibatch_size / (num_cpus() * 4);
+            
+    Lock update_lock;
+
+    vector<int> examples;
+    for (unsigned x = 0;  x < nx;  ++x) {
+        // Randomly exclude some samples
+        if (thread_context.random01() >= sample_proportion)
+            continue;
+        examples.push_back(x);
+    }
+    
+    if (randomize_order) {
+        Thread_Context::RNG_Type rng = thread_context.rng();
+        std::random_shuffle(examples.begin(), examples.end(), rng);
+    }
+    
+    int nx2 = examples.size();
+
+    double total_mse = 0.0;
+    Model_Output outputs;
+    outputs.resize(nx2);    
+
+    std::auto_ptr<boost::progress_display> progress;
+    if (verbosity >= 3) progress.reset(new boost::progress_display(nx2, cerr));
+
+    for (unsigned x = 0;  x < nx2;  x += minibatch_size) {
+                
+        DNAE_Stack_Updates updates(*this);
+                
+        // Now, submit it as jobs to the worker task to be done
+        // multithreaded
+        int group;
+        {
+            int parent = -1;  // no parent group
+            group = worker.get_group(NO_JOB, "dump user results task",
+                                     parent);
+                    
+            // Make sure the group gets unlocked once we've populated
+            // everything
+            Call_Guard guard(boost::bind(&Worker_Task::unlock_group,
+                                         boost::ref(worker),
+                                         group));
+                    
+                    
+            for (unsigned x2 = x;  x2 < nx2 && x2 < x + minibatch_size;
+                 x2 += microbatch_size) {
+                        
+                Train_Discrim_Examples_Job
+                    job(*this,
+                        data,
+                        labels,
+                        thread_context,
+                        examples,
+                        x2,
+                        min<int>(nx2,
+                                 min(x + minibatch_size,
+                                     x2 + microbatch_size)),
+                        updates,
+                        outputs,
+                        total_mse,
+                        update_lock,
+                        progress.get(),
+                        verbosity);
+
+                // Send it to a thread to be processed
+                worker.add(job, "backprop job", group);
+            }
+        }
+        
+        worker.run_until_finished(group);
+
+        //cerr << "applying minibatch updates" << endl;
+        
+        update(updates, learning_rate);
+    }
+
+    // TODO: calculate AUC score
+    distribution<float> test_labels;
+    for (unsigned i = 0;  i < nx2;  ++i)
+        test_labels.push_back(labels[examples[i]]);
+
+    double auc = outputs.calc_auc(test_labels);
+
+    return make_pair(sqrt(total_mse / nx2), auc);
+}
+
+std::pair<double, double>
+DNAE_Stack::
+train_discrim(const std::vector<distribution<float> > & training_data,
+              const std::vector<float> & training_labels,
+              const std::vector<distribution<float> > & testing_data,
+              const std::vector<float> & testing_labels,
+              const Configuration & config,
+              ML::Thread_Context & thread_context)
+{
+    double learning_rate = 0.75;
+    int minibatch_size = 512;
+    int niter = 50;
+    int verbosity = 2;
+
+    Transfer_Function_Type transfer_function = TF_TANH;
+
+    bool randomize_order = true;
+    float sample_proportion = 0.8;
+    int test_every = 1;
+
+    config.get(learning_rate, "learning_rate");
+    config.get(minibatch_size, "minibatch_size");
+    config.get(niter, "niter");
+    config.get(verbosity, "verbosity");
+    config.get(transfer_function, "transfer_function");
+    config.get(randomize_order, "randomize_order");
+    config.get(sample_proportion, "sample_proportion");
+    config.get(test_every, "test_every");
+
+    int nx = training_data.size();
+
+    if (training_data.size() != training_labels.size())
+        throw Exception("label and example sizes don't match");
+
+
+    int nxt = testing_data.size();
+
+    if (nx == 0)
+        throw Exception("can't train on no data");
+
+    // Learning rate is per-example
+    learning_rate /= nx;
+
+    // Compensate for the example proportion
+    learning_rate /= sample_proportion;
+
+    if (verbosity == 2)
+        cerr << "iter  ---- train ----  ---- test -----\n"
+             << "         rmse     auc     rmse     auc\n";
+    
+    for (unsigned iter = 0;  iter < niter;  ++iter) {
+        if (verbosity >= 3)
+            cerr << "iter " << iter << " training on " << nx << " examples"
+                 << endl;
+        else if (verbosity >= 2)
+            cerr << format("%4d", iter) << flush;
+        Timer timer;
+
+        double train_error_rmse, train_error_auc;
+        boost::tie(train_error_rmse, train_error_auc)
+            = train_discrim_iter(training_data, training_labels,
+                                 thread_context,
+                                 minibatch_size, learning_rate,
+                                 verbosity, sample_proportion,
+                                 randomize_order);
+        
+        if (verbosity >= 3) {
+            cerr << "error of iteration: rmse " << train_error_rmse
+                 << " noisy " << train_error_auc << endl;
+            if (verbosity >= 3) cerr << timer.elapsed() << endl;
+        }
+        else if (verbosity == 2)
+            cerr << format("  %7.5f %7.5f",
+                           train_error_rmse, train_error_auc)
+                 << flush;
+        
+        if (iter % test_every == (test_every - 1)
+            || iter == niter - 1) {
+            timer.restart();
+            double test_error_rmse = 0.0, test_error_auc = 0.0;
+                
+            if (verbosity >= 3)
+                cerr << "testing on " << nxt << " examples"
+                     << endl;
+
+            boost::tie(test_error_rmse, test_error_auc)
+                = test_discrim(testing_data, testing_labels,
+                               thread_context, verbosity);
+            
+            if (verbosity >= 3) {
+                cerr << "testing error of iteration: rmse "
+                     << test_error_rmse << " auc " << test_error_auc
+                     << endl;
+                cerr << timer.elapsed() << endl;
+            }
+            else if (verbosity == 2)
+                cerr << format("  %7.5f %7.5f",
+                               test_error_rmse, test_error_auc);
+        }
+        
+        if (verbosity == 2) cerr << endl;
+    }
+
+    // TODO: return something
+    return make_pair(0.0, 0.0);
+}
+
+void
+DNAE_Stack::
+update(const DNAE_Stack_Updates & updates, double learning_rate)
+{
+    if (updates.size() != size())
+        throw Exception("DNAE_Stack::update(): updates have the wrong size");
+
+    for (unsigned i = 0;  i < size();  ++i)
+        (*this)[i].update(updates[i], learning_rate);
+}
+
+struct Test_Discrim_Job {
+
+    const DNAE_Stack & stack;
+    const vector<distribution<float> > & data;
+    const vector<float> & labels;
+    int first;
+    int last;
+    const Thread_Context & context;
+    Lock & update_lock;
+    double & error_rmse;
+    vector<float> & outputs;
+    boost::progress_display * progress;
+    int verbosity;
+
+    Test_Discrim_Job(const DNAE_Stack & stack,
+                     const vector<distribution<float> > & data,
+                     const vector<float> & labels,
+                     int first, int last,
+                     const Thread_Context & context,
+                     Lock & update_lock,
+                     double & error_rmse,
+                     vector<float> & outputs,
+                     boost::progress_display * progress,
+                     int verbosity)
+        : stack(stack), data(data), labels(labels),
+          first(first), last(last),
+          context(context),
+          update_lock(update_lock),
+          error_rmse(error_rmse), outputs(outputs),
+          progress(progress), verbosity(verbosity)
+    {
+    }
+
+    void operator () ()
+    {
+        double local_error_rmse = 0.0;
+
+        for (unsigned x = first;  x < last;  ++x) {
+            distribution<float> output
+                = stack.apply(data[x]);
+
+            outputs[x] = output[0];
+            local_error_rmse += pow(labels[x] - output[0], 2);
+        }
+
+        Guard guard(update_lock);
+        error_rmse += local_error_rmse;
+        if (progress && verbosity >= 3) (*progress) += (last - first);
+    }
+};
+
+pair<double, double>
+DNAE_Stack::
+test_discrim(const std::vector<distribution<float> > & data,
+             const std::vector<float> & labels,
+             ML::Thread_Context & thread_context,
+             int verbosity)
+{
+    Lock update_lock;
+    double mse_total = 0.0;
+
+    int nx = data.size();
+
+    std::auto_ptr<boost::progress_display> progress;
+    if (verbosity >= 3) progress.reset(new boost::progress_display(nx, cerr));
+
+    Worker_Task & worker = thread_context.worker();
+
+    Model_Output outputs;
+    outputs.resize(nx);
+            
+    // Now, submit it as jobs to the worker task to be done
+    // multithreaded
+    int group;
+    {
+        int parent = -1;  // no parent group
+        group = worker.get_group(NO_JOB, "dump user results task",
+                                 parent);
+        
+        // Make sure the group gets unlocked once we've populated
+        // everything
+        Call_Guard guard(boost::bind(&Worker_Task::unlock_group,
+                                     boost::ref(worker),
+                                     group));
+        
+        // 20 jobs per CPU
+        int batch_size = nx / (num_cpus() * 20);
+        
+        for (unsigned x = 0; x < nx;  x += batch_size) {
+            
+            Test_Discrim_Job job(*this, data, labels,
+                                 x, min<int>(x + batch_size, nx),
+                                 thread_context,
+                                 update_lock,
+                                 mse_total, outputs,
+                                 progress.get(),
+                                 verbosity);
+            
+            // Send it to a thread to be processed
+            worker.add(job, "test discrim job", group);
+        }
+    }
+    
+    worker.run_until_finished(group);
+    
+    return make_pair(sqrt(mse_total),
+                     outputs.calc_auc
+                     (distribution<float>(labels.begin(), labels.end())));
 }
 
 struct Test_Stack_Job {
@@ -1976,7 +2450,6 @@ test_dnae(const vector<distribution<float> > & data,
     return make_pair(sqrt(error_exact / nx),
                      sqrt(error_noisy / nx));
 }
-
 
 void
 DNAE_Stack::
@@ -2324,30 +2797,57 @@ train_dnae(const std::vector<distribution<float> > & training_data,
 
 distribution<float>
 DNAE_Decomposition::
-decompose(const distribution<float> & vals) const
+decompose(const distribution<float> & model_outputs) const
 {
-    distribution<float> output = 0.8 * vals, result;
+    distribution<float> output = 0.8 * model_outputs, result;
     
+    // How many layers do we output?
+    int nlayers = 1;
+
     // Go down the stack
     for (unsigned l = 0;  l < stack.size();  ++l) {
         output = stack[l].apply(output);
-        if (l >= stack.size() - 2)
+        if (l >= stack.size() - nlayers)
             result.insert(result.begin(), output.begin(), output.end());
     }
     
     return result;
 
-    //return stack.apply(0.8 * vals);
+    //return stack.apply(0.8 * model_outputs);
 }
 
 distribution<float>
 DNAE_Decomposition::
-recompose(const distribution<float> & decomposition, int order) const
+recompose(const distribution<float> & model_outputs,
+          const distribution<float> & decomposition, int order) const
 {
-    distribution<float> vals = 1.25 * decomposition;
-    vals.resize(stack.back().outputs());
-    return 1.25 * stack.iapply(vals);
-    //return 1.25 * stack.iapply(decomposition);
+    distribution<float> output = 0.8 * model_outputs;
+    
+    // Go down the stack
+    int l;
+    for (l = 0;  l < stack.size();  ++l) {
+        output = stack[l].apply(output);
+
+        // Did we get to a narrow enough layer?
+        if (output.size() <= order) break;
+    }
+
+    // Go the other way and re-generate
+    for (; l >= 0;  --l) {
+        output = stack[l].iapply(output);
+    }
+    
+    return 1.25 * output;
+}
+
+std::vector<int>
+DNAE_Decomposition::
+recomposition_orders() const
+{
+    vector<int> result;
+    for (unsigned i = 0;  i < stack.size();  ++i)
+        result.push_back(stack[i].outputs());
+    return result;
 }
 
 void

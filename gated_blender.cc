@@ -63,12 +63,6 @@ configure(const ML::Configuration & config_,
     config.find(blender_trainer_name, "blender.trainer_name");
 
     this->target = target;
-
-    recomposition_sizes.push_back(10);
-    recomposition_sizes.push_back(20);
-    recomposition_sizes.push_back(50);
-    recomposition_sizes.push_back(100);
-    //recomposition_sizes.push_back(200);
 }
 
 template<class Float>
@@ -436,6 +430,9 @@ train_conf(int model, const Data & training_data,
     model_coefficients[model] = parameters;
 }
 
+struct Generate_Blend_Data_Job {
+};
+
 void
 Gated_Blender::
 init(const Data & training_data_in,
@@ -457,6 +454,9 @@ init(const Data & training_data_in,
 
     this->data = &training_data_in;
 
+    if (data->decomposition)
+        recomposition_sizes = data->decomposition->recomposition_orders();
+    
     //decompose_training_data.load("download/S_"
     //                             + targ_type_uc + "_Train.csv", target);
 
@@ -546,7 +546,7 @@ init(const Data & training_data_in,
 
     // Assemble the labels
     distribution<BlendFloat> correct(nx);
-    boost::multi_array<BlendFloat, 2> outputs(boost::extents[nv][nx]);
+    //boost::multi_array<BlendFloat, 2> outputs(boost::extents[nv][nx]);
     distribution<BlendFloat> w(blend_example_weights.begin(),
                                blend_example_weights.end());
     w.normalize();
@@ -601,8 +601,8 @@ init(const Data & training_data_in,
         if (features.size() != nv)
             throw Exception("nv is wrong");
 
-        for (unsigned j = 0;  j < nv;  ++j)
-            outputs[j][i] = features[j];
+        //for (unsigned j = 0;  j < nv;  ++j)
+        //    outputs[j][i] = features[j];
 
         features.push_back(correct[i]);
         
@@ -666,9 +666,6 @@ conf_feature_space() const
         result->add_feature(s + "_rmse", REAL);
     }
 
-    result->add_feature("error_50", REAL);
-    result->add_feature("error_50_abs", REAL);
-
     result->add_feature("models_mean", REAL);
     result->add_feature("models_std", REAL);
     result->add_feature("models_min", REAL);
@@ -713,7 +710,9 @@ get_conf_features(int model,
         // TODO: this is unnecessarily done for each of the models
         distribution<float> reconst;
         if (!data->decomposition) reconst = model_outputs;
-        else reconst = data->decomposition->recompose(target_singular, nr);
+        else reconst
+                 = data->decomposition
+                 ->recompose(model_outputs, target_singular, nr);
 
         //cerr << "reconstitution for order " << nr << " model "
         //     << model << ": in " << model_outputs[model]
@@ -811,6 +810,19 @@ blend_feature_space() const
         result->add_feature(s + "_weighted", REAL);
         result->add_feature(s + "_dev_from_mean", REAL);
         result->add_feature(s + "_diff_from_int", REAL);
+
+        for (unsigned i = 0;  i < recomposition_sizes.size();  ++i) {
+            string s2 = format("%s_recomp_error_%d", s.c_str(),
+                               recomposition_sizes[i]);
+            result->add_feature(s2, REAL);
+            result->add_feature(s2 + "_abs", REAL);
+            result->add_feature(s2 + "_sqr", REAL);
+        }
+    }
+
+    for (unsigned i = 0;  i < recomposition_sizes.size();  ++i) {
+        string s = format("recomp_error_%d", recomposition_sizes[i]);
+        result->add_feature(s + "_rmse", REAL);
     }
 
     //for (unsigned i = 0;  i < data->nm();  ++i)
@@ -871,6 +883,18 @@ get_blend_features(const distribution<float> & model_outputs,
 
     distribution<float> dense_model, dense_conf;
 
+    vector<distribution<float> > recompositions;
+
+    for (unsigned i = 0;  i < recomposition_sizes.size();  ++i) {
+        int nr = recomposition_sizes[i];
+        distribution<float> reconst;
+        if (!data->decomposition) reconst = model_outputs;
+        else reconst
+                 = data->decomposition
+                 ->recompose(model_outputs, target_singular, nr);
+        recompositions.push_back(reconst);
+    }
+
     for (unsigned i = 0;  i < model_outputs.size();  ++i) {
         if (model_coefficients[i].empty()) continue;
         result.push_back(model_outputs[i]);
@@ -881,9 +905,23 @@ get_blend_features(const distribution<float> & model_outputs,
 
         float real_prediction = model_outputs[i];
 
-        result.push_back((real_prediction - target_stats.mean) / target_stats.std);
-        result.push_back(std::min(fabs(real_prediction - ceil(real_prediction)),
-                                  fabs(real_prediction - floor(real_prediction))));
+        result.push_back((real_prediction - target_stats.mean)
+                         / target_stats.std);
+        result.push_back
+            (std::min(fabs(real_prediction - ceil(real_prediction)),
+                      fabs(real_prediction - floor(real_prediction))));
+        
+        for (unsigned r = 0;  r < recomposition_sizes.size();  ++r) {
+            const distribution<float> & reconst = recompositions[r];
+            result.push_back(reconst[i] - model_outputs[i]);
+            result.push_back(abs(reconst[i] - model_outputs[i]));
+            result.push_back(sqr(reconst[i] - model_outputs[i]));
+        }
+    }
+
+    for (unsigned i = 0;  i < recomposition_sizes.size();  ++i) {
+        const distribution<float> & reconst = recompositions[i];
+        result.push_back((reconst - model_outputs).two_norm());
     }
     
     //result.insert(result.end(), model_outputs.begin(), model_outputs.end());

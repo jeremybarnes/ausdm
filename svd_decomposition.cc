@@ -10,6 +10,7 @@
 #include "algebra/lapack.h"
 #include "stats/distribution_simd.h"
 #include "arch/simd_vector.h"
+#include <boost/assign/list_of.hpp>
 
 
 using namespace std;
@@ -145,7 +146,9 @@ decompose(const distribution<float> & vals) const
 
 distribution<float>
 SVD_Decomposition::
-recompose(const distribution<float> & decomposition, int order) const
+recompose(const distribution<float> & model_outputs,
+          const distribution<float> & decomposition,
+          int order) const
 {
     if (order == -1 || order > decomposition.size())
         order = decomposition.size();
@@ -168,6 +171,13 @@ recompose(const distribution<float> & decomposition, int order) const
                                          order);
 
     return result.cast<float>();
+}
+
+std::vector<int>
+SVD_Decomposition::
+recomposition_orders() const
+{
+    return boost::assign::list_of<int>(10)(20)(50)(100);
 }
 
 void

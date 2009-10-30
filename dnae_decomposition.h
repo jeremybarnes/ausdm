@@ -10,6 +10,7 @@
 
 #include "decomposition.h"
 #include "boosting/layer.h"
+#include "arch/threads.h"
 
 typedef float LFloat;
 
@@ -194,6 +195,9 @@ struct Twoway_Layer : public Twoway_Layer_Base {
 IMPL_SERIALIZE_RECONSTITUTE(Twoway_Layer);
 
 
+struct DNAE_Stack_Updates;
+
+
 /*****************************************************************************/
 /* DNAE_STACK                                                                */
 /*****************************************************************************/
@@ -211,23 +215,54 @@ struct DNAE_Stack : public std::vector<Twoway_Layer> {
     void serialize(ML::DB::Store_Writer & store) const;
     void reconstitute(ML::DB::Store_Reader & store);
 
+    /** Train a single example.  Returns the RMSE in the first and the
+        output value (which can be used to calculate the AUC) in the
+        second.
+    */
+    std::pair<double, double>
+    train_discrim_example(const distribution<float> & data,
+                          float label,
+                          DNAE_Stack_Updates & udpates) const;
+
+    /** Trains a single iteration on the given data with the selected
+        parameters.  Returns a moving estimate of the RMSE on the
+        training set. */
+    std::pair<double, double>
+    train_discrim_iter(const std::vector<distribution<float> > & data,
+                       const std::vector<float> & labels,
+                       Thread_Context & thread_context,
+                       int minibatch_size, float learning_rate,
+                       int verbosity,
+                       float sample_proportion,
+                       bool randomize_order);
+
     /** Perform backpropagation given an error gradient.  Note that doing
-        so will adversely affect the performance of the autoencoder. */
-    void train_discrim(const std::vector<distribution<float> > & training_data,
-                       const std::vector<float> & training_labels,
-                       const std::vector<distribution<float> > & testing_data,
-                       const std::vector<float> & testing_labels,
-                       const Configuration & config,
-                       ML::Thread_Context & thread_context);
+        so will adversely affect the performance of the autoencoder, as
+        the reverse weights aren't modified when performing this training.
+
+        Returns the best training and testing error.
+    */
+    std::pair<double, double>
+    train_discrim(const std::vector<distribution<float> > & training_data,
+                  const std::vector<float> & training_labels,
+                  const std::vector<distribution<float> > & testing_data,
+                  const std::vector<float> & testing_labels,
+                  const Configuration & config,
+                  ML::Thread_Context & thread_context);
+
+    /** Update given the learning rate and the gradient. */
+    void update(const DNAE_Stack_Updates & updates, double learning_rate);
     
     /** Test the discriminative power of the network.  Returns the RMS error
         or AUC depending upon whether it's a regression or classification
         task.
     */
-    double test_discrim(const std::vector<distribution<float> > & training_data,
-                        const std::vector<float> & training_labels,
-                        ML::Thread_Context & thread_context);
-
+    std::pair<double, double>
+    test_discrim(const std::vector<distribution<float> > & data,
+                 const std::vector<float> & labels,
+                 ML::Thread_Context & thread_context,
+                 int verbosity);
+    
 
     /** Train (unsupervised) as a stack of denoising autoencoders. */
     void train_dnae(const std::vector<distribution<float> > & training_data,
@@ -268,11 +303,15 @@ struct DNAE_Decomposition : public Decomposition {
 
     /// Apply the decomposition, returning the decomposed element
     virtual distribution<float>
-    decompose(const distribution<float> & vals) const;
+    decompose(const distribution<float> & model_outputs) const;
 
     virtual distribution<float>
-    recompose(const distribution<float> & decomposition,
+    recompose(const distribution<float> & model_outputs,
+              const distribution<float> & decomposition,
               int order = -1) const;
+
+    /** Which order values should be passed to recompose? */
+    virtual std::vector<int> recomposition_orders() const;
 
     virtual void serialize(ML::DB::Store_Writer & store) const;
 

@@ -9,6 +9,7 @@
 #include "blender.h"
 #include "boosting_blender.h"
 #include "gated_blender.h"
+#include "deep_net_blender.h"
 
 
 using namespace ML;
@@ -126,6 +127,8 @@ get_blender(const ML::Configuration & config_,
         result.reset(new Boosting_Blender());
     else if (type == "gated")
         result.reset(new Gated_Blender());
+    else if (type == "deep_net")
+        result.reset(new Deep_Net_Blender());
     else throw Exception("Blender of type " + type + " doesn't exist");
 
     result->configure(config_, name, random_seed, target);

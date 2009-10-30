@@ -36,7 +36,7 @@ bbdt {
 
 bbdt2 {
     type=bagging;
-    verbosity=3;
+    verbosity=1;
     weak_learner {
         type=boosting;
         verbosity=3;
@@ -49,6 +49,7 @@ bbdt2 {
         }
         min_iter=5;
         max_iter=10;
+        verbosity=0;
     }
     num_bags=500;
 }

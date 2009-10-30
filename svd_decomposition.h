@@ -49,7 +49,11 @@ struct SVD_Decomposition : public Decomposition {
     decompose(const distribution<float> & vals) const;
 
     virtual distribution<float>
-    recompose(const distribution<float> & vals, int order = -1) const;
+    recompose(const distribution<float> & model_outputs,
+              const distribution<float> & decomposition,
+              int order) const;
+
+    virtual std::vector<int> recomposition_orders() const;
 
     virtual void serialize(ML::DB::Store_Writer & store) const;
 
