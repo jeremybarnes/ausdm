@@ -922,3 +922,43 @@ model 123: before 0.0668508/0.389111 after 0.473596/0.131626
 model 140: before 0.0688745/0.385887 after 0.46605/0.126157
 model 150: before 0.0678839/0.393203 after 0.481739/0.134856
 model 167: before 0.0683845/0.383097 after 0.460483/0.126257
+
+
+--------
+
+
+
+
+Attempt of trained dnae:
+
+./build/x86_64/bin/ausdm -t auc auc.type=deep_net model_base=auc_decomposed_6.bin niter=500 learning_rate=0.4 -o auc-dnae.txt
+
+Success
+Gini = 0.8797460452102
+AUC = 0.9398730226051
+
+
+
+ ./build/x86_64/bin/ausdm -t auc auc.type=deep_net model_base=auc_decomposed_6.bin niter=2000 learning_rate=0.4 -o auc-dnae2.txt 2>&1 | tee auc-dnae2.lo
+
+
+
+Success
+Gini = 0.8770325990085
+AUC = 0.93851629950425
+
+Hmmm....
+
+
+
+
+./build/x86_64/bin/ausdm -t auc auc.type=deep_net model_base=auc_decomposed_8.bin niter=500 learning_rate=0.4 -o auc-dnae3.txt 2>&1 | tee auc-dnae3.log
+
+
+Success
+Gini = 0.87949115052811
+AUC = 0.93974557526406
+
+Still not where we would like to be...
+
+

@@ -6,7 +6,7 @@
 */
 
 #ifndef __ausdm__dnae_decomposition_h__
-#define __ausdm__dnaw_decomposition_h__
+#define __ausdm__dnae_decomposition_h__
 
 #include "decomposition.h"
 #include "boosting/layer.h"
@@ -81,14 +81,54 @@ struct Dense_Missing_Layer : public Dense_Layer<LFloat> {
 IMPL_SERIALIZE_RECONSTITUTE(Dense_Missing_Layer);
 
 
-typedef Dense_Missing_Layer Twoway_Layer_Base;
+/*****************************************************************************/
+/* TWOWAY_LAYER_UPDATES                                                      */
+/*****************************************************************************/
 
-class Twoway_Layer_Updates;
+struct Twoway_Layer;
+
+struct Twoway_Layer_Updates {
+
+    Twoway_Layer_Updates();
+
+    Twoway_Layer_Updates(bool train_generative,
+                         const Twoway_Layer & layer);
+
+    Twoway_Layer_Updates(bool use_dense_missing,
+                         bool train_generative,
+                         int inputs, int outputs);
+
+    void zero_fill();
+
+    void init(bool train_generative,
+              const Twoway_Layer & layer);
+
+    void init(bool use_dense_missing, bool train_generative,
+              int inputs, int outputs);
+
+    int inputs() const { return weights.shape()[0]; }
+    int outputs() const { return weights.shape()[1]; }
+
+    Twoway_Layer_Updates & operator += (const Twoway_Layer_Updates & other);
+
+    bool use_dense_missing;
+    bool train_generative;
+    boost::multi_array<double, 2> weights;
+    distribution<double> bias;
+    distribution<double> missing_replacements;
+    std::vector<distribution<double> > missing_activations;
+    distribution<double> ibias;
+    distribution<double> iscales;
+    distribution<double> hscales;
+};
 
 
 /*****************************************************************************/
 /* TWOWAY_LAYER                                                              */
 /*****************************************************************************/
+
+typedef Dense_Missing_Layer Twoway_Layer_Base;
+
 
 /** A perceptron layer that has both a forward and a reverse direction.  It's
     both a discriminative model (in the forward direction) and a generative
@@ -195,7 +235,22 @@ struct Twoway_Layer : public Twoway_Layer_Base {
 IMPL_SERIALIZE_RECONSTITUTE(Twoway_Layer);
 
 
-struct DNAE_Stack_Updates;
+/*****************************************************************************/
+/* DNAE_STACK_UPDATES                                                        */
+/*****************************************************************************/
+
+struct DNAE_Stack;
+
+struct DNAE_Stack_Updates : public std::vector<Twoway_Layer_Updates> {
+
+    DNAE_Stack_Updates();
+
+    DNAE_Stack_Updates(const DNAE_Stack & stack);
+
+    void init(const DNAE_Stack & stack);
+
+    DNAE_Stack_Updates & operator += (const DNAE_Stack_Updates & updates);
+};
 
 
 /*****************************************************************************/

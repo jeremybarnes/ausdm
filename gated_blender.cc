@@ -307,7 +307,7 @@ train_conf(int model, const Data & training_data,
 
     Thread_Context context;
 
-    int n_irls = 50;
+    int n_irls = 5;
     for (unsigned i = 0;  i < n_irls;  ++i) {
         
         float p_in = min(1.0, 2.0 / n_irls);

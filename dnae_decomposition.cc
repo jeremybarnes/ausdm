@@ -298,141 +298,136 @@ operator == (const Dense_Missing_Layer & other) const
 /* TWOWAY_LAYER_UPDATES                                                      */
 /*****************************************************************************/
 
-struct Twoway_Layer_Updates {
+Twoway_Layer_Updates::
+Twoway_Layer_Updates()
+{
+    init(false, false, 0, 0);
+}
 
-    Twoway_Layer_Updates()
-    {
-        init(false, false, 0, 0);
-    }
+Twoway_Layer_Updates::
+Twoway_Layer_Updates(bool train_generative,
+                     const Twoway_Layer & layer)
+{
+    init(train_generative, layer);
+}
 
-    Twoway_Layer_Updates(bool train_generative,
-                         const Twoway_Layer & layer)
-    {
-        init(train_generative, layer);
-    }
+Twoway_Layer_Updates::
+Twoway_Layer_Updates(bool use_dense_missing,
+                     bool train_generative,
+                     int inputs, int outputs)
+{
+    init(use_dense_missing, train_generative, inputs, outputs);
+}
 
-    Twoway_Layer_Updates(bool use_dense_missing,
-                         bool train_generative,
-                         int inputs, int outputs)
-    {
-        init(use_dense_missing, train_generative, inputs, outputs);
-    }
+void
+Twoway_Layer_Updates::
+zero_fill()
+{
+    std::fill(weights.data(), weights.data() + weights.num_elements(),
+              0.0);
+    bias.fill(0.0);
+    missing_replacements.fill(0.0);
+    if (use_dense_missing)
+        for (unsigned i = 0;  i < missing_activations.size();  ++i)
+            missing_activations[i].fill(0.0);
+    ibias.fill(0.0);
+    iscales.fill(0.0);
+    hscales.fill(0.0);
+}
 
-    void zero_fill()
-    {
-        std::fill(weights.data(), weights.data() + weights.num_elements(),
-                  0.0);
-        bias.fill(0.0);
-        missing_replacements.fill(0.0);
-        if (use_dense_missing)
-            for (unsigned i = 0;  i < missing_activations.size();  ++i)
-                missing_activations[i].fill(0.0);
-        ibias.fill(0.0);
-        iscales.fill(0.0);
-        hscales.fill(0.0);
-    }
+void
+Twoway_Layer_Updates::
+init(bool train_generative,
+     const Twoway_Layer & layer)
+{
+    init(layer.use_dense_missing, train_generative,
+         layer.inputs(), layer.outputs());
+}
 
-    void init(bool train_generative,
-              const Twoway_Layer & layer)
-    {
-        init(layer.use_dense_missing, train_generative,
-             layer.inputs(), layer.outputs());
-    }
-
-    void init(bool use_dense_missing, bool train_generative,
-              int inputs, int outputs)
-    {
-        this->use_dense_missing = use_dense_missing;
-        this->train_generative = train_generative;
-
-        weights.resize(boost::extents[inputs][outputs]);
-        bias.resize(outputs);
-        missing_replacements.resize(inputs);
-
-        if (use_dense_missing)
-            missing_activations.resize(inputs, distribution<double>(outputs));
-
-        ibias.resize(inputs);
-        iscales.resize(inputs);
-        hscales.resize(outputs);
-
-        zero_fill();
-    }
-
-    int inputs() const { return weights.shape()[0]; }
-    int outputs() const { return weights.shape()[1]; }
-
-    Twoway_Layer_Updates & operator += (const Twoway_Layer_Updates & other)
-    {
-        int ni = inputs();
-        int no = outputs();
+void
+Twoway_Layer_Updates::
+init(bool use_dense_missing, bool train_generative,
+     int inputs, int outputs)
+{
+    this->use_dense_missing = use_dense_missing;
+    this->train_generative = train_generative;
     
-        //cerr << "ni = " << ni << " no = " << no << endl;
+    weights.resize(boost::extents[inputs][outputs]);
+    bias.resize(outputs);
+    missing_replacements.resize(inputs);
+    
+    if (use_dense_missing)
+        missing_activations.resize(inputs, distribution<double>(outputs));
+    
+    ibias.resize(inputs);
+    iscales.resize(inputs);
+    hscales.resize(outputs);
+    
+    zero_fill();
+}
 
-        if (ni != other.inputs() || no != other.outputs()
-            || use_dense_missing != other.use_dense_missing)
-            throw Exception("incompatible update objects");
-
-        ibias += other.ibias;
-        bias += other.bias;
-        iscales += other.iscales;
-        hscales += other.hscales;
-        
-        CHECK_NO_NAN(ibias);
-        CHECK_NO_NAN(other.ibias);
-        CHECK_NO_NAN(bias);
-        CHECK_NO_NAN(other.bias);
-        CHECK_NO_NAN(iscales);
-        CHECK_NO_NAN(other.iscales);
-        CHECK_NO_NAN(hscales);
-        CHECK_NO_NAN(other.hscales);
-
-        for (unsigned i = 0;  i < ni;  ++i) {
-            SIMD::vec_add(&weights[i][0],
-                          &other.weights[i][0],
-                          &weights[i][0], no);
-            CHECK_NO_NAN_RANGE(&other.weights[i][0], &other.weights[i][0] + no);
-            CHECK_NO_NAN_RANGE(&weights[i][0], &weights[i][0] + no);
-        }
-        
-        if (use_dense_missing) {
-            if (missing_activations.size() != ni
-                || other.missing_activations.size() != ni) {
-                throw Exception("wrong missing activation size");
-            }
-
-            for (unsigned i = 0;  i < ni;  ++i) {
-                if (missing_activations[i].size() != no
-                    || other.missing_activations[i].size() != no)
-                    throw Exception("wrong inner missing activation size");
-
-                const distribution<double> & me JML_UNUSED
-                    = missing_activations[i];
-                CHECK_NO_NAN(me);
-                const distribution<double> & them JML_UNUSED
-                    = missing_activations[i];
-                CHECK_NO_NAN(them);
-
-                SIMD::vec_add(&missing_activations[i][0],
-                              &other.missing_activations[i][0],
-                              &missing_activations[i][0], no);
-            }
-        }
-        else missing_replacements += other.missing_replacements;
-
-        return *this;
+Twoway_Layer_Updates &
+Twoway_Layer_Updates::
+operator += (const Twoway_Layer_Updates & other)
+{
+    int ni = inputs();
+    int no = outputs();
+    
+    //cerr << "ni = " << ni << " no = " << no << endl;
+    
+    if (ni != other.inputs() || no != other.outputs()
+        || use_dense_missing != other.use_dense_missing)
+        throw Exception("incompatible update objects");
+    
+    ibias += other.ibias;
+    bias += other.bias;
+    iscales += other.iscales;
+    hscales += other.hscales;
+    
+    CHECK_NO_NAN(ibias);
+    CHECK_NO_NAN(other.ibias);
+    CHECK_NO_NAN(bias);
+    CHECK_NO_NAN(other.bias);
+    CHECK_NO_NAN(iscales);
+    CHECK_NO_NAN(other.iscales);
+    CHECK_NO_NAN(hscales);
+    CHECK_NO_NAN(other.hscales);
+    
+    for (unsigned i = 0;  i < ni;  ++i) {
+        SIMD::vec_add(&weights[i][0],
+                      &other.weights[i][0],
+                      &weights[i][0], no);
+        CHECK_NO_NAN_RANGE(&other.weights[i][0], &other.weights[i][0] + no);
+        CHECK_NO_NAN_RANGE(&weights[i][0], &weights[i][0] + no);
     }
-
-    bool use_dense_missing;
-    bool train_generative;
-    boost::multi_array<double, 2> weights;
-    distribution<double> bias;
-    distribution<double> missing_replacements;
-    std::vector<distribution<double> > missing_activations;
-    distribution<double> ibias;
-    distribution<double> iscales;
-    distribution<double> hscales;
-};
+    
+    if (use_dense_missing) {
+        if (missing_activations.size() != ni
+            || other.missing_activations.size() != ni) {
+            throw Exception("wrong missing activation size");
+        }
+        
+        for (unsigned i = 0;  i < ni;  ++i) {
+            if (missing_activations[i].size() != no
+                || other.missing_activations[i].size() != no)
+                throw Exception("wrong inner missing activation size");
+            
+            const distribution<double> & me JML_UNUSED
+                = missing_activations[i];
+            CHECK_NO_NAN(me);
+            const distribution<double> & them JML_UNUSED
+                = missing_activations[i];
+            CHECK_NO_NAN(them);
+            
+            SIMD::vec_add(&missing_activations[i][0],
+                          &other.missing_activations[i][0],
+                          &missing_activations[i][0], no);
+        }
+    }
+    else missing_replacements += other.missing_replacements;
+    
+    return *this;
+}
 
 
 /*****************************************************************************/
@@ -1758,35 +1753,38 @@ test_and_update(const vector<distribution<float> > & data_in,
 /* DNAE_STACK_UPDATES                                                        */
 /*****************************************************************************/
 
-struct DNAE_Stack_Updates : public std::vector<Twoway_Layer_Updates> {
+DNAE_Stack_Updates::
+DNAE_Stack_Updates()
+{
+}
 
-    DNAE_Stack_Updates()
-    {
-    }
+DNAE_Stack_Updates::
+DNAE_Stack_Updates(const DNAE_Stack & stack)
+{
+    init(stack);
+}
 
-    DNAE_Stack_Updates(const DNAE_Stack & stack)
-    {
-        init(stack);
-    }
+void
+DNAE_Stack_Updates::
+init(const DNAE_Stack & stack)
+{
+    resize(stack.size());
+    for (unsigned i = 0;  i < size();  ++i)
+        (*this)[i].init(false /* train_generative */, stack[i]);
+}
 
-    void init(const DNAE_Stack & stack)
-    {
-        resize(stack.size());
-        for (unsigned i = 0;  i < size();  ++i)
-            (*this)[i].init(false /* train_generative */, stack[i]);
-    }
-
-    DNAE_Stack_Updates & operator += (const DNAE_Stack_Updates & updates)
-    {
-        if (updates.size() != size())
-            throw Exception("DNAE_Stack_Updates: out of sync");
-
-        for (unsigned i = 0;  i < size();  ++i)
-            (*this)[i] += updates[i];
-        
-        return *this;
-    }
-};
+DNAE_Stack_Updates &
+DNAE_Stack_Updates::
+operator += (const DNAE_Stack_Updates & updates)
+{
+    if (updates.size() != size())
+        throw Exception("DNAE_Stack_Updates: out of sync");
+    
+    for (unsigned i = 0;  i < size();  ++i)
+        (*this)[i] += updates[i];
+    
+    return *this;
+}
 
 
 /*****************************************************************************/
@@ -2293,7 +2291,7 @@ test_discrim(const std::vector<distribution<float> > & data,
     
     worker.run_until_finished(group);
     
-    return make_pair(sqrt(mse_total),
+    return make_pair(sqrt(mse_total / nx),
                      outputs.calc_auc
                      (distribution<float>(labels.begin(), labels.end())));
 }
@@ -2822,19 +2820,16 @@ recompose(const distribution<float> & model_outputs,
           const distribution<float> & decomposition, int order) const
 {
     distribution<float> output = 0.8 * model_outputs;
-    
+
     // Go down the stack
     int l;
-    for (l = 0;  l < stack.size();  ++l) {
+    for (l = 0;  l < stack.size() && l <= order;  ++l) {
         output = stack[l].apply(output);
-
-        // Did we get to a narrow enough layer?
-        if (output.size() <= order) break;
     }
 
     // Go the other way and re-generate
-    for (; l >= 0;  --l) {
-        output = stack[l].iapply(output);
+    for (; l > 0;  --l) {
+        output = stack[l - 1].iapply(output);
     }
     
     return 1.25 * output;
@@ -2846,7 +2841,7 @@ recomposition_orders() const
 {
     vector<int> result;
     for (unsigned i = 0;  i < stack.size();  ++i)
-        result.push_back(stack[i].outputs());
+        result.push_back(i);
     return result;
 }
 
