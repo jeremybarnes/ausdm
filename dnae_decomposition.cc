@@ -695,9 +695,31 @@ operator == (const Twoway_Layer & other) const
 // Float type to use for calculations
 typedef double CFloat;
 
+void
+Twoway_Layer::
+ibackprop_example(const distribution<double> & outputs,
+                  const distribution<double> & output_deltas,
+                  const distribution<double> & inputs,
+                  distribution<double> & input_deltas,
+                  Twoway_Layer_Updates & updates) const
+{
+#if 0
+    distribution<double> dibias = iderivative(outputs) * output_deltas;
 
-/** Backpropagate the given example.  The gradient will be acculmulated in
-    the output.  Fills in the errors for the next stage at input_errors. */
+    updates.ibias += dibias;
+
+    // The inputs can't be missing in this direction
+
+    int ni = this->inputs(), no = this->outputs();
+
+    for (unsigned i = 0;  i < ni;  ++i)
+        SIMD::vec_add(&updates.weights[i][0], inputs[i], &dbias[0],
+                      &updates.weights[i][0], no);
+
+    input_deltas = weights * dbias;
+#endif
+}
+
 void
 Twoway_Layer::
 backprop_example(const distribution<double> & outputs,
@@ -709,16 +731,39 @@ backprop_example(const distribution<double> & outputs,
     distribution<double> dbias = derivative(outputs) * output_deltas;
 
     updates.bias += dbias;
-
-    // Assuming that there were no missing inputs
-
+    
     int ni = this->inputs(), no = this->outputs();
 
-    for (unsigned i = 0;  i < ni;  ++i)
-        SIMD::vec_add(&updates.weights[i][0], inputs[i], &dbias[0],
-                      &updates.weights[i][0], no);
+    input_deltas.resize(ni);
 
-    input_deltas = weights * dbias;
+    for (unsigned i = 0;  i < ni;  ++i) {
+        bool was_missing = isnan(inputs[i]);
+        input_deltas[i] = 0;
+        
+        if (!was_missing) {
+            SIMD::vec_add(&updates.weights[i][0], inputs[i],
+                          &dbias[0], &updates.weights[i][0], no);
+            input_deltas[i]
+                = SIMD::vec_dotprod_dp(&updates.weights[i][0],
+                                       &dbias[0], no);
+        }
+        else if (use_dense_missing)
+            SIMD::vec_add(&updates.missing_activations[i][0],
+                          &dbias[0],
+                          &updates.missing_activations[i][0], no);
+        else {
+            // Missing
+
+            // Update the weights
+            SIMD::vec_add(&updates.weights[i][0], missing_replacements[i],
+                          &dbias[0], &updates.weights[i][0], no);
+            
+            // Update the missing replacement
+            updates.missing_activations[i]
+                += SIMD::vec_dotprod_dp(&updates.weights[i][0],
+                                        &dbias[0], no);
+        }
+    }
 }
 
 template<typename Float>
@@ -735,6 +780,90 @@ add_noise(const distribution<Float> & inputs,
     
     return result;
 }
+
+#if 0
+pair<double, double>
+train_example2(const Twoway_Layer & layer,
+               const vector<distribution<float> > & data,
+               int example_num,
+               float max_prob_cleared,
+               Thread_Context & thread_context,
+               Twoway_Layer_Updates & updates,
+               Lock & update_lock,
+               bool need_lock,
+               int verbosity)
+{
+    int ni JML_UNUSED = layer.inputs();
+    int no JML_UNUSED = layer.outputs();
+
+    // Present this input
+    distribution<CFloat> model_input(data.at(example_num));
+
+    CHECK_NO_NAN(model_input);
+    
+    if (model_input.size() != ni) {
+        cerr << "model_input.size() = " << model_input.size() << endl;
+        cerr << "ni = " << ni << endl;
+        throw Exception("wrong sizes");
+    }
+
+    float prob_cleared = max_prob_cleared;
+
+    distribution<CFloat> noisy_input;
+
+    // Every second example we add with zero noise so that we don't end up
+    // losing the ability to reconstruct the non-noisy input
+    if (thread_context.random01() < 0.5)
+        noisy_input = add_noise(model_input, thread_context, prob_cleared);
+    else noisy_input = model_input;
+
+    // Apply the layer
+    distribution<CFloat> hidden_rep
+        = layer.apply(noisy_input);
+
+    CHECK_NO_NAN(hidden_rep);
+            
+    // Reconstruct the input
+    distribution<CFloat> denoised_input
+        = layer.iapply(hidden_rep);
+
+    CHECK_NO_NAN(denoised_input);
+            
+    // Error signal
+    distribution<CFloat> diff
+        = model_input - denoised_input;
+    
+    // Overall error
+    double error = pow(diff.two_norm(), 2);
+    
+
+    double error_exact = pow((model_input - layer.iapply(layer.apply(model_input))).two_norm(), 2);
+
+    distribution<CFloat> denoised_input_deltas = -2 * diff;
+
+    distribution<CFloat> hidden_rep_deltas;
+
+    // Now we backprop in the two directions
+    distribution<CFloat> hidden_rep_deltas;
+    ibackprop_examples(denoised_input,
+                       denoised_input_deltas,
+                       hidden_rep,
+                       hidden_rep_deltas,
+                       updates);
+
+    CHECK_NO_NAN(hidden_rep_deltas);
+
+    // And the other one
+    distribution<CFloat> noisy_input_deltas;
+    backprop_example(hidden_rep,
+                     hidden_rep_deltas,
+                     noisy_input,
+                     noisy_input_deltas,
+                     updates);
+
+    return make_pair(error_exact, error);
+}
+#endif
 
 pair<double, double>
 train_example(const Twoway_Layer & layer,

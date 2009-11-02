@@ -194,6 +194,15 @@ struct Twoway_Layer : public Twoway_Layer_Base {
                           distribution<double> & input_deltas,
                           Twoway_Layer_Updates & updates) const;
 
+    /** Inverse direction backpropagation of the given example.  Again, the
+        gradient will be acculmulated in the output.  Fills in the errors for
+        the next stage at input_errors. */
+    void ibackprop_example(const distribution<double> & outputs,
+                           const distribution<double> & output_deltas,
+                           const distribution<double> & inputs,
+                           distribution<double> & input_deltas,
+                           Twoway_Layer_Updates & updates) const;
+
     /** Trains a single iteration on the given data with the selected
         parameters.  Returns a moving estimate of the RMSE on the
         training set. */
