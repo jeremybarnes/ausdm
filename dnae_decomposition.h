@@ -8,9 +8,11 @@
 #ifndef __ausdm__dnae_decomposition_h__
 #define __ausdm__dnae_decomposition_h__
 
+
 #include "decomposition.h"
-#include "neural/layer.h"
+#include "neural/dense_layer.h"
 #include "arch/threads.h"
+
 
 typedef float LFloat;
 
