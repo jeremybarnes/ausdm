@@ -18,6 +18,452 @@ using namespace std;
 using namespace ML;
 
 
+namespace ML {
+
+/*****************************************************************************/
+/* AUGMENTED_DEEP_NET_UPDATES                                                */
+/*****************************************************************************/
+
+Augmented_Deep_Net_Updates::
+Augmented_Deep_Net_Updates()
+{
+}
+
+Augmented_Deep_Net_Updates::
+Augmented_Deep_Net_Updates(const Augmented_Deep_Net & net)
+    : dnae(net.dnae), supervised(net.supervised)
+{
+}
+
+Augmented_Deep_Net_Updates &
+Augmented_Deep_Net_Updates::
+operator += (const Augmented_Deep_Net_Updates & updates)
+{
+    dnae += updates.dnae;
+    supervised += updates.supervised;
+    return *this;
+}
+
+
+/*****************************************************************************/
+/* AUGMENTED_DEEP_NET                                                        */
+/*****************************************************************************/
+
+Augmented_Deep_Net::
+Augmented_Deep_Net()
+{
+}
+
+void
+Augmented_Deep_Net::
+init(const DNAE_Stack & dnae, int nfeatures,
+     int nhidden, int noutputs, Transfer_Function_Type transfer,
+     Thread_Context & context)
+{
+    this->dnae = dnae;
+
+    // Create the combined model: hidden layer
+    Twoway_Layer hlayer(false, nfeatures + dnae.back().outputs(),
+                        nhidden, TF_TANH, context);
+
+    supervised.push_back(hlayer);
+
+    // Output layer
+    Twoway_Layer olayer(false /* use_dense_missing */, nhidden /* inputs */,
+                        1 /* ousputs */, TF_TANH, context);
+
+    supervised.push_back(olayer);
+}
+
+float
+Augmented_Deep_Net::
+predict(const ML::distribution<float> & models,
+        const distribution<float> & features) const
+{
+    distribution<float> dnae_output
+        = dnae.apply(0.8 * models);
+
+    dnae_output.insert(dnae_output.end(), features.begin(), features.end());
+
+    return 1.25 * supervised.apply(dnae_output)[0];
+}
+
+void
+Augmented_Deep_Net::
+update(const Augmented_Deep_Net_Updates & updates,
+       double learning_rate)
+{
+    dnae.update(updates.dnae, learning_rate);
+    supervised.update(updates.supervised, learning_rate);
+}
+
+std::pair<double, double>
+Augmented_Deep_Net::
+train_example(const distribution<float> & model_input,
+              const distribution<float> & extra_features,
+              float label,
+              Augmented_Deep_Net_Updates & updates) const
+{
+    /* fprop */
+
+    vector<distribution<double> > dnae_outputs(dnae.size() + 1);
+    dnae_outputs[0] = model_input;
+
+    for (unsigned i = 0;  i < dnae.size();  ++i) {
+        //cerr << "dnae " << i << ": inputs " << dnae_outputs[i].size()
+        //     << " expected: " << dnae[i].inputs() << endl;
+        dnae_outputs[i + 1] = dnae[i].apply(dnae_outputs[i]);
+    }
+
+    vector<distribution<double> > sup_outputs(supervised.size() + 1);
+    sup_outputs[0] = dnae_outputs.back();
+    sup_outputs[0].insert(sup_outputs[0].end(),
+                          extra_features.begin(),
+                          extra_features.end());
+
+    for (unsigned i = 0;  i < supervised.size();  ++i) {
+        //cerr << "supervised " << i << ": inputs " << sup_outputs[i].size()
+        //     << " expected: " << supervised[i].inputs() << endl;
+        sup_outputs[i + 1] = supervised[i].apply(sup_outputs[i]);
+    }
+    
+    
+
+    /* errors */
+    distribution<double> errors = ((0.8 * label) - sup_outputs.back());
+    double error = errors.dotprod(errors);
+    distribution<double> derrors = -2.0 * errors;
+    distribution<double> new_derrors;
+
+    /* bprop */
+    for (int i = supervised.size() - 1;  i >= 0;  --i) {
+        supervised[i].backprop_example(sup_outputs[i + 1],
+                                             derrors,
+                                             sup_outputs[i],
+                                             new_derrors,
+                                             updates.supervised[i]);
+        derrors.swap(new_derrors);
+    }
+
+    /* Take the errors for the part of the dnae stack */
+
+    derrors.resize(dnae_outputs.back().size());
+
+    for (int i = dnae.size() - 1;  i >= 0;  --i) {
+
+        dnae[i].backprop_example(dnae_outputs[i + 1],
+                                       derrors,
+                                       dnae_outputs[i],
+                                       new_derrors,
+                                       updates.dnae[i]);
+        derrors.swap(new_derrors);
+    }
+
+    return make_pair(sqrt(error), sup_outputs.back()[0]);
+}
+
+struct Train_Deep_Net_Examples_Job {
+
+    const Augmented_Deep_Net & net;
+    const std::vector<distribution<float> > & model_outputs;
+    const std::vector<distribution<float> > & features;
+    const std::vector<float> & labels;
+    Thread_Context & thread_context;
+    const vector<int> & examples;
+    int first;
+    int last;
+    Augmented_Deep_Net_Updates & updates;
+    vector<float> & outputs;
+    double & total_rmse;
+    Lock & updates_lock;
+    boost::progress_display * progress;
+    int verbosity;
+
+    Train_Deep_Net_Examples_Job(const Augmented_Deep_Net & net,
+                                const std::vector<distribution<float> > & model_outputs,
+                                const std::vector<distribution<float> > & features,
+                                const std::vector<float> & labels,
+                                Thread_Context & thread_context,
+                                const vector<int> & examples,
+                                int first, int last,
+                                Augmented_Deep_Net_Updates & updates,
+                                vector<float> & outputs,
+                                double & total_rmse,
+                                Lock & updates_lock,
+                                boost::progress_display * progress,
+                                int verbosity)
+        : net(net), model_outputs(model_outputs), features(features),
+          labels(labels),
+          thread_context(thread_context), examples(examples),
+          first(first), last(last),
+          updates(updates),
+          outputs(outputs),
+          total_rmse(total_rmse), updates_lock(updates_lock),
+          progress(progress), verbosity(verbosity)
+    {
+    }
+
+    void operator () ()
+    {
+        Augmented_Deep_Net_Updates local_updates(net);
+
+        double total_rmse_local = 0.0;
+
+        for (unsigned ix = first; ix < last;  ++ix) {
+            int x = examples[ix];
+
+            double rmse_contribution;
+            double output;
+
+            boost::tie(rmse_contribution, output)
+                = net.train_example(model_outputs[x],
+                                    features[x],
+                                    labels[x],
+                                    local_updates);
+
+            outputs[ix] = output;
+            total_rmse_local += rmse_contribution;
+        }
+
+        Guard guard(updates_lock);
+        total_rmse += total_rmse_local;
+        updates += local_updates;
+        if (progress) progress += (last - first);
+    }
+};
+
+std::pair<double, double>
+Augmented_Deep_Net::
+train_iter(const std::vector<distribution<float> > & model_outputs,
+           const std::vector<distribution<float> > & features,
+           const std::vector<float> & labels,
+           ML::Thread_Context & thread_context,
+           int minibatch_size, float learning_rate,
+           int verbosity,
+           float sample_proportion,
+           bool randomize_order)
+{
+    Worker_Task & worker = thread_context.worker();
+
+    int nx = model_outputs.size();
+
+    int microbatch_size = minibatch_size / (num_threads() * 4);
+            
+    Lock update_lock;
+
+    vector<int> examples;
+    for (unsigned x = 0;  x < nx;  ++x) {
+        // Randomly exclude some samples
+        if (thread_context.random01() >= sample_proportion)
+            continue;
+        examples.push_back(x);
+    }
+    
+    if (randomize_order) {
+        Thread_Context::RNG_Type rng = thread_context.rng();
+        std::random_shuffle(examples.begin(), examples.end(), rng);
+    }
+    
+    int nx2 = examples.size();
+
+    double total_mse = 0.0;
+    Model_Output outputs;
+    outputs.resize(nx2);    
+
+    std::auto_ptr<boost::progress_display> progress;
+    if (verbosity >= 3) progress.reset(new boost::progress_display(nx2, cerr));
+
+    for (unsigned x = 0;  x < nx2;  x += minibatch_size) {
+                
+        Augmented_Deep_Net_Updates updates(*this);
+                
+        // Now, submit it as jobs to the worker task to be done
+        // multithreaded
+        int group;
+        {
+            int parent = -1;  // no parent group
+            group = worker.get_group(NO_JOB, "dump user results task",
+                                     parent);
+                    
+            // Make sure the group gets unlocked once we've populated
+            // everything
+            Call_Guard guard(boost::bind(&Worker_Task::unlock_group,
+                                         boost::ref(worker),
+                                         group));
+                    
+                    
+            for (unsigned x2 = x;  x2 < nx2 && x2 < x + minibatch_size;
+                 x2 += microbatch_size) {
+                        
+                Train_Deep_Net_Examples_Job
+                    job(*this,
+                        model_outputs,
+                        features,
+                        labels,
+                        thread_context,
+                        examples,
+                        x2,
+                        min<int>(nx2,
+                                 min(x + minibatch_size,
+                                     x2 + microbatch_size)),
+                        updates,
+                        outputs,
+                        total_mse,
+                        update_lock,
+                        progress.get(),
+                        verbosity);
+
+                // Send it to a thread to be processed
+                worker.add(job, "backprop job", group);
+            }
+        }
+        
+        worker.run_until_finished(group);
+        
+        update(updates, learning_rate);
+    }
+
+    // TODO: calculate AUC score
+    distribution<float> test_labels;
+    for (unsigned i = 0;  i < nx2;  ++i)
+        test_labels.push_back(labels[examples[i]]);
+
+    double auc = outputs.calc_auc(test_labels);
+
+    return make_pair(sqrt(total_mse / nx2), auc);
+}
+
+struct Test_Deep_Net_Job {
+
+    const Augmented_Deep_Net & net;
+    const vector<distribution<float> > & model_outputs;
+    const vector<distribution<float> > & features;
+    const vector<float> & labels;
+    int first;
+    int last;
+    const Thread_Context & context;
+    Lock & update_lock;
+    double & error_rmse;
+    vector<float> & outputs;
+    boost::progress_display * progress;
+    int verbosity;
+
+    Test_Deep_Net_Job(const Augmented_Deep_Net & net,
+                      const vector<distribution<float> > & model_outputs,
+                      const vector<distribution<float> > & features,
+                      const vector<float> & labels,
+                      int first, int last,
+                      const Thread_Context & context,
+                      Lock & update_lock,
+                      double & error_rmse,
+                      vector<float> & outputs,
+                      boost::progress_display * progress,
+                      int verbosity)
+        : net(net), model_outputs(model_outputs), features(features),
+          labels(labels),
+          first(first), last(last),
+          context(context),
+          update_lock(update_lock),
+          error_rmse(error_rmse), outputs(outputs),
+          progress(progress), verbosity(verbosity)
+    {
+    }
+
+    void operator () ()
+    {
+        double local_error_rmse = 0.0;
+
+        for (unsigned x = first;  x < last;  ++x) {
+            float output = net.predict(model_outputs[x], features[x]);
+
+            outputs[x] = output;
+            local_error_rmse += pow(labels[x] - output, 2);
+        }
+        
+        Guard guard(update_lock);
+        error_rmse += local_error_rmse;
+        if (progress && verbosity >= 3) (*progress) += (last - first);
+    }
+};
+
+std::pair<double, double>
+Augmented_Deep_Net::
+test(const std::vector<distribution<float> > & model_outputs,
+     const std::vector<distribution<float> > & features,
+     const std::vector<float> & labels,
+     ML::Thread_Context & thread_context,
+     int verbosity)
+{
+    Lock update_lock;
+    double mse_total = 0.0;
+
+    int nx = model_outputs.size();
+
+    std::auto_ptr<boost::progress_display> progress;
+    if (verbosity >= 3) progress.reset(new boost::progress_display(nx, cerr));
+
+    Worker_Task & worker = thread_context.worker();
+
+    Model_Output outputs;
+    outputs.resize(nx);
+            
+    // Now, submit it as jobs to the worker task to be done
+    // multithreaded
+    int group;
+    {
+        int parent = -1;  // no parent group
+        group = worker.get_group(NO_JOB, "dump user results task",
+                                 parent);
+        
+        // Make sure the group gets unlocked once we've populated
+        // everything
+        Call_Guard guard(boost::bind(&Worker_Task::unlock_group,
+                                     boost::ref(worker),
+                                     group));
+        
+        // 20 jobs per CPU
+        int batch_size = nx / (num_cpus() * 20);
+        
+        for (unsigned x = 0; x < nx;  x += batch_size) {
+            
+            Test_Deep_Net_Job job(*this, model_outputs, features, labels,
+                                  x, min<int>(x + batch_size, nx),
+                                  thread_context,
+                                  update_lock,
+                                  mse_total, outputs,
+                                  progress.get(),
+                                  verbosity);
+            
+            // Send it to a thread to be processed
+            worker.add(job, "test discrim job", group);
+        }
+    }
+    
+    worker.run_until_finished(group);
+    
+    return make_pair(sqrt(mse_total / nx),
+                     outputs.calc_auc
+                     (distribution<float>(labels.begin(), labels.end())));
+}
+
+#if 0
+double
+Augmented_Deep_Net::
+calc_learning_rate(const std::vector<distribution<float> > & model_outputs,
+                   const std::vector<distribution<float> > & features,
+                   const std::vector<float> & labels) const
+{
+}
+#endif
+
+
+
+
+
+
+}  // namespace ML
+
+
 /*****************************************************************************/
 /* DEEP_NET_BLENDER                                                          */
 /*****************************************************************************/
@@ -121,366 +567,7 @@ get_extra_features(const distribution<float> & model_outputs,
     return result;
 }
 
-std::pair<double, double>
-Deep_Net_Blender::
-train_example(const distribution<float> & model_input,
-              const distribution<float> & extra_features,
-              float label,
-              DNAE_Stack_Updates & dnae_updates,
-              DNAE_Stack_Updates & supervised_updates) const
-{
-    /* fprop */
 
-    vector<distribution<double> > dnae_outputs(dnae_stack.size() + 1);
-    dnae_outputs[0] = model_input;
-
-    for (unsigned i = 0;  i < dnae_stack.size();  ++i) {
-        //cerr << "dnae " << i << ": inputs " << dnae_outputs[i].size()
-        //     << " expected: " << dnae_stack[i].inputs() << endl;
-        dnae_outputs[i + 1] = dnae_stack[i].apply(dnae_outputs[i]);
-    }
-
-    vector<distribution<double> > sup_outputs(supervised_stack.size() + 1);
-    sup_outputs[0] = dnae_outputs.back();
-    sup_outputs[0].insert(sup_outputs[0].end(),
-                          extra_features.begin(),
-                          extra_features.end());
-
-    for (unsigned i = 0;  i < supervised_stack.size();  ++i) {
-        //cerr << "supervised " << i << ": inputs " << sup_outputs[i].size()
-        //     << " expected: " << supervised_stack[i].inputs() << endl;
-        sup_outputs[i + 1] = supervised_stack[i].apply(sup_outputs[i]);
-    }
-    
-    
-
-    /* errors */
-    distribution<double> errors = ((0.8 * label) - sup_outputs.back());
-    double error = errors.dotprod(errors);
-    distribution<double> derrors = -2.0 * errors;
-    distribution<double> new_derrors;
-
-    /* bprop */
-    for (int i = supervised_stack.size() - 1;  i >= 0;  --i) {
-        supervised_stack[i].backprop_example(sup_outputs[i + 1],
-                                             derrors,
-                                             sup_outputs[i],
-                                             new_derrors,
-                                             supervised_updates[i]);
-        derrors.swap(new_derrors);
-    }
-
-    /* Take the errors for the part of the dnae stack */
-
-    derrors.resize(dnae_outputs.back().size());
-
-    for (int i = dnae_stack.size() - 1;  i >= 0;  --i) {
-
-        dnae_stack[i].backprop_example(dnae_outputs[i + 1],
-                                       derrors,
-                                       dnae_outputs[i],
-                                       new_derrors,
-                                       dnae_updates[i]);
-        derrors.swap(new_derrors);
-    }
-
-    return make_pair(sqrt(error), sup_outputs.back()[0]);
-}
-
-
-struct Train_Deep_Net_Examples_Job {
-
-    const Deep_Net_Blender & blender;
-    const std::vector<distribution<float> > & model_outputs;
-    const std::vector<distribution<float> > & features;
-    const std::vector<float> & labels;
-    Thread_Context & thread_context;
-    const vector<int> & examples;
-    int first;
-    int last;
-    DNAE_Stack_Updates & dnae_updates;
-    DNAE_Stack_Updates & supervised_updates;
-    vector<float> & outputs;
-    double & total_rmse;
-    Lock & updates_lock;
-    boost::progress_display * progress;
-    int verbosity;
-
-    Train_Deep_Net_Examples_Job(const Deep_Net_Blender & blender,
-                                const std::vector<distribution<float> > & model_outputs,
-                                const std::vector<distribution<float> > & features,
-                                const std::vector<float> & labels,
-                                Thread_Context & thread_context,
-                                const vector<int> & examples,
-                                int first, int last,
-                                DNAE_Stack_Updates & dnae_updates,
-                                DNAE_Stack_Updates & supervised_updates,
-                                vector<float> & outputs,
-                                double & total_rmse,
-                                Lock & updates_lock,
-                                boost::progress_display * progress,
-                                int verbosity)
-        : blender(blender), model_outputs(model_outputs), features(features),
-          labels(labels),
-          thread_context(thread_context), examples(examples),
-          first(first), last(last),
-          dnae_updates(dnae_updates), supervised_updates(supervised_updates),
-          outputs(outputs),
-          total_rmse(total_rmse), updates_lock(updates_lock),
-          progress(progress), verbosity(verbosity)
-    {
-    }
-
-    void operator () ()
-    {
-        DNAE_Stack_Updates local_updates_dnae(blender.dnae_stack);
-        DNAE_Stack_Updates local_updates_sup(blender.supervised_stack);
-
-        double total_rmse_local = 0.0;
-
-        for (unsigned ix = first; ix < last;  ++ix) {
-            int x = examples[ix];
-
-            double rmse_contribution;
-            double output;
-
-            boost::tie(rmse_contribution, output)
-                = blender.train_example(model_outputs[x],
-                                        features[x],
-                                        labels[x],
-                                        local_updates_dnae,
-                                        local_updates_sup);
-
-            outputs[ix] = output;
-            total_rmse_local += rmse_contribution;
-        }
-
-        Guard guard(updates_lock);
-        total_rmse += total_rmse_local;
-        dnae_updates += local_updates_dnae;
-        supervised_updates += local_updates_sup;
-        if (progress) progress += (last - first);
-    }
-};
-
-std::pair<double, double>
-Deep_Net_Blender::
-train_iter(const std::vector<distribution<float> > & model_outputs,
-           const std::vector<distribution<float> > & features,
-           const std::vector<float> & labels,
-           Thread_Context & thread_context,
-           int minibatch_size, float learning_rate,
-           int verbosity,
-           float sample_proportion,
-           bool randomize_order)
-{
-    Worker_Task & worker = thread_context.worker();
-
-    int nx = model_outputs.size();
-
-    int microbatch_size = minibatch_size / (num_threads() * 4);
-            
-    Lock update_lock;
-
-    vector<int> examples;
-    for (unsigned x = 0;  x < nx;  ++x) {
-        // Randomly exclude some samples
-        if (thread_context.random01() >= sample_proportion)
-            continue;
-        examples.push_back(x);
-    }
-    
-    if (randomize_order) {
-        Thread_Context::RNG_Type rng = thread_context.rng();
-        std::random_shuffle(examples.begin(), examples.end(), rng);
-    }
-    
-    int nx2 = examples.size();
-
-    double total_mse = 0.0;
-    Model_Output outputs;
-    outputs.resize(nx2);    
-
-    std::auto_ptr<boost::progress_display> progress;
-    if (verbosity >= 3) progress.reset(new boost::progress_display(nx2, cerr));
-
-    for (unsigned x = 0;  x < nx2;  x += minibatch_size) {
-                
-        DNAE_Stack_Updates dnae_updates(dnae_stack);
-        DNAE_Stack_Updates supervised_updates(supervised_stack);
-                
-        // Now, submit it as jobs to the worker task to be done
-        // multithreaded
-        int group;
-        {
-            int parent = -1;  // no parent group
-            group = worker.get_group(NO_JOB, "dump user results task",
-                                     parent);
-                    
-            // Make sure the group gets unlocked once we've populated
-            // everything
-            Call_Guard guard(boost::bind(&Worker_Task::unlock_group,
-                                         boost::ref(worker),
-                                         group));
-                    
-                    
-            for (unsigned x2 = x;  x2 < nx2 && x2 < x + minibatch_size;
-                 x2 += microbatch_size) {
-                        
-                Train_Deep_Net_Examples_Job
-                    job(*this,
-                        model_outputs,
-                        features,
-                        labels,
-                        thread_context,
-                        examples,
-                        x2,
-                        min<int>(nx2,
-                                 min(x + minibatch_size,
-                                     x2 + microbatch_size)),
-                        dnae_updates,
-                        supervised_updates,
-                        outputs,
-                        total_mse,
-                        update_lock,
-                        progress.get(),
-                        verbosity);
-
-                // Send it to a thread to be processed
-                worker.add(job, "backprop job", group);
-            }
-        }
-        
-        worker.run_until_finished(group);
-
-        //cerr << "applying minibatch updates" << endl;
-        
-        dnae_stack.update(dnae_updates, learning_rate);
-        supervised_stack.update(supervised_updates, learning_rate);
-    }
-
-    // TODO: calculate AUC score
-    distribution<float> test_labels;
-    for (unsigned i = 0;  i < nx2;  ++i)
-        test_labels.push_back(labels[examples[i]]);
-
-    double auc = outputs.calc_auc(test_labels);
-
-    return make_pair(sqrt(total_mse / nx2), auc);
-}
-
-struct Test_Deep_Net_Job {
-
-    const Deep_Net_Blender & blender;
-    const vector<distribution<float> > & model_outputs;
-    const vector<distribution<float> > & features;
-    const vector<float> & labels;
-    int first;
-    int last;
-    const Thread_Context & context;
-    Lock & update_lock;
-    double & error_rmse;
-    vector<float> & outputs;
-    boost::progress_display * progress;
-    int verbosity;
-
-    Test_Deep_Net_Job(const Deep_Net_Blender & blender,
-                      const vector<distribution<float> > & model_outputs,
-                      const vector<distribution<float> > & features,
-                      const vector<float> & labels,
-                      int first, int last,
-                      const Thread_Context & context,
-                      Lock & update_lock,
-                      double & error_rmse,
-                      vector<float> & outputs,
-                      boost::progress_display * progress,
-                      int verbosity)
-        : blender(blender), model_outputs(model_outputs), features(features),
-          labels(labels),
-          first(first), last(last),
-          context(context),
-          update_lock(update_lock),
-          error_rmse(error_rmse), outputs(outputs),
-          progress(progress), verbosity(verbosity)
-    {
-    }
-
-    void operator () ()
-    {
-        double local_error_rmse = 0.0;
-
-        for (unsigned x = first;  x < last;  ++x) {
-            float output = blender.predict(model_outputs[x], features[x]);
-
-            outputs[x] = output;
-            local_error_rmse += pow(labels[x] - output, 2);
-        }
-        
-        Guard guard(update_lock);
-        error_rmse += local_error_rmse;
-        if (progress && verbosity >= 3) (*progress) += (last - first);
-    }
-};
-
-pair<double, double>
-Deep_Net_Blender::
-test(const std::vector<distribution<float> > & model_outputs,
-     const std::vector<distribution<float> > & features,
-     const std::vector<float> & labels,
-     ML::Thread_Context & thread_context,
-     int verbosity)
-{
-    Lock update_lock;
-    double mse_total = 0.0;
-
-    int nx = model_outputs.size();
-
-    std::auto_ptr<boost::progress_display> progress;
-    if (verbosity >= 3) progress.reset(new boost::progress_display(nx, cerr));
-
-    Worker_Task & worker = thread_context.worker();
-
-    Model_Output outputs;
-    outputs.resize(nx);
-            
-    // Now, submit it as jobs to the worker task to be done
-    // multithreaded
-    int group;
-    {
-        int parent = -1;  // no parent group
-        group = worker.get_group(NO_JOB, "dump user results task",
-                                 parent);
-        
-        // Make sure the group gets unlocked once we've populated
-        // everything
-        Call_Guard guard(boost::bind(&Worker_Task::unlock_group,
-                                     boost::ref(worker),
-                                     group));
-        
-        // 20 jobs per CPU
-        int batch_size = nx / (num_cpus() * 20);
-        
-        for (unsigned x = 0; x < nx;  x += batch_size) {
-            
-            Test_Deep_Net_Job job(*this, model_outputs, features, labels,
-                                  x, min<int>(x + batch_size, nx),
-                                  thread_context,
-                                  update_lock,
-                                  mse_total, outputs,
-                                  progress.get(),
-                                  verbosity);
-            
-            // Send it to a thread to be processed
-            worker.add(job, "test discrim job", group);
-        }
-    }
-    
-    worker.run_until_finished(group);
-    
-    return make_pair(sqrt(mse_total / nx),
-                     outputs.calc_auc
-                     (distribution<float>(labels.begin(), labels.end())));
-}
 
 void
 Deep_Net_Blender::
@@ -490,13 +577,10 @@ init(const Data & data,
     this->data = &data;
     
     // Reconstitute the base model
-    {
-        boost::shared_ptr<Decomposition> loaded;
-        const DNAE_Decomposition & decomp
-            = dynamic_cast <const DNAE_Decomposition & >
-                 (*(loaded = Decomposition::load(model_base)));
-        dnae_stack = decomp.stack;
-    }
+    boost::shared_ptr<Decomposition> loaded;
+    const DNAE_Decomposition & decomp
+        = dynamic_cast <const DNAE_Decomposition & >
+        (*(loaded = Decomposition::load(model_base)));
 
     int nfeatures = get_extra_features(data.examples[0],
                                        data.singular_targets[0],
@@ -507,18 +591,8 @@ init(const Data & data,
     Thread_Context context;
     context.seed(random_seed);
 
-    // Create the combined model: hidden layer
-    Twoway_Layer hlayer(false, nfeatures + dnae_stack.back().outputs(),
-                        nhidden, TF_TANH, context);
-
-    supervised_stack.push_back(hlayer);
-
-    // Output layer
-    Twoway_Layer olayer(false /* use_dense_missing */, nhidden /* inputs */,
-                        1 /* ousputs */, TF_TANH, context);
-
-    supervised_stack.push_back(olayer);
-
+    net.init(decomp.stack, nfeatures, nhidden, 1 /* noutputs */, TF_TANH,
+             context);
 
     float hold_out = 0.2;
     config.get(hold_out, "hold_out");
@@ -598,12 +672,12 @@ init(const Data & data,
 
         double train_error_rmse, train_error_auc;
         boost::tie(train_error_rmse, train_error_auc)
-            = train_iter(training_samples, training_features,
-                         training_data.targets,
-                         context,
-                         minibatch_size, learning_rate,
-                         verbosity, sample_proportion,
-                         randomize_order);
+            = net.train_iter(training_samples, training_features,
+                             training_data.targets,
+                             context,
+                             minibatch_size, learning_rate,
+                             verbosity, sample_proportion,
+                             randomize_order);
         
         if (verbosity >= 3) {
             cerr << "error of iteration: rmse " << train_error_rmse
@@ -625,8 +699,9 @@ init(const Data & data,
                      << endl;
 
             boost::tie(test_error_rmse, test_error_auc)
-                = test(testing_samples, testing_features, testing_data.targets,
-                       context, verbosity);
+                = net.test(testing_samples, testing_features,
+                           testing_data.targets,
+                           context, verbosity);
             
             if (verbosity >= 3) {
                 cerr << "testing error of iteration: rmse "
@@ -645,19 +720,6 @@ init(const Data & data,
 
 float
 Deep_Net_Blender::
-predict(const ML::distribution<float> & models,
-        const ML::distribution<float> & features) const
-{
-    distribution<float> dnae_output
-        = dnae_stack.apply(0.8 * models);
-
-    dnae_output.insert(dnae_output.end(), features.begin(), features.end());
-
-    return 1.25 * supervised_stack.apply(dnae_output)[0];
-}
-
-float
-Deep_Net_Blender::
 predict(const ML::distribution<float> & models) const
 {
     distribution<float> target_singular
@@ -668,7 +730,7 @@ predict(const ML::distribution<float> & models) const
     distribution<float> features
         = get_extra_features(models, target_singular, target_stats);
 
-    return predict(models, features);
+    return net.predict(models, features);
 }
 
 std::string

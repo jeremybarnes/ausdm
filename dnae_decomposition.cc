@@ -744,13 +744,14 @@ backprop_example(const distribution<double> & outputs,
             SIMD::vec_add(&updates.weights[i][0], inputs[i],
                           &dbias[0], &updates.weights[i][0], no);
             input_deltas[i]
-                = SIMD::vec_dotprod_dp(&updates.weights[i][0],
+                = SIMD::vec_dotprod_dp(&weights[i][0],
                                        &dbias[0], no);
         }
-        else if (use_dense_missing)
+        else if (use_dense_missing) {
             SIMD::vec_add(&updates.missing_activations[i][0],
                           &dbias[0],
                           &updates.missing_activations[i][0], no);
+        }
         else {
             // Missing
 
@@ -760,7 +761,7 @@ backprop_example(const distribution<double> & outputs,
             
             // Update the missing replacement
             updates.missing_activations[i]
-                += SIMD::vec_dotprod_dp(&updates.weights[i][0],
+                += SIMD::vec_dotprod_dp(&weights[i][0],
                                         &dbias[0], no);
         }
     }

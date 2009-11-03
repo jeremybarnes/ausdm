@@ -53,6 +53,9 @@ configure(const ML::Configuration & config_,
     debug_predict = false;
     config.find(debug_predict, "debug_predict");
 
+    debug_conf = false;
+    config.find(debug_conf, "debug_conf");
+
     config.require(num_models_to_train, "num_models_to_train");
 
     config.find(dump_training_features, "dump_training_features");
@@ -69,7 +72,9 @@ configure(const ML::Configuration & config_,
 
 void
 Gated_Blender::
-train_conf(int model, const Data & training_data,
+train_conf(int model,
+           const Data & training_data,
+           const Data & testing_data,
            const ML::distribution<float> & example_weights)
 {
     // Generate a matrix with the predictions
@@ -111,9 +116,13 @@ train_conf(int model, const Data & training_data,
             // Try to predict the probability that it's within 0.5 either side
             // of the correct answer.  With our modified scale, this really
             // means predicting if it's within 0.25.
+            //correct[i]
+            //    = abs(training_data.models[model][i]
+            //          - training_data.targets[i]) <= 0.25;
+
+            // Try to predict the error directly
             correct[i]
-                = abs(training_data.models[model][i]
-                      - training_data.targets[i]) <= 0.25;
+                = training_data.targets[i] - training_data.models[model][i];
         }
 
         const distribution<float> & model_outputs
@@ -206,24 +215,108 @@ train_conf(int model, const Data & training_data,
                                           link_function);
 
         before[i] = training_data.models[model][i];
-        after[i] = result;
+
+        if (target == AUC)
+            after[i] = result;
+        else after[i] = before[i] + result;
+
+#if 0
+        cerr << "example " << i << ": pred " << training_data.models[model][i]
+             << " target " << training_data.targets[i] << " conf "
+             << result << " real " << correct[i] << " adjusted "
+             << (training_data.models[model][i] + result) << endl;
+#endif
     }
 
     //cerr << "before = " << before << endl;
 
-    float auc_before1 = before.calc_score(training_data.targets, target);
-    float auc_after1  = after.calc_score(training_data.targets, target);
-    float auc_before2 = before.calc_auc(correct.cast<float>() * 2.0f - 1.0f);
-    float auc_after2  = after.calc_auc(correct.cast<float>() * 2.0f - 1.0f);
+    float auc_before1
+        = before.calc_score(training_data.targets, target);
+    float auc_after1
+        = after.calc_score(training_data.targets, target);
+    float auc_before2 = 0.0;
+    float auc_after2  = 0.0;
+    
+    if (target == AUC) {
+        auc_before2 = before.calc_auc(correct.cast<float>() * 2.0f - 1.0f);
+        auc_after2 = after.calc_auc(correct.cast<float>() * 2.0f - 1.0f);
+    }
+
+    Model_Output test_before, test_after;
+    test_before.resize(testing_data.nx());
+    test_after.resize(testing_data.nx());
+    distribution<float> correct_test(testing_data.nx());
+
+    // Test the original model and the weighted version for AUC
+    for (unsigned i = 0;  i < testing_data.nx();  ++i) {
+
+
+
+        const distribution<float> & model_outputs
+            = testing_data.examples[i];
+        
+        const distribution<float> & target_singular
+            = testing_data.singular_targets[i];
+
+        distribution<float> features
+            = get_conf_features(model, model_outputs, target_singular,
+                                testing_data.target_stats[i]);
+
+        //cerr << "conf features: " << features << endl;
+
+        if (features.size() != nv)
+            throw Exception("nv is wrong");
+
+        if (target == AUC) {
+            float pred = testing_data.models[model][i];
+            float margin = pred * testing_data.targets[i];
+            
+            correct_test[i] = (margin >= 0.2) ? 1.0 : 0.0;
+        }
+        else correct_test[i]
+                 = testing_data.targets[i] - testing_data.models[model][i];
+
+        float result = apply_link_inverse(features.dotprod(parameters),
+                                          link_function);
+
+        test_before[i] = testing_data.models[model][i];
+
+        if (target == AUC)
+            test_after[i] = result;
+        else test_after[i] = test_before[i] + result;
+
+#if 0
+        cerr << "example " << i << ": pred " << testing_data.models[model][i]
+             << " target " << testing_data.targets[i] << " conf "
+             << result << " real " << correct_test[i] << " adjusted "
+             << (testing_data.models[model][i] + result) << endl;
+#endif
+    }
+
+    //cerr << "before = " << before << endl;
+
+    float test_auc_before1
+        = test_before.calc_score(testing_data.targets, target);
+    float test_auc_after1
+        = test_after.calc_score(testing_data.targets, target);
+    float test_auc_before2 = 0.0;
+    float test_auc_after2  = 0.0;
+    
+    if (target == AUC) {
+        test_auc_before2 = test_before.calc_auc(correct_test);
+        test_auc_after2 = test_after.calc_auc(correct_test);
+    }
 
     static Lock lock;
     Guard guard(lock);
     
     cerr << "model " << model
          << ": before " << auc_before1 << "/" << auc_before2
-         << " after " << auc_after1 << "/" << auc_after2 << endl;
+         << " after " << auc_after1 << "/" << auc_after2
+         << " test: before " << test_auc_before1 << "/" << test_auc_before2
+         << " after " << test_auc_after1 << "/" << test_auc_after2 << endl;
 
-    if (auc_after2 < 0.01) {
+    if (auc_after2 < 0.01 && target == AUC) {
         cerr << "error on auc_after2" << endl;
         //cerr << "new_loc = " << new_loc << endl;
         cerr << "parameters = " << parameters << endl;
@@ -359,7 +452,9 @@ init(const Data & training_data_in,
                 continue;
 
             worker.add(boost::bind(&Gated_Blender::train_conf,
-                                   this, i, boost::cref(conf_training_data),
+                                   this, i,
+                                   boost::cref(conf_training_data),
+                                   boost::cref(blend_training_data),
                                    boost::cref(conf_example_weights)),
                        "train model job",
                        group);
@@ -819,6 +914,18 @@ predict(const ML::distribution<float> & models) const
     distribution<float> conf = this->conf(models, target_singular,
                                           target_stats);
     
+    if (target == RMSE) {
+        distribution<float> adjusted;
+
+        for (unsigned i = 0;  i < nm;  ++i) {
+            if (conf[i] == 0.0) continue;
+            adjusted.push_back(models[i] - conf[i]);
+        }
+
+        return adjusted.mean();
+    }
+
+
     //float result = models.dotprod(conf) / conf.total();
 
     //float result = conf.total() * 0.1 * 4.0 + 1.0;
@@ -863,14 +970,14 @@ predict(const ML::distribution<float> & models) const
     if (debug) cerr << "result before scaling = "
                     << result << endl;
 
+    if (debug) cerr << "result = " << result << " correct = "
+                    << correct_prediction << endl;
+
     if (target == RMSE) {
         //result = result * 2.5 + 3.0;
         if (result < -1.0) result = -1.0;
         if (result >  1.0) result = 1.0;
     }
-
-    if (debug) cerr << "result = " << result << " correct = "
-                    << correct_prediction << endl;
 
     return result;
 }

@@ -948,11 +948,7 @@ Gini = 0.8770325990085
 AUC = 0.93851629950425
 
 Hmmm....
-
-
-
-
-./build/x86_64/bin/ausdm -t auc auc.type=deep_net model_base=auc_decomposed_8.bin niter=500 learning_rate=0.4 -o auc-dnae3.txt 2>&1 | tee auc-dnae3.log
+/x86_64/bin/ausdm -t auc auc.type=deep_net model_base=auc_decomposed_8.bin niter=500 learning_rate=0.4 -o auc-dnae3.txt 2>&1 | tee auc-dnae3.log
 
 
 Success
@@ -1023,3 +1019,33 @@ AUC = 0.94096444324995
 
 So it appears that mixing is a good idea.
 
+
+
+------------
+
+Trying RMSE
+
+
+/usr/bin/time ./build/x86_64/bin/decompose niter=500 prob_cleared=0.1 -t rmse -T DNAE layer_sizes=250,150,100,50 minibatch_size=256 test_every=10 sample_proportion=0.8 minibatch_size=256 -o rmse_decomposed_6.bin 2>&1 | tee rmse_decomposed_6.log
+
+./build/x86_64/bin/ausdm -t rmse rmse.type=deep_net model_base=rmse_decomposed_6.bin niter=500 learning_rate=0.4 -o rmse-dnae2.txt 2>&1 | tee rmse-dnae2.log
+
+cat rmse-dnae2.txt | awk '{ print ($1 * 2) + 3000; }' > rmse-dnae2-scaled.txt
+
+
+Success - rmse = 879.86557192177
+
+
+
+-------------
+
+AUC-dnae3a.txt
+
+
+./build/x86_64/bin/ausdm -t auc auc.type=deep_net model_base=auc_decomposed_8.bin niter=500 learning_rate=0.4 -o auc-dnae3a.txt 2>&1 | tee auc-dnae3a.lo
+
+Re-trained, but with the different training routine
+
+Success
+Gini = 0.88030231837399
+AUC = 0.940151159187

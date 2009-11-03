@@ -16,45 +16,71 @@
 #include "utils/filter_streams.h"
 #include "dnae_decomposition.h"
 
+namespace ML {
+
+
+struct Augmented_Deep_Net;
+
 
 /*****************************************************************************/
-/* DEEP_NET_BLENDER                                                          */
+/* AUGMENTED_DEEP_NET_UPDATES                                                */
 /*****************************************************************************/
 
-struct Deep_Net_Blender : public Blender {
+struct Augmented_Deep_Net_Updates {
+    Augmented_Deep_Net_Updates();
+    Augmented_Deep_Net_Updates(const Augmented_Deep_Net & net);
 
-    Deep_Net_Blender();
+    DNAE_Stack_Updates dnae, supervised;
 
-    virtual ~Deep_Net_Blender();
+    Augmented_Deep_Net_Updates &
+    operator += (const Augmented_Deep_Net_Updates & updates);
+};
 
-    virtual void configure(const ML::Configuration & config,
-                           const std::string & name,
-                           int random_seed,
-                           Target target);
-    
-    virtual void init(const Data & training_data,
-                      const ML::distribution<float> & example_weights);
+
+/*****************************************************************************/
+/* AUGMENTED_DEEP_NET                                                        */
+/*****************************************************************************/
+
+/** This is a neural network in the following architecture:
+
+                        models
+                       iiiiiiiiii
+                       oooooooooo
+                       oooooooooo
+                       oooooooooo
+           features      oooooo
+           iiiiiiii       oooo
+           oooooooo       oooo
+              oooooooooooooo
+                     o
+
+    There are two networks stuck together: a denoising autoencoder that is
+    used to model the data, and a supervised network that takes the reduced
+    representation from the denoising autoencoder and augments it with other
+    features.
+*/
+
+struct Augmented_Deep_Net {
+    Augmented_Deep_Net();
+
+    void init(const DNAE_Stack & dnae, int nfeatures,
+              int nhidden, int noutputs, Transfer_Function_Type transfer,
+              Thread_Context & context);
+
+    ML::DNAE_Stack dnae;
+    ML::DNAE_Stack supervised;
 
     float predict(const ML::distribution<float> & models,
                   const distribution<float> & features) const;
 
-    virtual float predict(const ML::distribution<float> & models) const;
-
-    virtual std::string explain(const ML::distribution<float> & models) const;
-
-    /* Add in some extra features to help the classifier along */
-    distribution<float>
-    get_extra_features(const distribution<float> & model_outputs,
-                       const distribution<float> & target_singular,
-                       const Target_Stats & stats) const;
-
+    void update(const Augmented_Deep_Net_Updates & updates,
+                double learning_rate);
 
     std::pair<double, double>
     train_example(const distribution<float> & model_outpus,
                   const distribution<float> & extra_features,
                   float label,
-                  ML::DNAE_Stack_Updates & dnae_updates,
-                  ML::DNAE_Stack_Updates & supervised_updates) const;
+                  Augmented_Deep_Net_Updates & updates) const;
 
     /** Trains a single iteration on the given data with the selected
         parameters.  Returns a moving estimate of the RMSE on the
@@ -80,14 +106,46 @@ struct Deep_Net_Blender : public Blender {
          ML::Thread_Context & thread_context,
          int verbosity);
 
+};
+
+}  // namespace ML
+
+
+/*****************************************************************************/
+/* DEEP_NET_BLENDER                                                          */
+/*****************************************************************************/
+
+struct Deep_Net_Blender : public Blender {
+
+    Deep_Net_Blender();
+
+    virtual ~Deep_Net_Blender();
+
+    virtual void configure(const ML::Configuration & config,
+                           const std::string & name,
+                           int random_seed,
+                           Target target);
+    
+    virtual void init(const Data & training_data,
+                      const ML::distribution<float> & example_weights);
+
+    virtual float predict(const ML::distribution<float> & models) const;
+
+    virtual std::string explain(const ML::distribution<float> & models) const;
+
+    /* Add in some extra features to help the classifier along */
+    distribution<float>
+    get_extra_features(const distribution<float> & model_outputs,
+                       const distribution<float> & target_singular,
+                       const Target_Stats & stats) const;
+
+    ML::Augmented_Deep_Net net;
+
     ML::Configuration config;
     std::vector<int> recomposition_sizes;
 
     std::string model_base;
     int random_seed;
-
-    ML::DNAE_Stack dnae_stack;
-    ML::DNAE_Stack supervised_stack;
 
     const Data * data;
 };
