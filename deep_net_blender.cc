@@ -453,13 +453,42 @@ calc_learning_rate(const std::vector<distribution<float> > & model_outputs,
                    const std::vector<distribution<float> > & features,
                    const std::vector<float> & labels) const
 {
+    // See http://videolectures.net/eml07_lecun_wia/ and the slides at
+    // http://carbon.videolectures.net/2007/pascal/eml07_whistler/lecun_yann/eml07_lecun_wia_01.pdf especially slide 48.
+
+    Augmented_Deep_Net_Updates eigenvector(*this);
+    eigenvector.random_fill();
+
+    int nx = model_outputs.size();
+
+    double alpha = 1e-5;
+
+    for (unsigned x = 0;  x < nx;  ++x) {
+
+        Augmented_Deep_Net_Updates example_updates(*this);
+        
+        train_example(model_outputs[x], features[x], labels[x],
+                      example_updates);
+
+        // Now present a perturbed example
+        Augmented_Deep_Net perturbed(*this);
+
+        perturbed.update(eigenvector, alpha / eigenvector.two_norm());
+
+        Augmented_Deep_Net_Updates perturbed_updates(*this);
+
+        perturbed.train_example(model_outputs[x], features[x], labels[x],
+                                perturbed_updates);
+
+        // Find the difference in the gradient
+
+        Augmented_Deep_Net_Updates difference
+            = (perturbed_updates - example_updates);
+
+        // ...
+    }
 }
 #endif
-
-
-
-
-
 
 }  // namespace ML
 

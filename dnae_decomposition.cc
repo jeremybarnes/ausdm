@@ -110,7 +110,7 @@ preprocess(const float * input,
            float * preprocessed) const
 {
     if (!use_dense_missing) Base::preprocess(input, preprocessed);
-    else Layer::preprocess(input, preprocessed);
+    else std::copy(input, input + inputs(), preprocessed);
 }
 
 void
@@ -119,7 +119,7 @@ preprocess(const double * input,
            double * preprocessed) const
 {
     if (!use_dense_missing) Base::preprocess(input, preprocessed);
-    else Layer::preprocess(input, preprocessed);
+    else std::copy(input, input + inputs(), preprocessed);
 }
 
 void

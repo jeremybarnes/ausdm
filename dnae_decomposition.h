@@ -51,7 +51,7 @@ struct Dense_Missing_Layer : public Dense_Layer<LFloat> {
     virtual void preprocess(const double * input,
                             double * preprocessed) const;
 
-    using Layer::preprocess;
+    using Base::preprocess;
 
     virtual void activation(const float * preprocessed,
                             float * activation) const;
@@ -59,7 +59,7 @@ struct Dense_Missing_Layer : public Dense_Layer<LFloat> {
     virtual void activation(const double * preprocessed,
                             double * activation) const;
 
-    using Layer::activation;
+    using Base::activation;
 
     virtual void random_fill(float limit, Thread_Context & context);
 
