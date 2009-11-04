@@ -14,7 +14,10 @@
 #include "boosting/classifier.h"
 #include "algebra/irls.h"
 #include "utils/filter_streams.h"
-#include "dnae_decomposition.h"
+#include "neural/layer_stack.h"
+#include "neural/dense_layer.h"
+#include "neural/twoway_layer.h"
+
 
 namespace ML {
 
@@ -30,7 +33,7 @@ struct Augmented_Deep_Net_Updates {
     Augmented_Deep_Net_Updates();
     Augmented_Deep_Net_Updates(const Augmented_Deep_Net & net);
 
-    DNAE_Stack_Updates dnae, supervised;
+    ML::Parameter_Storage<double> dnae, supervised;
 
     Augmented_Deep_Net_Updates &
     operator += (const Augmented_Deep_Net_Updates & updates);
@@ -63,12 +66,12 @@ struct Augmented_Deep_Net_Updates {
 struct Augmented_Deep_Net {
     Augmented_Deep_Net();
 
-    void init(const DNAE_Stack & dnae, int nfeatures,
+    void init(const Layer_Stack<ML::Twoway_Layer> & dnae, int nfeatures,
               int nhidden, int noutputs, Transfer_Function_Type transfer,
               Thread_Context & context);
 
-    ML::DNAE_Stack dnae;
-    ML::DNAE_Stack supervised;
+    ML::Layer_Stack<ML::Dense_Layer<float> > dnae;
+    ML::Layer_Stack<ML::Dense_Layer<float> > supervised;
 
     float predict(const ML::distribution<float> & models,
                   const distribution<float> & features) const;

@@ -12,6 +12,7 @@
 #include "utils/info.h"
 #include "utils/guard.h"
 #include "arch/timers.h"
+#include "dnae_decomposition.h"
 
 
 using namespace std;
@@ -31,7 +32,8 @@ Augmented_Deep_Net_Updates()
 
 Augmented_Deep_Net_Updates::
 Augmented_Deep_Net_Updates(const Augmented_Deep_Net & net)
-    : dnae(net.dnae), supervised(net.supervised)
+    : dnae(net.dnae),
+      supervised(net.supervised)
 {
 }
 
@@ -51,28 +53,26 @@ operator += (const Augmented_Deep_Net_Updates & updates)
 
 Augmented_Deep_Net::
 Augmented_Deep_Net()
+    : dnae("dnae"), supervised("supervised")
 {
 }
 
 void
 Augmented_Deep_Net::
-init(const DNAE_Stack & dnae, int nfeatures,
+init(const Layer_Stack<Twoway_Layer> & dnae, int nfeatures,
      int nhidden, int noutputs, Transfer_Function_Type transfer,
      Thread_Context & context)
 {
     this->dnae = dnae;
 
     // Create the combined model: hidden layer
-    Twoway_Layer hlayer(false, nfeatures + dnae.back().outputs(),
-                        nhidden, TF_TANH, context);
-
-    supervised.push_back(hlayer);
+    supervised.add(new Twoway_Layer("hidden", nfeatures + dnae.outputs(),
+                                    nhidden, TF_TANH, MV_NONE, context));
 
     // Output layer
-    Twoway_Layer olayer(false /* use_dense_missing */, nhidden /* inputs */,
-                        1 /* ousputs */, TF_TANH, context);
-
-    supervised.push_back(olayer);
+    supervised.add(new Twoway_Layer ("output", nhidden /* inputs */,
+                                     1 /* outputs */, TF_TANH, MV_NONE,
+                                     context));
 }
 
 float
@@ -93,6 +93,7 @@ Augmented_Deep_Net::
 update(const Augmented_Deep_Net_Updates & updates,
        double learning_rate)
 {
+    
     dnae.update(updates.dnae, learning_rate);
     supervised.update(updates.supervised, learning_rate);
 }
@@ -139,7 +140,7 @@ train_example(const distribution<float> & model_input,
     for (int i = supervised.size() - 1;  i >= 0;  --i) {
         supervised[i].backprop_example(sup_outputs[i + 1],
                                              derrors,
-                                             sup_outputs[i],
+                                       sup_outputs[i],
                                              new_derrors,
                                              updates.supervised[i]);
         derrors.swap(new_derrors);
