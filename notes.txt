@@ -948,11 +948,7 @@ Gini = 0.8770325990085
 AUC = 0.93851629950425
 
 Hmmm....
-
-
-
-
-./build/x86_64/bin/ausdm -t auc auc.type=deep_net model_base=auc_decomposed_8.bin niter=500 learning_rate=0.4 -o auc-dnae3.txt 2>&1 | tee auc-dnae3.log
+/x86_64/bin/ausdm -t auc auc.type=deep_net model_base=auc_decomposed_8.bin niter=500 learning_rate=0.4 -o auc-dnae3.txt 2>&1 | tee auc-dnae3.log
 
 
 Success
@@ -962,3 +958,94 @@ AUC = 0.93974557526406
 Still not where we would like to be...
 
 
+./build/x86_64/bin/ausdm -t auc auc.type=deep_net model_base=auc_decomposed_6.bin niter=500 learning_rate=1 -T 0.20 2>&1 | tee deep_net_with_features_2.log
+
+category UNKNOWN: count 0 avg error 0 baseline avg error 0 avg improvement 0
+category AUTO: count 1792 avg error 0.0249236 baseline avg error 0.0277302 avg improvement 0.00280663
+category POSS: count 1046 avg error 0.0768187 baseline avg error 0.080278 avg improvement 0.00345936
+category IMP: count 162 avg error 0.266806 baseline avg error 0.279722 avg improvement 0.0129163
+overall: count 3000 avg error 0.0560793 baseline avg error 0.0596595 avg improvement 0.00358014
+
+0.0561 +/-    nan
+
+Submission:
+
+Success
+Gini = 0.88096246860063
+AUC = 0.94048123430032
+
+---------
+
+Trying to merge two models together (to see what the difference is)
+
+./build/x86_64/bin/ausdm -t auc --decomposition SVD -o auc-gated-svd1.txt 2>&1 | tee auc-gated-svd1.log
+
+
+ ./build/x86_64/bin/ausdm -t auc --decomposition SVD -T 0.20 2>&1 | tee auc-gated-svd-test.log
+
+score: 0.0565  baseline: 0.0597  diff: -0.00317
+category UNKNOWN: count 0 avg error 0 baseline avg error 0 avg improvement 0
+category AUTO: count 1792 avg error 0.0245438 baseline avg error 0.0277302 avg improvement 0.00318641
+category POSS: count 1046 avg error 0.0777773 baseline avg error 0.080278 avg improvement 0.00250071
+category IMP: count 162 avg error 0.272456 baseline avg error 0.279722 avg improvement 0.0072664
+overall: count 3000 avg error 0.0564918 baseline avg error 0.0596595 avg improvement 0.00316765
+worst entries: 
+
+
+Merging the SVD gated model with the deep net model:
+
+First I normalize them both to have a unit standard deviation and zero mean, as their scales are not comparable.
+
+
+jeremy@jeremy-desktop:~/projects/ausdm$ cat auc-gated-svd1.txt | awk '{ total += $1; records += 1; } END { mean = total / records; print mean; }'
+333.61
+jeremy@jeremy-desktop:~/projects/ausdm$ cat auc-gated-svd1.txt | awk '{ val = $1 - 333.61; total += val * val; records += 1; } END { std = sqrt(total / records); print std; }'
+2522.77
+jeremy@jeremy-desktop:~/projects/ausdm$ cat auc-dn gated-svd1.txt | awk '{ val = $1 - 333.61; total += val * val; records += 1; } END { std = sqrt(total / records); print std; }'
+auc-dnae2.log       auc-dnae3.log       auc-dnae-deep4.txt
+auc-dnae2.txt       auc-dnae3.txt       auc-dnae.txt
+jeremy@jeremy-desktop:~/projects/ausdm$ cat auc-dnae-deep4.txt | awk '{ val = $1 - 333.61; total += val * val; records += 1; } END { std = sqrt(total / records); print std; }'
+813.696
+jeremy@jeremy-desktop:~/projects/ausdm$ cat auc-dnae-deep4.txt | awk '{ total += $1; records += 1; } END { mean = total / records; print mean; }'161.243
+jeremy@jeremy-desktop:~/projects/ausdm$ cat auc-dnae-deep4.txt | awk '{ val = $1 - 161.243; total += val * val; records += 1; } END { std = sqrt(total / records); print std; }'
+795.23
+
+jeremy@jeremy-desktop:~/projects/ausdm$ paste auc-gated-svd1.txt auc-dnae-deep4.txt  | awk '{ print (($1 - 333.61) / 2522.77) + (($2 - 161.243) / 795.23); }' | less
+jeremy@jeremy-desktop:~/projects/ausdm$ paste auc-gated-svd1.txt auc-dnae-deep4.txt  | awk '{ print (($1 - 333.61) / 2522.77) + (($2 - 161.243) / 795.23); }' > auc-merged-1-dnae-deep4-1-gated-svd1.txt
+
+Success
+Gini = 0.88192888649991
+AUC = 0.94096444324995
+
+So it appears that mixing is a good idea.
+
+
+
+------------
+
+Trying RMSE
+
+
+/usr/bin/time ./build/x86_64/bin/decompose niter=500 prob_cleared=0.1 -t rmse -T DNAE layer_sizes=250,150,100,50 minibatch_size=256 test_every=10 sample_proportion=0.8 minibatch_size=256 -o rmse_decomposed_6.bin 2>&1 | tee rmse_decomposed_6.log
+
+./build/x86_64/bin/ausdm -t rmse rmse.type=deep_net model_base=rmse_decomposed_6.bin niter=500 learning_rate=0.4 -o rmse-dnae2.txt 2>&1 | tee rmse-dnae2.log
+
+cat rmse-dnae2.txt | awk '{ print ($1 * 2) + 3000; }' > rmse-dnae2-scaled.txt
+
+
+Success - rmse = 879.86557192177
+
+
+
+-------------
+
+AUC-dnae3a.txt
+
+
+./build/x86_64/bin/ausdm -t auc auc.type=deep_net model_base=auc_decomposed_8.bin niter=500 learning_rate=0.4 -o auc-dnae3a.txt 2>&1 | tee auc-dnae3a.lo
+
+Re-trained, but with the different training routine
+
+Success
+Gini = 0.88030231837399
+AUC = 0.940151159187

@@ -17,6 +17,8 @@
 #include "utils/filter_streams.h"
 #include "boosting/classifier_generator.h"
 #include "decomposition.h"
+#include "utils.h"
+
 
 using namespace ML;
 using namespace ML::Stats;
@@ -51,6 +53,9 @@ configure(const ML::Configuration & config_,
     debug_predict = false;
     config.find(debug_predict, "debug_predict");
 
+    debug_conf = false;
+    config.find(debug_conf, "debug_conf");
+
     config.require(num_models_to_train, "num_models_to_train");
 
     config.find(dump_training_features, "dump_training_features");
@@ -65,171 +70,11 @@ configure(const ML::Configuration & config_,
     this->target = target;
 }
 
-template<class Float>
-distribution<Float>
-perform_irls(const distribution<Float> & correct,
-             const boost::multi_array<Float, 2> & outputs,
-             const distribution<Float> & w,
-             Link_Function link_function)
-{
-    int nx = correct.size();
-    int nv = outputs.shape()[0];
-
-    if (outputs.shape()[1] != nx)
-        throw Exception("wrong shape for outputs");
-
-    bool verify = false;
-    //verify = true;
-
-    distribution<Float> svalues1
-        (std::min(outputs.shape()[0], outputs.shape()[1]) + 1);
-
-    if (verify) {
-        boost::multi_array<Float, 2> outputs2 = outputs;
-
-        svalues1.push_back(0.0);
-
-        int result = LAPack::gesdd("N",
-                                   outputs2.shape()[1],
-                                   outputs2.shape()[0],
-                                   outputs2.data(), outputs2.shape()[1], 
-                                   &svalues1[0], 0, 1, 0, 1);
-    
-        if (result != 0)
-            throw Exception("error in SVD");
-    }
-    
-    boost::multi_array<Float, 2> outputs3 = outputs;
-
-    /* Factorize the matrix with partial pivoting.  This allows us to find the
-       largest number of linearly independent columns possible. */
-    
-    distribution<Float> tau(nv, 0.0);
-    distribution<int> permutations(nv, 0);
-    
-    int res = LAPack::geqp3(outputs3.shape()[1],
-                            outputs3.shape()[0],
-                            outputs3.data(), outputs3.shape()[1],
-                            &permutations[0],
-                            &tau[0]);
-    
-    if (res != 0)
-        throw Exception(format("geqp3: error in parameter %d", -res));
-
-    // Convert back to c indexes
-    permutations -= 1;
-
-    //cerr << "permutations = " << permutations << endl;
-    //cerr << "tau = " << tau << endl;
-
-    distribution<Float> diag(nv);
-    for (unsigned i = 0;  i < nv;  ++i)
-        diag[i] = outputs3[i][i];
-
-    //cerr << "diag = " << diag << endl;
-    
-    int nkeep = nv;
-    while (nkeep > 0 && fabs(diag[nkeep - 1]) < 0.01) --nkeep;
-    
-    //cerr << "keeping " << nkeep << " of " << nv << endl;
-    
-    vector<int> new_loc(nv, -1);
-    for (unsigned i = 0;  i < nkeep;  ++i)
-        new_loc[permutations[i]] = i;
-
-    boost::multi_array<Float, 2> outputs_reduced(boost::extents[nkeep][nx]);
-    for (unsigned i = 0;  i < nx;  ++i)
-        for (unsigned j = 0;  j < nv;  ++j)
-            if (new_loc[j] != -1)
-                outputs_reduced[new_loc[j]][i] = outputs[j][i];
-    
-    double svreduced = svalues1[nkeep - 1];
-
-    if (verify && svreduced < 0.001)
-        throw Exception("not all linearly dependent columns were removed");
-
-#if 0
-    cerr << "v.size() = " << w.size() << endl;
-    cerr << "correct.size() = " << correct.size() << endl;
-    cerr << "w.total() = " << w.total() << endl;
-
-    cerr << "outputs_reduced: " << outputs_reduced.shape()[0] << "x"
-         << outputs_reduced.shape()[1] << endl;
-#endif
-
-    Ridge_Regressor regressor(1e-5);
-
-    distribution<Float> trained
-        = run_irls(correct, outputs_reduced, w, link_function, regressor);
-
-    distribution<Float> parameters(nv);
-    for (unsigned v = 0;  v < nv;  ++v)
-        if (new_loc[v] != -1)
-            parameters[v] = trained[new_loc[v]];
-    
-
-    if (abs(parameters).max() > 1000.0) {
-
-        distribution<Float> svalues_reduced
-            (std::min(outputs_reduced.shape()[0],
-                      outputs_reduced.shape()[1]));
-        
-#if 0
-        filter_ostream out(format("good.model.%d.txt.gz", model));
-
-        out << "model " << model << endl;
-        out << "trained " << trained << endl;
-        out << "svalues_reduced " << svalues_reduced << endl;
-        out << "parameters " << parameters << endl;
-        out << "permuations " << permutations << endl;
-        out << "svalues1 " << svalues1 << endl;
-        out << "correct " << correct << endl;
-        out << "outputs_reduced: " << outputs_reduced.shape()[0] << "x"
-            << outputs_reduced.shape()[1] << endl;
-        
-        for (unsigned i = 0;  i < nx;  ++i) {
-            out << "example " << i << ": ";
-            for (unsigned j = 0;  j < nkeep;  ++j)
-                out << " " << outputs_reduced[j][i];
-            out << endl;
-        }
-#endif
-
-        int result = LAPack::gesdd("N", outputs_reduced.shape()[1],
-                                   outputs_reduced.shape()[0],
-                                   outputs_reduced.data(),
-                                   outputs_reduced.shape()[1], 
-                                   &svalues_reduced[0], 0, 1, 0, 1);
-
-        //cerr << "model = " << model << endl;
-        cerr << "trained = " << trained << endl;
-        cerr << "svalues_reduced = " << svalues_reduced << endl;
-
-        cerr << "parameters.two_norm() = " << parameters.two_norm()
-             << endl;
-
-        if (result != 0)
-            throw Exception("gesdd returned error");
-        
-        if (svalues_reduced.back() <= 0.001) {
-            throw Exception("didn't remove all linearly dependent");
-        }
-
-        // We reject this later
-        //if (abs(parameters).max() > 1000.0) {
-        //    throw Exception("IRLS returned inplausibly high weights");
-        //}
-        
-    }
-
-    //cerr << "irls returned parameters " << parameters << endl;
-
-    return parameters;
-}
-
 void
 Gated_Blender::
-train_conf(int model, const Data & training_data,
+train_conf(int model,
+           const Data & training_data,
+           const Data & testing_data,
            const ML::distribution<float> & example_weights)
 {
     // Generate a matrix with the predictions
@@ -271,9 +116,13 @@ train_conf(int model, const Data & training_data,
             // Try to predict the probability that it's within 0.5 either side
             // of the correct answer.  With our modified scale, this really
             // means predicting if it's within 0.25.
+            //correct[i]
+            //    = abs(training_data.models[model][i]
+            //          - training_data.targets[i]) <= 0.25;
+
+            // Try to predict the error directly
             correct[i]
-                = abs(training_data.models[model][i]
-                      - training_data.targets[i]) <= 0.25;
+                = training_data.targets[i] - training_data.models[model][i];
         }
 
         const distribution<float> & model_outputs
@@ -366,24 +215,108 @@ train_conf(int model, const Data & training_data,
                                           link_function);
 
         before[i] = training_data.models[model][i];
-        after[i] = result;
+
+        if (target == AUC)
+            after[i] = result;
+        else after[i] = before[i] + result;
+
+#if 0
+        cerr << "example " << i << ": pred " << training_data.models[model][i]
+             << " target " << training_data.targets[i] << " conf "
+             << result << " real " << correct[i] << " adjusted "
+             << (training_data.models[model][i] + result) << endl;
+#endif
     }
 
     //cerr << "before = " << before << endl;
 
-    float auc_before1 = before.calc_score(training_data.targets, target);
-    float auc_after1  = after.calc_score(training_data.targets, target);
-    float auc_before2 = before.calc_auc(correct.cast<float>() * 2.0f - 1.0f);
-    float auc_after2  = after.calc_auc(correct.cast<float>() * 2.0f - 1.0f);
+    float auc_before1
+        = before.calc_score(training_data.targets, target);
+    float auc_after1
+        = after.calc_score(training_data.targets, target);
+    float auc_before2 = 0.0;
+    float auc_after2  = 0.0;
+    
+    if (target == AUC) {
+        auc_before2 = before.calc_auc(correct.cast<float>() * 2.0f - 1.0f);
+        auc_after2 = after.calc_auc(correct.cast<float>() * 2.0f - 1.0f);
+    }
+
+    Model_Output test_before, test_after;
+    test_before.resize(testing_data.nx());
+    test_after.resize(testing_data.nx());
+    distribution<float> correct_test(testing_data.nx());
+
+    // Test the original model and the weighted version for AUC
+    for (unsigned i = 0;  i < testing_data.nx();  ++i) {
+
+
+
+        const distribution<float> & model_outputs
+            = testing_data.examples[i];
+        
+        const distribution<float> & target_singular
+            = testing_data.singular_targets[i];
+
+        distribution<float> features
+            = get_conf_features(model, model_outputs, target_singular,
+                                testing_data.target_stats[i]);
+
+        //cerr << "conf features: " << features << endl;
+
+        if (features.size() != nv)
+            throw Exception("nv is wrong");
+
+        if (target == AUC) {
+            float pred = testing_data.models[model][i];
+            float margin = pred * testing_data.targets[i];
+            
+            correct_test[i] = (margin >= 0.2) ? 1.0 : 0.0;
+        }
+        else correct_test[i]
+                 = testing_data.targets[i] - testing_data.models[model][i];
+
+        float result = apply_link_inverse(features.dotprod(parameters),
+                                          link_function);
+
+        test_before[i] = testing_data.models[model][i];
+
+        if (target == AUC)
+            test_after[i] = result;
+        else test_after[i] = test_before[i] + result;
+
+#if 0
+        cerr << "example " << i << ": pred " << testing_data.models[model][i]
+             << " target " << testing_data.targets[i] << " conf "
+             << result << " real " << correct_test[i] << " adjusted "
+             << (testing_data.models[model][i] + result) << endl;
+#endif
+    }
+
+    //cerr << "before = " << before << endl;
+
+    float test_auc_before1
+        = test_before.calc_score(testing_data.targets, target);
+    float test_auc_after1
+        = test_after.calc_score(testing_data.targets, target);
+    float test_auc_before2 = 0.0;
+    float test_auc_after2  = 0.0;
+    
+    if (target == AUC) {
+        test_auc_before2 = test_before.calc_auc(correct_test);
+        test_auc_after2 = test_after.calc_auc(correct_test);
+    }
 
     static Lock lock;
     Guard guard(lock);
     
     cerr << "model " << model
          << ": before " << auc_before1 << "/" << auc_before2
-         << " after " << auc_after1 << "/" << auc_after2 << endl;
+         << " after " << auc_after1 << "/" << auc_after2
+         << " test: before " << test_auc_before1 << "/" << test_auc_before2
+         << " after " << test_auc_after1 << "/" << test_auc_after2 << endl;
 
-    if (auc_after2 < 0.01) {
+    if (auc_after2 < 0.01 && target == AUC) {
         cerr << "error on auc_after2" << endl;
         //cerr << "new_loc = " << new_loc << endl;
         cerr << "parameters = " << parameters << endl;
@@ -519,7 +452,9 @@ init(const Data & training_data_in,
                 continue;
 
             worker.add(boost::bind(&Gated_Blender::train_conf,
-                                   this, i, boost::cref(conf_training_data),
+                                   this, i,
+                                   boost::cref(conf_training_data),
+                                   boost::cref(blend_training_data),
                                    boost::cref(conf_example_weights)),
                        "train model job",
                        group);
@@ -979,6 +914,18 @@ predict(const ML::distribution<float> & models) const
     distribution<float> conf = this->conf(models, target_singular,
                                           target_stats);
     
+    if (target == RMSE) {
+        distribution<float> adjusted;
+
+        for (unsigned i = 0;  i < nm;  ++i) {
+            if (conf[i] == 0.0) continue;
+            adjusted.push_back(models[i] - conf[i]);
+        }
+
+        return adjusted.mean();
+    }
+
+
     //float result = models.dotprod(conf) / conf.total();
 
     //float result = conf.total() * 0.1 * 4.0 + 1.0;
@@ -1023,14 +970,14 @@ predict(const ML::distribution<float> & models) const
     if (debug) cerr << "result before scaling = "
                     << result << endl;
 
+    if (debug) cerr << "result = " << result << " correct = "
+                    << correct_prediction << endl;
+
     if (target == RMSE) {
         //result = result * 2.5 + 3.0;
         if (result < -1.0) result = -1.0;
         if (result >  1.0) result = 1.0;
     }
-
-    if (debug) cerr << "result = " << result << " correct = "
-                    << correct_prediction << endl;
 
     return result;
 }

@@ -28,6 +28,7 @@
 #include <boost/program_options/variables_map.hpp>
 
 #include "dnae_decomposition.h"
+#include "neural/dnae.h"
 
 
 using namespace std;
@@ -90,20 +91,22 @@ int main(int argc, char ** argv)
     for (int i = -800;  i <= 800;  ++i)
         data.push_back(distribution<float>(1, i / 1000.0));
 
-    DNAE_Stack stack;
+    Layer_Stack<Twoway_Layer> stack("stack");
     
     Thread_Context context;
 
-    stack.train_dnae(data, data, config, context);
+    train_dnae(stack, data, data, config, context);
 
     cerr << stack[0].print() << endl;
 
     filter_ostream out("data.txt");
 
+#if 0
     for (unsigned i = 0;  i < data.size();  ++i) {
         float output = stack.iapply(stack.apply(data[i]))[0];
         out << format("%6.3f %8.5f %8.5f", data[i][0],
                       output, data[i][0] - output)
             << endl;
     }
+#endif
 }

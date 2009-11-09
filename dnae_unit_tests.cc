@@ -82,6 +82,8 @@ void test_serialize_reconstitute(const X & x)
     BOOST_CHECK_EQUAL(s, "END");
 }
 
+#if 0
+
 BOOST_AUTO_TEST_CASE( test_serialize_reconstitute_dense_layer )
 {
     Thread_Context context;
@@ -89,7 +91,6 @@ BOOST_AUTO_TEST_CASE( test_serialize_reconstitute_dense_layer )
     test_serialize_reconstitute(layer);
 }
 
-#if 0
 
 BOOST_AUTO_TEST_CASE( test_serialize_reconstitute_dense_missing_layer_1 )
 {

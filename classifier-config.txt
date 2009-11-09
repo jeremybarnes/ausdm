@@ -151,7 +151,7 @@ glz2 {
 
 bglz2 {
     type=bagging;
-    num_bags=100;
+    num_bags=1;
     weak_learner : glz2 {
     }
 }

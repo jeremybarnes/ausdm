@@ -49,7 +49,9 @@ struct Gated_Blender : public Blender {
 
     virtual std::string explain(const ML::distribution<float> & models) const;
 
-    void train_conf(int model, const Data & training_data,
+    void train_conf(int model,
+                    const Data & training_data,
+                    const Data & testing_data,
                     const ML::distribution<float> & example_weights);
 
     distribution<float>
@@ -66,6 +68,7 @@ struct Gated_Blender : public Blender {
 
     ML::Link_Function link_function;
     int num_models_to_train;
+    bool debug_conf;
     bool debug_predict;
 
     std::vector<int> recomposition_sizes;
