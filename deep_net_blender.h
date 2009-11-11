@@ -33,7 +33,7 @@ struct Augmented_Deep_Net_Updates {
     Augmented_Deep_Net_Updates();
     Augmented_Deep_Net_Updates(const Augmented_Deep_Net & net);
 
-    ML::Parameter_Storage<double> dnae, supervised;
+    ML::Parameters_Copy<double> dnae, supervised;
 
     Augmented_Deep_Net_Updates &
     operator += (const Augmented_Deep_Net_Updates & updates);

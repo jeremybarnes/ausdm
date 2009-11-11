@@ -21,8 +21,6 @@
 
 
 using namespace ML;
-using namespace ML::Stats;
-using ML::Stats::sqr;
 using namespace std;
 
 

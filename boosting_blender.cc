@@ -13,7 +13,6 @@
 
 
 using namespace ML;
-using namespace ML::Stats;
 using namespace std;
 
 

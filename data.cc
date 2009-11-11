@@ -18,11 +18,11 @@
 #include "boosting/worker_task.h"
 #include "utils/guard.h"
 #include <boost/bind.hpp>
-
+#include "stats/rmse.h"
+#include "stats/auc.h"
 
 using namespace std;
 using namespace ML;
-using ML::Stats::sqr;
 
 
 /*****************************************************************************/
@@ -108,13 +108,7 @@ double
 Model_Output::
 calc_rmse(const distribution<float> & targets) const
 {
-    if (targets.size() != size())
-        throw Exception("targets and predictions don't match");
-
-    //cerr << "targets[0] = " << targets[0] << endl;
-    //cerr << "this[0] = " << (*this)[0] << endl;
-
-    return sqrt(sqr((targets - *this) * 2.0).total() * (1.0 / size()));
+    return ML::calc_rmse(*this, targets);
 }
 
 double
@@ -122,114 +116,14 @@ Model_Output::
 calc_rmse(const distribution<float> & targets,
           const distribution<float> & weights) const
 {
-    if (targets.size() != size())
-        throw Exception("targets and predictions don't match");
-
-    if (weights.size() != size())
-        throw Exception("weights and predictions don't match");
-
-    return sqrt((sqr((targets - *this) * 2.0) * weights).total() / weights.total());
+    return ML::calc_rmse(*this, targets, weights);
 }
-
-
-namespace {
-        
-struct AUC_Entry {
-    AUC_Entry(float model = 0.0, float target = 0.0, float weight = 1.0)
-        : model(model), target(target), weight(weight)
-    {
-    }
-
-    float model;
-    float target;
-    float weight;
-
-    bool operator < (const AUC_Entry & other) const
-    {
-        return model < other.model;
-    }
-};
-
-double do_calc_auc(std::vector<AUC_Entry> & entries)
-{
-    // 1.  Total number of positive and negative
-    int num_neg = 0, num_pos = 0;
-
-    for (unsigned i = 0;  i < entries.size();  ++i) {
-        if (entries[i].weight == 0.0) continue;
-        if (entries[i].target == -1) ++num_neg;
-        else ++num_pos;
-    }
-
-    // 2.  Sort
-    std::sort(entries.begin(), entries.end());
-    
-    // 3.  Get (x,y) points and calculate the AUC
-    int total_pos = 0, total_neg = 0;
-
-    float prevx = 0.0, prevy = 0.0;
-
-    double total_area = 0.0, total_weight = 0.0, current_weight = 0.0;
-
-    for (unsigned i = 0;  i < entries.size();  ++i) {
-        if (entries[i].weight > 0.0) {
-            if (entries[i].target == -1) ++total_neg;
-            else ++total_pos;
-        }
-        
-        current_weight += entries[i].weight;
-        total_weight += entries[i].weight;
-
-        if (i != entries.size() - 1
-            && entries[i].model == entries[i + 1].model)
-            continue;
-        
-        if (entries[i].weight == 0.0) continue;
-
-        float x = total_pos * 1.0 / num_pos;
-        float y = total_neg * 1.0 / num_neg;
-
-        double area = (x - prevx) * (y + prevy) * 0.5;
-
-        total_area += /* current_weight * */ area;
-
-        prevx = x;
-        prevy = y;
-        current_weight = 0.0;
-    }
-
-    // TODO: get weighted working properly...
-
-    //cerr << "total_area = " << total_area << " total_weight = "
-    //     << total_weight << endl;
-
-    if (total_pos != num_pos || total_neg != num_neg)
-        throw Exception("bad total pos or total neg");
-
-    // 4.  Convert to gini
-    //double gini = 2.0 * (total_area - 0.5);
-
-    // 5.  Final score is absolute value.  Since we want an error, we take
-    //     1.0 - the gini
-    //return 1.0 - fabs(gini);
-    return 1.0 - total_area;
-}
-
-} // file scope
 
 double
 Model_Output::
 calc_auc(const distribution<float> & targets) const
 {
-    if (targets.size() != size())
-        throw Exception("targets and predictions don't match");
-    
-    vector<AUC_Entry> entries;
-    entries.reserve(size());
-    for (unsigned i = 0;  i < size();  ++i)
-        entries.push_back(AUC_Entry((*this)[i], targets[i]));
-    
-    return do_calc_auc(entries);
+    return ML::calc_auc(*this, targets, 1.0, -1.0);
 }
 
 double
@@ -237,23 +131,13 @@ Model_Output::
 calc_auc(const distribution<float> & targets,
          const distribution<float> & weights) const
 {
-    if (targets.size() != size())
-        throw Exception("targets and predictions don't match");
-    if (weights.size() != size())
-        throw Exception("targets and weights don't match");
-    
-    vector<AUC_Entry> entries;
-    entries.reserve(size());
-    for (unsigned i = 0;  i < size();  ++i)
-        entries.push_back(AUC_Entry((*this)[i], targets[i], weights[i]));
-    
-    return do_calc_auc(entries);
+    return ML::calc_auc(*this, targets, weights, 1.0, -1.0);
 }
 
 double
 Model_Output::
 calc_score(const distribution<float> & targets,
-         Target target) const
+           Target target) const
 {
     if (target == AUC) return calc_auc(targets);
     else if (target == RMSE) return calc_rmse(targets);

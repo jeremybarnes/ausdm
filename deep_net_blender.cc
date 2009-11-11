@@ -41,8 +41,8 @@ Augmented_Deep_Net_Updates &
 Augmented_Deep_Net_Updates::
 operator += (const Augmented_Deep_Net_Updates & updates)
 {
-    dnae += updates.dnae;
-    supervised += updates.supervised;
+    dnae.values += updates.dnae.values;
+    supervised.values += updates.supervised.values;
     return *this;
 }
 
@@ -94,8 +94,8 @@ update(const Augmented_Deep_Net_Updates & updates,
        double learning_rate)
 {
     
-    dnae.parameters()->update(updates.dnae, learning_rate);
-    supervised.parameters()->update(updates.supervised, learning_rate);
+    dnae.parameters().update(updates.dnae, learning_rate);
+    supervised.parameters().update(updates.supervised, learning_rate);
 }
 
 std::pair<double, double>
@@ -134,12 +134,16 @@ train_example(const distribution<float> & model_input,
 
     /* bprop */
 
-    supervised.bprop(derrors, supervised_tmp, supervised_space_required,
-                     updates.supervised, new_derrors, 1.0,
-                     true /* calculate_input_errors */);
+    new_derrors
+        = supervised.bprop(sup_input, output,
+                           supervised_tmp, supervised_space_required,
+                           derrors, updates.supervised, 1.0);
     
-    dnae.bprop(new_derrors, dnae_tmp, dnae_space_required, updates.dnae,
-               new_derrors, 1.0, false /* calculate_input_errors */);
+    new_derrors.resize(dnae.outputs());
+
+    dnae.bprop(model_input.cast<double>(), dnae_output,
+               dnae_tmp, dnae_space_required,
+               new_derrors, updates.dnae, 1.0);
 
     return make_pair(sqrt(error), output[0]);
 }

@@ -39,7 +39,7 @@
 
 using namespace std;
 using namespace ML;
-using namespace ML::Stats;
+
 
 struct Predict_Job {
     Model_Output & result;
@@ -578,8 +578,8 @@ int main(int argc, char ** argv)
     }
 
     if (hold_out_data > 0.0) {
-        double mean = Stats::mean(trial_scores.begin(), trial_scores.end());
-        double std = Stats::std_dev(trial_scores.begin(), trial_scores.end(),
+        double mean = ML::mean(trial_scores.begin(), trial_scores.end());
+        double std = ML::std_dev(trial_scores.begin(), trial_scores.end(),
                                     mean);
         
         cout << "scores: " << trial_scores << endl;

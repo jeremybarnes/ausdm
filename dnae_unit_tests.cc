@@ -25,7 +25,6 @@
 
 using namespace ML;
 using namespace ML::DB;
-using namespace ML::Stats;
 using namespace std;
 
 using boost::unit_test::test_suite;
