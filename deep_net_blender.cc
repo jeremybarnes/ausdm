@@ -41,8 +41,8 @@ Augmented_Deep_Net_Updates &
 Augmented_Deep_Net_Updates::
 operator += (const Augmented_Deep_Net_Updates & updates)
 {
-    dnae += updates.dnae;
-    supervised += updates.supervised;
+    dnae.values += updates.dnae.values;
+    supervised.values += updates.supervised.values;
     return *this;
 }
 
@@ -94,8 +94,8 @@ update(const Augmented_Deep_Net_Updates & updates,
        double learning_rate)
 {
     
-    dnae.update(updates.dnae, learning_rate);
-    supervised.update(updates.supervised, learning_rate);
+    dnae.parameters().update(updates.dnae, learning_rate);
+    supervised.parameters().update(updates.supervised, learning_rate);
 }
 
 std::pair<double, double>
@@ -105,62 +105,54 @@ train_example(const distribution<float> & model_input,
               float label,
               Augmented_Deep_Net_Updates & updates) const
 {
-    /* fprop */
-
-    vector<distribution<double> > dnae_outputs(dnae.size() + 1);
-    dnae_outputs[0] = model_input;
-
-    for (unsigned i = 0;  i < dnae.size();  ++i) {
-        //cerr << "dnae " << i << ": inputs " << dnae_outputs[i].size()
-        //     << " expected: " << dnae[i].inputs() << endl;
-        dnae_outputs[i + 1] = dnae[i].apply(dnae_outputs[i]);
-    }
-
-    vector<distribution<double> > sup_outputs(supervised.size() + 1);
-    sup_outputs[0] = dnae_outputs.back();
-    sup_outputs[0].insert(sup_outputs[0].end(),
-                          extra_features.begin(),
-                          extra_features.end());
-
-    for (unsigned i = 0;  i < supervised.size();  ++i) {
-        //cerr << "supervised " << i << ": inputs " << sup_outputs[i].size()
-        //     << " expected: " << supervised[i].inputs() << endl;
-        sup_outputs[i + 1] = supervised[i].apply(sup_outputs[i]);
-    }
+    /* fprop - dnae */
     
+    size_t dnae_temp_space_required
+        = dnae.fprop_temporary_space_required();
+
+    float dnae_temp_space[dnae_temp_space_required];
+
+    distribution<float> dnae_inputs = model_input;
+    distribution<float> dnae_outputs
+        = dnae.fprop(dnae_inputs, dnae_temp_space, dnae_temp_space_required);
+
+    /* fprop - supervised */
+    distribution<float> sup_inputs = dnae_outputs;
+    sup_inputs.extend(extra_features);
     
+    size_t sup_temp_space_required
+        = supervised.fprop_temporary_space_required();
+
+    float sup_temp_space[sup_temp_space_required];
+
+    distribution<float> sup_outputs
+        = supervised.fprop(sup_inputs, sup_temp_space, sup_temp_space_required);
 
     /* errors */
-    distribution<double> errors = ((0.8 * label) - sup_outputs.back());
+    distribution<float> errors = ((0.8 * label) - sup_outputs);
     double error = errors.dotprod(errors);
-    distribution<double> derrors = -2.0 * errors;
-    distribution<double> new_derrors;
+    distribution<float> sup_derrors = -2.0 * errors;
+    distribution<float> dnae_derrors;
 
-    /* bprop */
-    for (int i = supervised.size() - 1;  i >= 0;  --i) {
-        supervised[i].backprop_example(sup_outputs[i + 1],
-                                             derrors,
-                                       sup_outputs[i],
-                                             new_derrors,
-                                             updates.supervised[i]);
-        derrors.swap(new_derrors);
-    }
+    /* bprop - supervised */
+
+    supervised.bprop(sup_derrors,
+                     sup_temp_space, sup_temp_space_required,
+                     updates.supervised,
+                     dnae_derrors, 1.0, true /* calculate_input_errors */);
 
     /* Take the errors for the part of the dnae stack */
+    dnae_derrors.resize(dnae.outputs());
 
-    derrors.resize(dnae_outputs.back().size());
+    distribution<float> input_derrors;
 
-    for (int i = dnae.size() - 1;  i >= 0;  --i) {
+    /* bprop - dnae */
+    dnae.bprop(dnae_derrors,
+               dnae_temp_space, dnae_temp_space_required,
+               updates.dnae,
+               input_derrors, 1.0, false /* calculate_input_errors */);
 
-        dnae[i].backprop_example(dnae_outputs[i + 1],
-                                       derrors,
-                                       dnae_outputs[i],
-                                       new_derrors,
-                                       updates.dnae[i]);
-        derrors.swap(new_derrors);
-    }
-
-    return make_pair(sqrt(error), sup_outputs.back()[0]);
+    return make_pair(sqrt(error), sup_outputs[0]);
 }
 
 struct Train_Deep_Net_Examples_Job {

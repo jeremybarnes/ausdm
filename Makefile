@@ -43,11 +43,11 @@ $(eval $(call library,ausdm,$(LIBAUSDM_SOURCES),$(LIBAUSDM_LINK)))
 
 $(eval $(call add_sources,exception_hook.cc))
 
-$(eval $(call program,ausdm,ausdm utils ACE boost_program_options-mt db arch boosting,ausdm.cc exception_hook.cc,tools))
+$(eval $(call program,ausdm,ausdm utils ACE boost_program_options-mt db arch boosting neural,ausdm.cc exception_hook.cc,tools))
 
-$(eval $(call program,decompose,ausdm utils ACE boost_program_options-mt db arch boosting,decompose.cc exception_hook.cc,tools))
+$(eval $(call program,decompose,ausdm utils ACE boost_program_options-mt db arch boosting neural,decompose.cc exception_hook.cc,tools))
 
-$(eval $(call program,dnae_decomposition_test,ausdm utils ACE boost_program_options-mt db arch boosting,dnae_decomposition_test.cc exception_hook.cc,tools))
+$(eval $(call program,dnae_decomposition_test,ausdm utils ACE boost_program_options-mt db arch boosting neural,dnae_decomposition_test.cc exception_hook.cc,tools))
 
 $(eval $(call test,dnae_unit_tests,ausdm,boost))
 
