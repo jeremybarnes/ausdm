@@ -28,8 +28,8 @@
 #include <boost/program_options/variables_map.hpp>
 
 #include "dnae_decomposition.h"
-#include "neural/dnae.h"
-
+#include "neural/auto_encoder_trainer.h"
+#include "neural/twoway_layer.h"
 
 using namespace std;
 using namespace ML;
@@ -91,12 +91,15 @@ int main(int argc, char ** argv)
     for (int i = -800;  i <= 800;  ++i)
         data.push_back(distribution<float>(1, i / 1000.0));
 
-    Layer_Stack<Twoway_Layer> stack("stack");
-    
+    Auto_Encoder_Stack stack("stack");
+
     Thread_Context context;
 
-    DNAE_Trainer trainer;
-    trainer.train(stack, data, data, config, context);
+    stack.add(new Twoway_Layer("layer", 1, 1, TF_TANH, MV_DENSE, context));
+    
+    Auto_Encoder_Trainer trainer;
+    trainer.configure("", config);
+    trainer.train_stack(stack, data, data, context);
 
     cerr << stack[0].print() << endl;
 

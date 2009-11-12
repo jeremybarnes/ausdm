@@ -33,7 +33,8 @@
 
 #include <limits>
 
-#include "neural/dnae.h"
+#include "neural/auto_encoder_trainer.h"
+#include "neural/twoway_layer.h"
 
 
 using namespace std;
@@ -169,8 +170,31 @@ train(const Data & training_data,
     for (unsigned x = 0;  x < nxt;  ++x)
         layer_test[x] = 0.8f * testing_data.examples[x];
 
-    DNAE_Trainer trainer;
-    trainer.train(stack, layer_train, layer_test, config, thread_context);
+
+    vector<int> layer_sizes
+        = boost::assign::list_of<int>(250)(150)(100)(50);
+
+    config.get(layer_sizes, "layer_sizes");
+
+    Transfer_Function_Type transfer_function = TF_TANH;
+
+    config.get(transfer_function, "transfer_function");
+
+    stack.clear();
+
+    for (unsigned i = 0;  i < layer_sizes.size();  ++i) {
+        int ni = (i == 0 ? layer_train[0].size() : layer_sizes[i - 1]);
+        int no = layer_sizes[i];
+
+        stack.add(new Twoway_Layer(format("dnae%d", i),
+                                   ni, no, transfer_function,
+                                   MV_DENSE, thread_context));
+    }
+
+
+    Auto_Encoder_Trainer trainer;
+    trainer.configure("", config);
+    trainer.train(stack, layer_train, layer_test, thread_context);
 }
 
 namespace {

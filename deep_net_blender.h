@@ -23,6 +23,7 @@ namespace ML {
 
 
 struct Augmented_Deep_Net;
+struct Auto_Encoder_Stack;
 
 
 /*****************************************************************************/
@@ -66,7 +67,7 @@ struct Augmented_Deep_Net_Updates {
 struct Augmented_Deep_Net {
     Augmented_Deep_Net();
 
-    void init(const Layer_Stack<ML::Twoway_Layer> & dnae, int nfeatures,
+    void init(const ML::Auto_Encoder_Stack & dnae, int nfeatures,
               int nhidden, int noutputs, Transfer_Function_Type transfer,
               Thread_Context & context);
 

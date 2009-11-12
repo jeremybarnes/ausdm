@@ -10,8 +10,7 @@
 
 
 #include "decomposition.h"
-#include "neural/twoway_layer.h"
-#include "neural/layer_stack.h"
+#include "neural/auto_encoder_stack.h"
 #include "arch/threads.h"
 
 
@@ -35,8 +34,8 @@ struct DNAE_Decomposition : public Decomposition {
 
     DNAE_Decomposition();
 
-    /// The neural network stack that implements the decomposition
-    ML::Layer_Stack<ML::Twoway_Layer> stack;
+    /// The auto-encoder stack that implements the decomposition
+    ML::Auto_Encoder_Stack stack;
 
     /// Apply the decomposition, returning the decomposed element
     virtual distribution<float>
@@ -62,9 +61,5 @@ struct DNAE_Decomposition : public Decomposition {
 
     bool operator == (const DNAE_Decomposition & other) const;
 };
-
-
-
-
 
 #endif /* __ausdm__dnaw_decomposition_h__ */

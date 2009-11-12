@@ -129,3 +129,7 @@ BOOST_AUTO_TEST_CASE( test_serialize_reconstitute_stack_1 )
 #endif
 
 #endif
+
+BOOST_AUTO_TEST_CASE( test1 )
+{
+}

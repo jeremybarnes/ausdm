@@ -59,20 +59,20 @@ Augmented_Deep_Net()
 
 void
 Augmented_Deep_Net::
-init(const Layer_Stack<Twoway_Layer> & dnae, int nfeatures,
+init(const Auto_Encoder_Stack & dnae, int nfeatures,
      int nhidden, int noutputs, Transfer_Function_Type transfer,
      Thread_Context & context)
 {
     this->dnae = dnae;
 
     // Create the combined model: hidden layer
-    supervised.add(new Twoway_Layer("hidden", nfeatures + dnae.outputs(),
-                                    nhidden, TF_TANH, MV_NONE, context));
+    supervised.add(new Dense_Layer<float>("hidden", nfeatures + dnae.outputs(),
+                                          nhidden, TF_TANH, MV_NONE, context));
 
     // Output layer
-    supervised.add(new Twoway_Layer ("output", nhidden /* inputs */,
-                                     1 /* outputs */, TF_TANH, MV_NONE,
-                                     context));
+    supervised.add(new Dense_Layer<float>("output", nhidden /* inputs */,
+                                          1 /* outputs */, TF_TANH, MV_NONE,
+                                          context));
 }
 
 float
@@ -128,33 +128,29 @@ train_example(const distribution<float> & model_input,
     distribution<float> sup_outputs
         = supervised.fprop(sup_inputs, sup_temp_space, sup_temp_space_required);
 
-    distribution<double> output
-        = supervised.fprop(sup_input, supervised_tmp,
-                           supervised_space_required);
-    
     /* errors */
     distribution<float> errors = ((0.8 * label) - sup_outputs);
     double error = errors.dotprod(errors);
     distribution<float> sup_derrors = -2.0 * errors;
-    distribution<float> dnae_derrors;
 
     /* bprop - supervised */
-
-    supervised.bprop(sup_derrors,
-                     sup_temp_space, sup_temp_space_required,
-                     updates.supervised,
-                     dnae_derrors, 1.0, true /* calculate_input_errors */);
+    distribution<float> dnae_derrors
+        = supervised.bprop(sup_inputs,
+                           sup_outputs,
+                           sup_temp_space, sup_temp_space_required,
+                           sup_derrors,
+                           updates.supervised,
+                           1.0);
 
     /* Take the errors for the part of the dnae stack */
     dnae_derrors.resize(dnae.outputs());
 
-    distribution<float> input_derrors;
-
     /* bprop - dnae */
-    dnae.bprop(dnae_derrors,
+    dnae.bprop(dnae_inputs, dnae_outputs,
                dnae_temp_space, dnae_temp_space_required,
+               dnae_derrors,
                updates.dnae,
-               input_derrors, 1.0, false /* calculate_input_errors */);
+               1.0);
 
     return make_pair(sqrt(error), sup_outputs[0]);
 }
