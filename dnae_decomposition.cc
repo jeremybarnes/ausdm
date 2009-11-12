@@ -59,16 +59,17 @@ void calc_W_updates(float k1, const float * x, float k2, const float * y,
     return SIMD::vec_k1_x_plus_k2_y_z(k1, x, k2, y, z, r, n);
 }
 
-
-
-
-
 } // namespace ML
 
 
 /*****************************************************************************/
 /* DNAE_DECOMPOSITION                                                        */
 /*****************************************************************************/
+
+DNAE_Decomposition::
+DNAE_Decomposition()
+{
+}
 
 distribution<float>
 DNAE_Decomposition::
@@ -168,7 +169,8 @@ train(const Data & training_data,
     for (unsigned x = 0;  x < nxt;  ++x)
         layer_test[x] = 0.8f * testing_data.examples[x];
 
-    train_dnae(stack, layer_train, layer_test, config, thread_context);
+    DNAE_Trainer trainer;
+    trainer.train(stack, layer_train, layer_test, config, thread_context);
 }
 
 namespace {

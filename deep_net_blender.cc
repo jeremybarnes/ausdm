@@ -128,6 +128,10 @@ train_example(const distribution<float> & model_input,
     distribution<float> sup_outputs
         = supervised.fprop(sup_inputs, sup_temp_space, sup_temp_space_required);
 
+    distribution<double> output
+        = supervised.fprop(sup_input, supervised_tmp,
+                           supervised_space_required);
+    
     /* errors */
     distribution<float> errors = ((0.8 * label) - sup_outputs);
     double error = errors.dotprod(errors);
