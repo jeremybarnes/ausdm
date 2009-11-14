@@ -164,12 +164,34 @@ train(const Data & training_data,
 
     vector<distribution<float> > layer_train(nx), layer_test(nxt);
 
-    for (unsigned x = 0;  x < nx;  ++x)
-        layer_train[x] = 0.8f * training_data.examples[x];
+    // Condition by removing the mean and using unit standard deviation
+    distribution<double> means(training_data.examples.at(0).size());
 
-    for (unsigned x = 0;  x < nxt;  ++x)
-        layer_test[x] = 0.8f * testing_data.examples[x];
+    for (unsigned x = 0;  x < nx;  ++x) {
+        means += training_data.examples[x] / nx;
+    }
 
+    distribution<double> stds(means.size());
+    for (unsigned x = 0;  x < nx;  ++x) {
+        stds += sqr(training_data.examples[x] - means) / nx;
+    }
+
+    stds = sqrt(stds);
+
+    cerr << "means = " << means << endl;
+    cerr << "stds  = " << stds << endl;
+
+    for (unsigned x = 0;  x < nx;  ++x) {
+        //layer_train[x] = 0.8f * training_data.examples[x];
+        //layer_train[x] = (training_data.examples[x] - means) * (0.8 / stds);
+        layer_train[x] = (training_data.examples[x] - means) * (0.8);
+    }
+
+    for (unsigned x = 0;  x < nxt;  ++x) {
+        //layer_test[x] = 0.8f * testing_data.examples[x];
+        //layer_test[x] = (testing_data.examples[x] - means) * (0.8 / stds);
+        layer_test[x] = (testing_data.examples[x] - means) * (0.8);
+    }
 
     vector<int> layer_sizes
         = boost::assign::list_of<int>(250)(150)(100)(50);
@@ -194,7 +216,7 @@ train(const Data & training_data,
 
     Auto_Encoder_Trainer trainer;
     trainer.configure("", config);
-    trainer.train(stack, layer_train, layer_test, thread_context);
+    trainer.train_stack(stack, layer_train, layer_test, thread_context);
 }
 
 namespace {
