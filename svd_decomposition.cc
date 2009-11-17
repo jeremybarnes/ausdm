@@ -39,22 +39,22 @@ train(const Data & training_data,
 
     if (training_data.examples.empty()) return;
 
-    train(training_data.examples, order);
+    train(training_data, order);
 }
 
 void
 SVD_Decomposition::
-train(const std::vector<distribution<float> > & data,
+train(const Data & data,
       int order)
 {
-    nm = data[0].size();
-    nx = data.size();
+    nm = data.nm();
+    nx = data.nx();
         
     boost::multi_array<float, 2> values(boost::extents[nx][nm]);
         
     for (unsigned j = 0;  j < nx;  ++j)
         for (unsigned i = 0;  i < nm;  ++i)
-            values[j][i] = data[j][i];
+            values[j][i] = data.examples[j]->models[i];
         
     nvalues = std::min(nm, nx);
         

@@ -57,6 +57,9 @@ struct Decomposition {
     virtual void train(const Data & training_data,
                        const Data & testing_data,
                        const ML::Configuration & config) = 0;
+
+    /** The dimensionality of the decomposition */
+    virtual size_t size() const = 0;
 };
 
 

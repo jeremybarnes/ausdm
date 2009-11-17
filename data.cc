@@ -20,6 +20,8 @@
 #include <boost/bind.hpp>
 #include "stats/rmse.h"
 #include "stats/auc.h"
+#include "utils/filter_streams.h"
+
 
 using namespace std;
 using namespace ML;
@@ -170,7 +172,8 @@ load(const std::string & filename, Target target, bool clear_first)
 
     this->target = target;
 
-    Parse_Context c(filename);
+    filter_istream stream(filename);
+    Parse_Context c(filename, stream);
 
     // First row: header.
     c.expect_literal("RowID,Target");
@@ -196,20 +199,15 @@ load(const std::string & filename, Target target, bool clear_first)
     
     if (clear_first) {
         models.resize(model_names.size());
-        for (unsigned i = 0;  i < nm;  ++i) {
-            models[i].reserve(50000);
-        }
     }
 
-    examples.reserve(50000);
-    
     int num_rows = 0;
     for (; c; ++num_rows) {
         int id = c.expect_int();
         model_ids.push_back(id);
         c.expect_literal(',');
 
-        distribution<float> example(nm);
+        distribution<float> model_values(nm);
 
         float target_val = c.expect_int();
 
@@ -224,18 +222,19 @@ load(const std::string & filename, Target target, bool clear_first)
             c.expect_literal(',');
             int score = c.expect_int();
             float val = (score - 3000)/ 2000.0;
-            example[i] = val;
-            models[i].push_back(val);
+            model_values[i] = val;
         }
 
-        examples.push_back(distribution<float>());
-        examples.back().swap(example);
+        boost::shared_ptr<Example> example
+            (new Example(model_values, target_val, target));
+        examples.push_back(example);
 
         c.skip_whitespace();
         c.expect_eol();
     }
 
     //cerr << num_rows << " rows... ";
+    calc_scores();
 }
 
 void
@@ -247,8 +246,6 @@ clear()
     model_ids.clear();
     models.clear();
     model_ranking.clear();
-    singular_targets.clear();
-    target_stats.clear();
     examples.clear();
     decomposition = 0;
 }
@@ -263,8 +260,6 @@ swap(Data & other)
     model_ids.swap(other.model_ids);
     models.swap(other.models);
     model_ranking.swap(other.model_ranking);
-    singular_targets.swap(other.singular_targets);
-    target_stats.swap(other.target_stats);
     examples.swap(other.examples);
     std::swap(decomposition, other.decomposition);
 }
@@ -275,26 +270,33 @@ calc_scores()
 {
     vector<pair<float, int> > model_scores;
 
-    for (unsigned i = 0;  i < nm();  ++i) {
-        if (target == RMSE)
-            models[i].score = models[i].calc_rmse(targets);
-        else models[i].score = models[i].calc_auc(targets);
+    Model_Output outputs[16];
+    for (unsigned i = 0;  i < 16;  ++i)
+        outputs[i].resize(nx());
+    
+    for (unsigned i = 0;  i < nm();  i += 16) {
+        int ii = std::min<int>(i + 16, nm());
 
-        model_scores.push_back(make_pair(models[i].score, i));
+        for (unsigned x = 0;  x < nx();  ++x) {
+            const distribution<float> & m = examples[x]->models;
+            
+            for (unsigned j = i;  j < ii;  ++j)
+                outputs[j - i][x] = m[j];
+        }
+        
+        for (unsigned j = i;  j < ii;  ++j) {
+            if (target == RMSE)
+                models[i].score = outputs[j - i].calc_rmse(targets);
+            else models[i].score = outputs[j - i].calc_auc(targets);
+            
+            model_scores.push_back(make_pair(models[i].score, i));
+        }
     }
 
     sort_on_first_ascending(model_scores);
 
     for (unsigned i = 0;  i < nm();  ++i)
         models[model_scores[i].second].rank = i;
-
-#if 0
-    for (unsigned i = 0;  i < 20;  ++i) {
-        int m = model_scores[i].second;
-        cerr << "rank " << i << " " << model_names[m] << " score "
-             << models[m].score << endl;
-    }
-#endif
 
     model_ranking.clear();
     model_ranking.insert(model_ranking.end(),
@@ -360,18 +362,6 @@ hold_out(Data & remove_to, float proportion,
     remove_to_example_weights.clear();
     remove_to_example_weights.reserve(to_remove.size());
 
-    bool has_st = !singular_targets.empty();
-
-    for (unsigned i = 0;  i < model_names.size();  ++i) {
-        new_me.models[i].reserve(nx() - to_remove.size());
-        remove_to.models[i].reserve(to_remove.size());
-    }
-
-    if (has_st) {
-        new_me.singular_targets.reserve(nx() - to_remove.size());
-        remove_to.singular_targets.reserve(to_remove.size());
-    }
-
     for (unsigned i = 0;  i < nx();  ++i) {
         Data & add_to = remove_me[i] ? remove_to : new_me;
         distribution<float> & weights
@@ -380,18 +370,10 @@ hold_out(Data & remove_to, float proportion,
         add_to.model_ids.push_back(model_ids[i]);
         add_to.examples.push_back(examples[i]);
         weights.push_back(example_weights[i]);
-
-        for (unsigned j = 0;  j < model_names.size();  ++j)
-            add_to.models[j].push_back(models[j][i]);
-
-        if (has_st) {
-            add_to.singular_targets.push_back(distribution<float>());
-            add_to.singular_targets.back().swap(singular_targets[i]);
-        }
     }
 
-    remove_to.stats();
-    new_me.stats();
+    new_me.calc_scores();
+    remove_to.calc_scores();
 
     swap(new_me);
     example_weights.swap(new_example_weights);
@@ -399,17 +381,15 @@ hold_out(Data & remove_to, float proportion,
 
 struct Decompose_Job {
 
-    vector<distribution<float> > & decompositions;
-    const vector<distribution<float> > & examples;
+    vector<boost::shared_ptr<Data::Example> > & examples;
     const Decomposition & decomposition;
     int first;
     int last;
 
-    Decompose_Job(vector<distribution<float> > & decompositions,
-                  const vector<distribution<float> > & examples,
+    Decompose_Job(vector<boost::shared_ptr<Data::Example> > & examples,
                   const Decomposition & decomposition,
                   int first, int last)
-        : decompositions(decompositions), examples(examples),
+        : examples(examples),
           decomposition(decomposition), first(first), last(last)
     {
     }
@@ -417,7 +397,8 @@ struct Decompose_Job {
     void operator () ()
     {
         for (unsigned x = first;  x < last;  ++x)
-            decompositions[x] = decomposition.decompose(examples[x]);
+            examples[x]->decomposed
+                = decomposition.decompose(examples[x]->models);
     }
 };
 
@@ -426,8 +407,6 @@ Data::
 apply_decomposition(const Decomposition & decomposition)
 {
     this->decomposition = &decomposition;
-
-    singular_targets.resize(nx());
 
     static Worker_Task & worker = Worker_Task::instance(num_threads() - 1);
         
@@ -446,8 +425,7 @@ apply_decomposition(const Decomposition & decomposition)
         for (unsigned i = 0;  i < nx();  i += 100) {
             int last = std::min<int>(nx(), i + 100);
 
-            Decompose_Job job(singular_targets,
-                              examples,
+            Decompose_Job job(examples,
                               decomposition,
                               i, last);
 
@@ -467,6 +445,7 @@ apply_decomposition(const distribution<float> & example) const
     return decomposition->decompose(example);
 }
 
+#if 0
 void
 Data::
 stats()
@@ -517,4 +496,12 @@ stats()
     cerr << "auto " << nautomatic << " imp " << nimpossible << " poss "
          << npossible << endl;
 #endif
+}
+#endif
+
+size_t
+Data::
+decomposition_size() const
+{
+    return (decomposition ? decomposition->size() : 0);
 }

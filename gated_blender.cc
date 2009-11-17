@@ -83,9 +83,9 @@ train_conf(int model,
 
     int nv = get_conf_features
         (model,
-         training_data.examples[0],
-         training_data.singular_targets[0],
-         Target_Stats())
+         training_data.examples[0]->models,
+         training_data.examples[0]->decomposed,
+         training_data.examples[0]->stats)
         .size();
 
 
@@ -103,7 +103,7 @@ train_conf(int model,
             // works for AUC; for RMSE we will need something different.
             // Eventually, we might want to predict the margin directly or
             // take a threshold for the margin, eg 0.5
-            float pred = training_data.models[model][i];
+            float pred = training_data.examples[i]->models[model];
             float margin = pred * training_data.targets[i];
             
             correct[i] = (margin >= 0.2);
@@ -120,11 +120,12 @@ train_conf(int model,
 
             // Try to predict the error directly
             correct[i]
-                = training_data.targets[i] - training_data.models[model][i];
+                = training_data.targets[i]
+                - training_data.examples[i]->models[model];
         }
 
         const distribution<float> & model_outputs
-            = training_data.examples[i];
+            = training_data.examples[i]->models;
         
 #if 0
         cerr << "training_data.singular_targets.size() = "
@@ -134,11 +135,11 @@ train_conf(int model,
 #endif
 
         const distribution<float> & target_singular
-            = training_data.singular_targets[i];
+            = training_data.examples[i]->decomposed;
 
         distribution<float> features
             = get_conf_features(model, model_outputs, target_singular,
-                                training_data.target_stats[i]);
+                                training_data.examples[i]->stats);
 
         //cerr << "conf features: " << features << endl;
 
@@ -211,8 +212,8 @@ train_conf(int model,
         
         float result = apply_link_inverse(features.dotprod(parameters),
                                           link_function);
-
-        before[i] = training_data.models[model][i];
+        
+        before[i] = training_data.examples[i]->models[model];
 
         if (target == AUC)
             after[i] = result;
@@ -251,14 +252,14 @@ train_conf(int model,
 
 
         const distribution<float> & model_outputs
-            = testing_data.examples[i];
+            = testing_data.examples[i]->models;
         
         const distribution<float> & target_singular
-            = testing_data.singular_targets[i];
+            = testing_data.examples[i]->decomposed;
 
         distribution<float> features
             = get_conf_features(model, model_outputs, target_singular,
-                                testing_data.target_stats[i]);
+                                testing_data.examples[i]->stats);
 
         //cerr << "conf features: " << features << endl;
 
@@ -266,18 +267,19 @@ train_conf(int model,
             throw Exception("nv is wrong");
 
         if (target == AUC) {
-            float pred = testing_data.models[model][i];
+            float pred = testing_data.examples[i]->models[model];
             float margin = pred * testing_data.targets[i];
             
             correct_test[i] = (margin >= 0.2) ? 1.0 : 0.0;
         }
         else correct_test[i]
-                 = testing_data.targets[i] - testing_data.models[model][i];
+                 = testing_data.targets[i]
+                 - testing_data.examples[i]->models[model];
 
         float result = apply_link_inverse(features.dotprod(parameters),
                                           link_function);
 
-        test_before[i] = testing_data.models[model][i];
+        test_before[i] = testing_data.examples[i]->models[model];
 
         if (target == AUC)
             test_after[i] = result;
@@ -415,13 +417,7 @@ init(const Data & training_data_in,
     //conf_training_data.apply_decomposition(decompose_training_data);
     //blend_training_data.apply_decomposition(decompose_training_data);
 
-    //decompose_training_data.stats();
-    conf_training_data.stats();
-    blend_training_data.stats();
-
     //decompose_training_data.calc_scores();
-    conf_training_data.calc_scores();
-    blend_training_data.calc_scores();
 
     int nm = conf_training_data.nm();
 
@@ -468,7 +464,7 @@ init(const Data & training_data_in,
     int nv = get_blend_features
         (distribution<float>(nm),
          distribution<float>(nm),
-         blend_training_data.singular_targets[0],
+         blend_training_data.examples[0]->decomposed,
          Target_Stats())
         .size();
 
@@ -516,13 +512,13 @@ init(const Data & training_data_in,
         //cerr << "correct_prediction = " << correct_prediction << endl;
 
         const distribution<float> & model_outputs
-            = blend_training_data.examples[i];
+            = blend_training_data.examples[i]->models;
 
         const Target_Stats & target_stats
-            = blend_training_data.target_stats[i];
+            = blend_training_data.examples[i]->stats;
         
         const distribution<float> & target_singular
-            = blend_training_data.singular_targets[i];
+            = blend_training_data.examples[i]->decomposed;
 
         distribution<float> conf
             = this->conf(model_outputs, target_singular, target_stats);
@@ -588,7 +584,7 @@ conf_feature_space() const
 
     result->add_feature("model_pred", REAL);
 
-    for (unsigned i = 0;  i < data->singular_targets[0].size();  ++i)
+    for (unsigned i = 0;  i < data->decomposition_size();  ++i)
         result->add_feature(format("pc%03d", i), REAL);
 
     for (unsigned i = 0;  i < recomposition_sizes.size();  ++i) {
@@ -761,7 +757,7 @@ blend_feature_space() const
     //for (unsigned i = 0;  i < data->nm();  ++i)
     //    result->add_feature(data->model_names[i], REAL);
 
-    for (unsigned i = 0;  i < data->singular_targets[0].size();  ++i)
+    for (unsigned i = 0;  i < data->examples[0]->decomposed.size();  ++i)
         result->add_feature(format("pc%03d", i), REAL);
 
     result->add_feature("chosen_conf_min", REAL);

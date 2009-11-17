@@ -604,9 +604,9 @@ init(const Data & data,
         = dynamic_cast <const DNAE_Decomposition & >
         (*(loaded = Decomposition::load(model_base)));
 
-    int nfeatures = get_extra_features(data.examples[0],
-                                       data.singular_targets[0],
-                                       data.target_stats[0]).size();
+    int nfeatures = get_extra_features(data.examples[0]->models,
+                                       data.examples[0]->decomposed,
+                                       data.examples[0]->stats).size();
 
     int nhidden = 50;
 
@@ -624,32 +624,32 @@ init(const Data & data,
     training_data.hold_out(testing_data, hold_out, random_seed);
 
     // Start training
-    vector<distribution<float> > training_samples = training_data.examples;
-    vector<distribution<float> > testing_samples = testing_data.examples;
+    vector<distribution<float> > training_samples(training_data.examples.size());
+    vector<distribution<float> > testing_samples(testing_data.examples.size());
 
     int nx = training_samples.size();
 
     for (unsigned i = 0;  i < nx;  ++i)
-        training_samples[i] *= 0.8;
+        training_samples[i] = training_data.examples[i]->models *= 0.8;
 
     int nxt = testing_samples.size();
 
     for (unsigned i = 0;  i < nxt;  ++i)
-        testing_samples[i] *= 0.8;
+        testing_samples[i] = training_data.examples[i]->models * 0.8;
 
     vector<distribution<float> > training_features(nx), testing_features(nxt);
 
     for (unsigned i = 0;  i < nx;  ++i)
         training_features[i]
-            = get_extra_features(training_data.examples[i],
-                                 training_data.singular_targets[i],
-                                 training_data.target_stats[i]);
+            = get_extra_features(training_data.examples[i]->models,
+                                 training_data.examples[i]->decomposed,
+                                 training_data.examples[i]->stats);
 
     for (unsigned i = 0;  i < nxt;  ++i)
         testing_features[i]
-            = get_extra_features(testing_data.examples[i],
-                                 testing_data.singular_targets[i],
-                                 testing_data.target_stats[i]);
+            = get_extra_features(testing_data.examples[i]->models,
+                                 testing_data.examples[i]->decomposed,
+                                 testing_data.examples[i]->stats);
     
     double learning_rate = 0.75;
     int minibatch_size = 512;

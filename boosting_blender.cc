@@ -100,7 +100,7 @@ init(const Data & training_data,
 #endif
             
             const distribution<float> & models
-                = training_data.examples[x];
+                = training_data.examples[x]->models;
 
             weak_predictions[x] = weak->predict(models);
         }

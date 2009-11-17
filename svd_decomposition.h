@@ -38,7 +38,7 @@ struct SVD_Decomposition : public Decomposition {
                        const Data & testing_data,
                        const ML::Configuration & config);
 
-    void train(const std::vector<distribution<float> > & data,
+    void train(const Data & data,
                int order = -1);
 
     // Set the order of the model and extract things based upon it
@@ -60,6 +60,8 @@ struct SVD_Decomposition : public Decomposition {
     virtual void reconstitute(ML::DB::Store_Reader & store);
 
     virtual std::string class_id() const;
+
+    virtual size_t size() const { return order; }
 };
 
 

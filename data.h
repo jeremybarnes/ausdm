@@ -69,6 +69,20 @@ struct Scores {
 /*****************************************************************************/
 
 /// The output of one of the models that we are blending
+struct Model_Stats {
+    /// Score over whatever target we are trying to calculate
+    double score;
+    
+    /// Rank in accuracy over targets we are trying to calculate
+    int rank;
+};
+
+
+/*****************************************************************************/
+/* MODEL_OUTPUT                                                              */
+/*****************************************************************************/
+
+/// The output of one of the models that we are blending
 struct Model_Output : public distribution<float> {
     
     /// Calculate the RMSE over the given set of targets
@@ -94,13 +108,6 @@ struct Model_Output : public distribution<float> {
     double calc_score(const distribution<float> & targets,
                       const distribution<float> & weights,
                       Target target) const;
-    
-
-    /// Score over whatever target we are trying to calculate
-    double score;
-    
-    /// Rank in accuracy over targets we are trying to calculate
-    int rank;
 };
 
 
@@ -164,8 +171,6 @@ struct Data {
     void load(const std::string & filename, Target target,
               bool clear_first = true);
 
-    void calc_scores();
-
     void hold_out(Data & remove_to, float proportion,
                   int random_seed = 1);
 
@@ -183,8 +188,6 @@ struct Data {
     distribution<float>
     apply_decomposition(const distribution<float> & example) const;
 
-    void stats();
-
     int nm() const { return models.size(); }
     int nx() const { return examples.size(); }
 
@@ -199,23 +202,39 @@ struct Data {
     /// ID values of the models
     std::vector<int> model_ids;
 
-    std::vector<Model_Output> models;
-
-    std::vector<distribution<float> > examples;
+    std::vector<Model_Stats> models;
 
     /// Sorted list of models in order of score
     std::vector<int> model_ranking;
 
-    /// Singular representation of each target
-    std::vector<distribution<float> > singular_targets;
 
-    /// Statistics about models for each target
-    std::vector<Target_Stats> target_stats;
+    struct Example {
+        Example()
+            : label(0.0)
+        {
+        }
 
-    /// Information about how difficult each one is
-    std::vector<Difficulty> target_difficulty;
+        Example(const distribution<float> & models, float label, Target target)
+            : label(label), models(models), stats(models.begin(), models.end()),
+              difficulty(models, label, target)
+        {
+        }
+
+        float label;
+        distribution<float> models;
+        distribution<float> decomposed;
+        Target_Stats stats;
+        Difficulty difficulty;
+    };
+
+    std::vector<boost::shared_ptr<Example> > examples;
 
     const Decomposition * decomposition;
+
+    size_t decomposition_size() const;
+
+protected:
+    void calc_scores();
 };
 
 #endif /* __ausdm__data_h__ */

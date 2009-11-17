@@ -60,6 +60,8 @@ struct DNAE_Decomposition : public Decomposition {
                        const ML::Configuration & config);
 
     bool operator == (const DNAE_Decomposition & other) const;
+
+    virtual size_t size() const { return stack.outputs(); }
 };
 
 #endif /* __ausdm__dnaw_decomposition_h__ */

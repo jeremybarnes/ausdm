@@ -69,7 +69,8 @@ struct Predict_Job {
     void operator () ()
     {
         for (int j = first;  j < last;  ++j) {
-            const distribution<float> & model_inputs = data.examples[j];
+            const distribution<float> & model_inputs
+                = data.examples[j]->models;
 
             correct_prediction = data.targets[j];
 
@@ -127,6 +128,9 @@ int main(int argc, char ** argv)
     // Which size (S, M, L for Small, Medium and Large)
     string size = "S";
 
+    // Which verbosity level?
+    int verbosity = 3;
+
     {
         using namespace boost::program_options;
 
@@ -157,9 +161,11 @@ int main(int argc, char ** argv)
              "train on testing data as well (to test biasing, etc)" )
             ("decomposition", value<string>(&decomposition_name),
              "filename or name of decomposition; empty = none")
-            ("output-file,o",
-             value<string>(&output_file),
-             "dump output file to the given filename");
+            ("output-file,o", value<string>(&output_file),
+             "dump output file to the given filename")
+            ("verbosity,v", value<int>(&verbosity),
+             "set verbosity to value");
+        
 
         positional_options_description p;
         p.add("extra-config-option", -1);
@@ -220,10 +226,8 @@ int main(int argc, char ** argv)
         decomposition = Decomposition::create(decomposition_name);
         
         Data decompose_training_data;
-        //decompose_training_data.load("download/S_"
-        //                             + targ_type_uc + "_Train.csv", target);
         decompose_training_data.load("download/" + size + "_"
-                                     + targ_type_uc + "_Score.csv", target);
+                                     + targ_type_uc + "_Score.csv.gz", target);
         
         cerr << "training decomposition" << endl;
         decomposition->train(decompose_training_data,
@@ -241,13 +245,19 @@ int main(int argc, char ** argv)
 
     Model_Output result, baseline_result;
 
+    Data data_train;
+    data_train.load("download/" + size + "_" + targ_type_uc + "_Train.csv.gz",
+                    target);
+    
+    Data data_test;
+    if (hold_out_data == 0.0)
+        data_test.load("download/" + size + "_" + targ_type_uc
+                       + "_Score.csv.gz", target);
+
     for (unsigned trial = 0;  trial < num_trials;  ++trial) {
         if (num_trials > 1) cerr << "trial " << trial << endl;
 
         int rand_seed = hold_out_data > 0.0 ? 1 + trial : 0;
-
-        Data data_train;
-        data_train.load("download/" + size + "_" + targ_type_uc + "_Train.csv", target);
 
         Data data_test;
         if (!train_on_test) {
@@ -257,19 +267,13 @@ int main(int argc, char ** argv)
                                 + targ_type_uc + "_Score.csv", target);
         }
 
-        // Calculate the scores necessary for the job
-        data_train.calc_scores();
-
         if (decomposition) {
             cerr << "applying decomposition" << endl;
             data_train.apply_decomposition(*decomposition);
             cerr << "done." << endl;
             
         }
-        data_train.stats();
         
-        data_test.stats();
-
         distribution<float> example_weights(data_train.nx(),
                                             1.0 / data_train.nx());
 
@@ -285,7 +289,6 @@ int main(int argc, char ** argv)
         
         if (train_on_test && hold_out_data > 0.0) {
             data_train.hold_out(data_test, hold_out_data, rand_seed);
-            data_test.stats();
         }
 
         int np = data_test.nx();
@@ -454,7 +457,7 @@ int main(int argc, char ** argv)
                     errors_bl.push_back(error_bl);
                     improvements.push_back(make_pair(i, improvement));
 
-                    int cat = data_test.target_difficulty[i].category;
+                    int cat = data_test.examples[i]->difficulty.category;
                     category_errors[cat] += error_pred;
                     category_counts[cat] += 1.0;
                     baseline_category_errors[cat] += error_bl;
@@ -492,8 +495,10 @@ int main(int argc, char ** argv)
 
                 sort_on_second_ascending(improvements);
 
-                cerr << "worst entries: " << endl;
-                for (unsigned ii = 0;  ii < min(nxt, 50);  ++ii) {
+                if (verbosity > 2)
+                    cerr << "worst entries: " << endl;
+                for (unsigned ii = 0;  ii < min(nxt, 50) && verbosity > 2;
+                     ++ii) {
                     int i = improvements[ii].first;
 
                     float pred  = result[i];
@@ -502,7 +507,7 @@ int main(int argc, char ** argv)
 
                     cerr << ii << ": " << i << " " << " label: " << label
                          << " pred: " << pred << " bl: " << bl
-                         << " " << data_test.target_difficulty[i].category;
+                         << " " << data_test.examples[i]->difficulty.category;
 
                     float improvement = improvements[ii].second;
                     float error_pred  = errors_pred[i];
@@ -514,7 +519,7 @@ int main(int argc, char ** argv)
                     cerr << " improvement: " << improvement << endl;
 
                     const distribution<float> & model_inputs
-                        = data_test.examples[i];
+                        = data_test.examples[i]->models;
 
                     cerr << "    min: " << model_inputs.min()
                          << "  max: " << model_inputs.max() << " avg: "
@@ -524,8 +529,9 @@ int main(int argc, char ** argv)
                     cerr << blender->explain(model_inputs) << endl << endl;
                 }
 
-                cerr << "best entries: " << endl;
-                for (unsigned ii = 0;  ii < min(nxt, 50);  ++ii) {
+                if (verbosity > 2)
+                    cerr << "best entries: " << endl;
+                for (unsigned ii = 0;  ii < min(nxt, 50) && verbosity > 2;  ++ii) {
                     int i = improvements[improvements.size() - ii - 1].first;
 
                     float pred  = result[i];
@@ -534,7 +540,7 @@ int main(int argc, char ** argv)
 
                     cerr << ii << ": " << i << " " << " label: " << label
                          << " pred: " << pred << " bl: " << bl
-                         << " " << data_test.target_difficulty[i].category;
+                         << " " << data_test.examples[i]->difficulty.category;
 
                     float improvement = improvements[improvements.size() - ii - 1].second;
                     float error_pred  = errors_pred[i];
@@ -555,7 +561,7 @@ int main(int argc, char ** argv)
             for (unsigned i = 0;  i < nxt;  ++i) {
                 //cerr << "cat = " << data_test.target_difficulty[i].category
                 //     << endl;
-                weights.at(data_test.target_difficulty[i].category)[i] = 1.0;
+                weights.at(data_test.examples[i]->difficulty.category)[i] = 1.0;
             }
 
             for (unsigned i = 0;  i < 4;  ++i) {
