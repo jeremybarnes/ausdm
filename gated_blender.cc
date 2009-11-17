@@ -295,16 +295,19 @@ train_conf(int model,
 
     //cerr << "before = " << before << endl;
 
-    float test_auc_before1
-        = test_before.calc_score(testing_data.targets, target);
-    float test_auc_after1
-        = test_after.calc_score(testing_data.targets, target);
+    float test_auc_before1 = 0.0;
+    float test_auc_after1  = 0.0;
     float test_auc_before2 = 0.0;
     float test_auc_after2  = 0.0;
+
+    if ((testing_data.targets != 0).any()) {
+        test_auc_before1 = test_before.calc_score(testing_data.targets, target);
+        test_auc_before2 = test_after.calc_score(testing_data.targets, target);
     
-    if (target == AUC) {
-        test_auc_before2 = test_before.calc_auc(correct_test);
-        test_auc_after2 = test_after.calc_auc(correct_test);
+        if (target == AUC) {
+            test_auc_before2 = test_before.calc_auc(correct_test * 2.0f - 1.0f);
+            test_auc_after2 = test_after.calc_auc(correct_test * 2.0f - 1.0f);
+        }
     }
 
     static Lock lock;

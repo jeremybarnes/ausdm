@@ -59,6 +59,8 @@ struct SVD_Decomposition : public Decomposition {
 
     virtual void reconstitute(ML::DB::Store_Reader & store);
 
+    virtual void init(const ML::Configuration & config);
+
     virtual std::string class_id() const;
 
     virtual size_t size() const { return order; }

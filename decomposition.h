@@ -52,6 +52,8 @@ struct Decomposition {
     virtual void serialize(ML::DB::Store_Writer & store) const = 0;
     virtual void reconstitute(ML::DB::Store_Reader & store) = 0;
 
+    virtual void init(const ML::Configuration & config) = 0;
+
     virtual std::string class_id() const = 0;
 
     virtual void train(const Data & training_data,

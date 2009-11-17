@@ -44,6 +44,14 @@ train(const Data & training_data,
 
 void
 SVD_Decomposition::
+init(const ML::Configuration & config)
+{
+    config.must_find(order, "order");
+    extract_for_order(order);
+}
+
+void
+SVD_Decomposition::
 train(const Data & data,
       int order)
 {
@@ -129,7 +137,8 @@ decompose(const distribution<float> & vals) const
 
     // First, get the singular vector for the model
     distribution<double> target_singular(singular_values_order.size());
-        
+    
+
     for (unsigned i = 0;  i < nm;  ++i)
         SIMD::vec_add(&target_singular[0], vals[i],
                       &singular_models[i][0],
@@ -207,7 +216,16 @@ reconstitute(DB::Store_Reader & store)
         nm = compact_size_t(store);
         nx = compact_size_t(store);
         nvalues = compact_size_t(store);
+
+        cerr << "order = " << order << endl;
+        cerr << "nm = " << nm << endl;
+        cerr << "nx = " << nx << endl;
+        cerr << "nvalues = " << nvalues << endl;
+
         store >> singular_values >> lvectors >> rvectors;
+
+        cerr << "singular_values = " << singular_values << endl;
+
         store >> s;
         if (s != "end SVD decomposition")
             throw Exception("expected end of SVD decomposition");

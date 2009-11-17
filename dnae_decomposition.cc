@@ -219,6 +219,12 @@ train(const Data & training_data,
     trainer.train_stack(stack, layer_train, layer_test, thread_context);
 }
 
+void
+DNAE_Decomposition::
+init(const Configuration & config)
+{
+}
+
 namespace {
 
 Register_Factory<Decomposition, DNAE_Decomposition>

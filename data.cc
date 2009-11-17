@@ -125,7 +125,12 @@ double
 Model_Output::
 calc_auc(const distribution<float> & targets) const
 {
-    return ML::calc_auc(*this, targets, 1.0, -1.0);
+    if ((targets == 0).all()) return 1;
+    if ((targets == 0).any()) {
+        cerr << "targets = " << targets << endl;
+        cerr << "problem with calc_auc" << endl;
+    }
+    return ML::calc_auc(*this, targets, -1.0, 1.0);
 }
 
 double
@@ -133,7 +138,7 @@ Model_Output::
 calc_auc(const distribution<float> & targets,
          const distribution<float> & weights) const
 {
-    return ML::calc_auc(*this, targets, weights, 1.0, -1.0);
+    return ML::calc_auc(*this, targets, weights, -1.0, 1.0);
 }
 
 double
@@ -286,10 +291,10 @@ calc_scores()
         
         for (unsigned j = i;  j < ii;  ++j) {
             if (target == RMSE)
-                models[i].score = outputs[j - i].calc_rmse(targets);
-            else models[i].score = outputs[j - i].calc_auc(targets);
+                models[j].score = outputs[j - i].calc_rmse(targets);
+            else models[j].score = outputs[j - i].calc_auc(targets);
             
-            model_scores.push_back(make_pair(models[i].score, i));
+            model_scores.push_back(make_pair(models[j].score, j));
         }
     }
 

@@ -53,6 +53,8 @@ struct DNAE_Decomposition : public Decomposition {
 
     virtual void reconstitute(ML::DB::Store_Reader & store);
 
+    virtual void init(const ML::Configuration & config);
+
     virtual std::string class_id() const;
 
     virtual void train(const Data & training_data,

@@ -133,11 +133,11 @@ int main(int argc, char ** argv)
     else throw Exception("unknown target type");
 
     Data data_train;
-    data_train.load("download/" + size + "_" + targ_type_uc + "_Train.csv",
+    data_train.load("download/" + size + "_" + targ_type_uc + "_Train.csv.gz",
                     target);
     
     Data data_test;
-    data_test.load("download/" + size + "_" + targ_type_uc + "_Score.csv",
+    data_test.load("download/" + size + "_" + targ_type_uc + "_Score.csv.gz",
                    target);
 
     // NOTE: these are reversed on purpose; we don't want to overfit our

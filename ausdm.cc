@@ -235,8 +235,10 @@ int main(int argc, char ** argv)
                              config);
         cerr << "done" << endl;
     }
-    else if (decomposition_name != "")
+    else if (decomposition_name != "") {
         decomposition = Decomposition::load(decomposition_name);
+        decomposition->init(config);
+    }
 
     vector<double> trial_scores;
 
@@ -245,27 +247,26 @@ int main(int argc, char ** argv)
 
     Model_Output result, baseline_result;
 
-    Data data_train;
-    data_train.load("download/" + size + "_" + targ_type_uc + "_Train.csv.gz",
-                    target);
+    Data data_train_all;
+    data_train_all.load("download/" + size + "_" + targ_type_uc
+                        + "_Train.csv.gz",
+                        target);
     
-    Data data_test;
+    Data data_test_all;
     if (hold_out_data == 0.0)
-        data_test.load("download/" + size + "_" + targ_type_uc
-                       + "_Score.csv.gz", target);
-
+        data_test_all.load("download/" + size + "_" + targ_type_uc
+                           + "_Score.csv.gz", target);
+    
     for (unsigned trial = 0;  trial < num_trials;  ++trial) {
         if (num_trials > 1) cerr << "trial " << trial << endl;
 
         int rand_seed = hold_out_data > 0.0 ? 1 + trial : 0;
 
-        Data data_test;
-        if (!train_on_test) {
-            if (hold_out_data > 0.0)
-                data_train.hold_out(data_test, hold_out_data, rand_seed);
-            else data_test.load("download/" + size + "_"
-                                + targ_type_uc + "_Score.csv", target);
-        }
+        Data data_train = data_train_all;
+        Data data_test = data_test_all;
+
+        if (!train_on_test && hold_out_data > 0.0)
+            data_train.hold_out(data_test, hold_out_data, rand_seed);
 
         if (decomposition) {
             cerr << "applying decomposition" << endl;
@@ -600,6 +601,6 @@ int main(int argc, char ** argv)
     if (output_file != "" && num_trials == 1) {
         filter_ostream out(output_file);
         for (unsigned i = 0;  i < result.size();  ++i)
-            out << format("%.6f", result[i] * 1000.0) << endl;
+            out << format("%.1f", result[i] * 2000.0 + 3000.0) << endl;
     }
 }
