@@ -55,6 +55,10 @@ int main(int argc, char ** argv)
 
     // What type of target do we predict?
     string target_type;
+
+    // Which size (S, M, L for Small, Medium and Large)
+    string size = "S";
+
     {
         using namespace boost::program_options;
 
@@ -75,6 +79,8 @@ int main(int argc, char ** argv)
         control_options.add_options()
             ("target-type,t", value<string>(&target_type),
              "select target type: auc or rmse")
+            ("size,S", value<string>(&size),
+             "size: S (small), M (medium) or L (large)")
             ("output-file,o",
              value<string>(&output_file),
              "dump output file to the given filename");
@@ -121,52 +127,23 @@ int main(int argc, char ** argv)
 
     cerr << "loading data...";
 
-    // The decomposition is entirely unsupervised, and so doesn't use the
-    // label at all; thus we can put the training and validation sets together
+    string targ_type_uc;
+    if (target == AUC) targ_type_uc = "AUC";
+    else if (target == RMSE) targ_type_uc = "RMSE";
+    else throw Exception("unknown target type");
 
-    // Data[s/m/l][auc/rmse]
-    Data data[3][2][2];
-
-    const char * const size_names[3]   = { "S", "M", "L" };
-    const char * const target_names[2] = { "RMSE", "AUC" };
-    const char * const set_names[2]    = { "Train", "Score" };
-
-    set<string> model_names;
-
-    // (Small only for the moment until we get the hang of it)
-
-    for (unsigned i = 0;  i < 1;  ++i) {
-        for (unsigned j = target;  j <= target;  ++j) {
-            for (unsigned k = 0;  k < 2;  ++k) {
-                string filename = format("download/%s_%s_%s.csv",
-                                         size_names[i],
-                                         target_names[j],
-                                         set_names[k]);
-                Data & this_data = data[i][j][k];
-
-                this_data.load(filename, (Target)j, true /*(k == 0)*/ /* clear first */);
-                
-                model_names.insert(this_data.model_names.begin(),
-                                   this_data.model_names.end());
-            }
-        }
-    }
+    Data data_train;
+    data_train.load("download/" + size + "_" + targ_type_uc + "_Train.csv",
+                    target);
     
-    cerr << "done" << endl;
-
-    cerr << model_names.size() << " total models" << endl;
-
-    // Now, we look at all of the column names to get an idea of the input
-    // dimensions.  
-
-
-    // Denoising auto encoder
-    // We train a stack of layers, one at a time
+    Data data_test;
+    data_test.load("download/" + size + "_" + targ_type_uc + "_Score.csv",
+                   target);
 
     // NOTE: these are reversed on purpose; we don't want to overfit our
     // training data
-    const Data & training_data = data[0][target][1];
-    const Data & testing_data  = data[0][target][0];
+    const Data & training_data = data_test;
+    const Data & testing_data  = data_train;
 
     boost::shared_ptr<Decomposition> decomposition
         = Decomposition::create(decomposition_type);

@@ -124,6 +124,9 @@ int main(int argc, char ** argv)
     // What is the decomposition?  Either a filename or a type.
     string decomposition_name = "SVD";
 
+    // Which size (S, M, L for Small, Medium and Large)
+    string size = "S";
+
     {
         using namespace boost::program_options;
 
@@ -146,6 +149,8 @@ int main(int argc, char ** argv)
              "run a local test and score on held out data")
             ("target-type,t", value<string>(&target_type),
              "select target type: auc or rmse")
+            ("size,S", value<string>(&size),
+             "size: S (small), M (medium) or L (large)")
             ("num-trials,r", value<int>(&num_trials),
              "select number of trials to perform")
             ("train-on-test", value<bool>(&train_on_test)->zero_tokens(),
@@ -217,7 +222,7 @@ int main(int argc, char ** argv)
         Data decompose_training_data;
         //decompose_training_data.load("download/S_"
         //                             + targ_type_uc + "_Train.csv", target);
-        decompose_training_data.load("download/S_"
+        decompose_training_data.load("download/" + size + "_"
                                      + targ_type_uc + "_Score.csv", target);
         
         cerr << "training decomposition" << endl;
@@ -242,13 +247,13 @@ int main(int argc, char ** argv)
         int rand_seed = hold_out_data > 0.0 ? 1 + trial : 0;
 
         Data data_train;
-        data_train.load("download/S_" + targ_type_uc + "_Train.csv", target);
+        data_train.load("download/" + size + "_" + targ_type_uc + "_Train.csv", target);
 
         Data data_test;
         if (!train_on_test) {
             if (hold_out_data > 0.0)
                 data_train.hold_out(data_test, hold_out_data, rand_seed);
-            else data_test.load("download/S_"
+            else data_test.load("download/" + size + "_"
                                 + targ_type_uc + "_Score.csv", target);
         }
 
