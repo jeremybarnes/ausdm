@@ -23,6 +23,7 @@ using namespace ML;
 
 Multiple_Regression_Blender::
 Multiple_Regression_Blender()
+    : decomposition(0)
 {
 }
 
@@ -62,22 +63,28 @@ Multiple_Regression_Blender::
 train_model(const Data & data,
             Thread_Context & thread_context) const
 {
+    if (data.nx() == 0)
+        throw Exception("can't train with no data");
+
+    int nf = get_features(data.examples[0]->models,
+                          data.examples[0]->decomposed,
+                          data.examples[0]->stats).size();
+
     // Number of examples to take
     int nx_me = std::min(data.nx(), num_examples);
 
     // Number of models to take
-    int nm_me = std::min(data.nm(), num_features);
+    int nf_me = std::min(nf, num_features);
     
     int nx = data.nx();
-    int nm = data.nm();
 
     // Choose models randomly
-    set<int> models_done;
-    while (models_done.size() < nm_me) {
-        models_done.insert(thread_context.random01() * nm);
+    set<int> features_done;
+    while (features_done.size() < nf_me) {
+        features_done.insert(thread_context.random01() * nf);
     }
 
-    vector<int> models(models_done.begin(), models_done.end());
+    vector<int> kept_features(features_done.begin(), features_done.end());
     
 
     // Choose examples randomly
@@ -90,14 +97,17 @@ train_model(const Data & data,
 
     typedef double Float;
     distribution<Float> correct(nx_me);
-    boost::multi_array<Float, 2> outputs(boost::extents[nm_me][nx_me]);
+    boost::multi_array<Float, 2> outputs(boost::extents[nf_me][nx_me]);
     distribution<Float> w(nx_me, 1.0);
 
     for (unsigned i = 0;  i < nx_me;  ++i) {
-        distribution<float> features = data.examples[examples[i]]->models;
+        distribution<float> features
+            = get_features(data.examples[examples[i]]->models,
+                           data.examples[examples[i]]->decomposed,
+                           data.examples[examples[i]]->stats);
 
-        for (unsigned j = 0;  j < nm_me;  ++j)
-            outputs[j][i] = features[models[j]];
+        for (unsigned j = 0;  j < nf_me;  ++j)
+            outputs[j][i] = features[kept_features[j]];
 
         correct[i] = data.targets[examples[i]];
         if (target == AUC)
@@ -109,10 +119,10 @@ train_model(const Data & data,
 
     //cerr << "trained_params = " << trained_params << endl;
 
-    distribution<float> result(nm);
+    distribution<float> result(nf);
 
-    for (unsigned i = 0;  i < models.size();  ++i)
-        result[models[i]] = trained_params[i];
+    for (unsigned i = 0;  i < kept_features.size();  ++i)
+        result[kept_features[i]] = trained_params[i];
 
     return result;
 }
@@ -160,8 +170,20 @@ init(const Data & training_data,
 {
     Data train = training_data, test;
 
+    bool squashed = (link_function == LINEAR);
+
+    this->decomposition = training_data.decomposition;
+    this->model_stats = training_data.models;
+
+    if (decomposition)
+        recomposition_orders = decomposition->recomposition_orders();
+
+    int nf = get_features(training_data.examples[0]->models,
+                          training_data.examples[0]->decomposed,
+                          training_data.examples[0]->stats).size();
+
     coefficients.clear();
-    coefficients.resize(train.nm());
+    coefficients.resize(squashed ? 1 : num_iter, distribution<double>(nf));
     
     Thread_Context context;
     context.seed(random_seed);
@@ -186,31 +208,125 @@ init(const Data & training_data,
                                      group));
 
         for (unsigned i = 0;  i < num_iter;  ++i) {
-            worker.add(Train_Model_Job(*this, coefficients, lock, train, test,
-                                       context.random(), progress),
-                       "train model job",
-                       group);
+            worker.add
+                (Train_Model_Job(*this,
+                                 (squashed
+                                  ? coefficients[0] : coefficients[i]),
+                                 lock, train, test,
+                                 context.random(), progress),
+                 "train model job",
+                 group);
         }
     }
 
     // Add this thread to the thread pool until we're ready
     worker.run_until_finished(group);
 
-    coefficients /= num_iter;
+    if (squashed) coefficients[0] /= num_iter;
+}
+
+distribution<float>
+Multiple_Regression_Blender::
+get_features(const ML::distribution<float> & models) const
+{
+    distribution<float> decomposed;
+    if (decomposition)
+        decomposed = decomposition->decompose(models);
+    Target_Stats stats(models.begin(), models.end());
+
+    return get_features(models, decomposed, stats);
+}
+
+distribution<float>
+Multiple_Regression_Blender::
+get_features(const ML::distribution<float> & model_outputs,
+             const ML::distribution<float> & decomp,
+             const Target_Stats & stats) const
+{
+    distribution<float> result = model_outputs;
+    result.extend(decomp);
+
+    result.push_back(model_outputs.min());
+    result.push_back(model_outputs.max());
+
+    vector<distribution<float> > recompositions;
+
+    for (unsigned i = 0;  i < recomposition_orders.size();  ++i) {
+        int nr = recomposition_orders[i];
+        distribution<float> reconst;
+        if (!decomposition) reconst = model_outputs;
+        else reconst
+                 = decomposition
+                 ->recompose(model_outputs, decomp, nr);
+        recompositions.push_back(reconst);
+    }
+
+    distribution<float> dense_model;
+
+    for (unsigned i = 0;  i < model_outputs.size();  ++i) {
+        if (model_stats[i].rank >= 10) continue;
+        result.push_back(model_outputs[i]);
+        dense_model.push_back(model_outputs[i]);
+
+        float real_prediction = model_outputs[i];
+
+        result.push_back((real_prediction - stats.mean)
+                         / stats.std);
+        result.push_back
+            (std::min(fabs(real_prediction - ceil(real_prediction)),
+                      fabs(real_prediction - floor(real_prediction))));
+        
+        for (unsigned r = 0;  r < recomposition_orders.size();  ++r) {
+            const distribution<float> & reconst = recompositions[r];
+            result.push_back(reconst[i] - model_outputs[i]);
+            result.push_back(abs(reconst[i] - model_outputs[i]));
+            result.push_back(pow(reconst[i] - model_outputs[i], 2));
+        }
+    }
+
+    for (unsigned i = 0;  i < recomposition_orders.size();  ++i) {
+        const distribution<float> & reconst = recompositions[i];
+        result.push_back((reconst - model_outputs).two_norm());
+    }
+    
+    result.push_back(model_outputs.total() / model_outputs.size());
+    float avg_model_chosen = dense_model.mean();
+
+    result.push_back(avg_model_chosen);
+
+    result.push_back(stats.mean);
+    result.push_back(stats.std);
+    result.push_back(stats.min);
+    result.push_back(stats.max);
+
+    result.push_back(stats.max - stats.min);
+    result.push_back((stats.max - stats.mean) / stats.std);
+    result.push_back((stats.mean - stats.min) / stats.std);
+
+
+    result.push_back(stats.mean - avg_model_chosen);
+    result.push_back(abs(stats.mean - avg_model_chosen));
+
+    return result;
 }
 
 float
 Multiple_Regression_Blender::
 predict(const ML::distribution<float> & models) const
 {
-    distribution<float> features = models;
+    distribution<float> features = get_features(models);
 
-    float output = features.dotprod(coefficients);
+    double total = 0.0;
 
-    // Link function to change into a probability
-    float prob = apply_link_inverse(output, link_function);
+    for (unsigned i = 0;  i < coefficients.size();  ++i) {
+        float output = features.dotprod(coefficients[i]);
+        // Link function to change into a probability
+        float prob = apply_link_inverse(output, link_function);
 
-    return prob;
+        total += prob;
+    }
+
+    return total / coefficients.size();
 }
 
 std::string

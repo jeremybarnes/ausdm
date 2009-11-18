@@ -42,17 +42,29 @@ struct Multiple_Regression_Blender : public Blender {
 
     virtual std::string explain(const ML::distribution<float> & models) const;
 
+    distribution<float>
+    get_features(const ML::distribution<float> & models) const;
+
+    distribution<float>
+    get_features(const ML::distribution<float> & models,
+                 const ML::distribution<float> & decomp,
+                 const Target_Stats & stats) const;
+    
     int random_seed;
     int num_iter;
     int num_examples;
     int num_features;
     bool ridge_regression;
 
-    distribution<double> coefficients;
+    std::vector<distribution<double> > coefficients;
 
     ML::Link_Function link_function;
 
     Target target;
+
+    const Decomposition * decomposition;
+    std::vector<int> recomposition_orders;
+    std::vector<Model_Stats> model_stats;
 };
 
 #endif /* __ausdm__multiple_regression_blender_h__ */
