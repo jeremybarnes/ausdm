@@ -1049,3 +1049,19 @@ Re-trained, but with the different training routine
 Success
 Gini = 0.88030231837399
 AUC = 0.940151159187
+
+
+--------------
+/usr/bin/time ./build/x86_64/bin/ausdm -t rmse -S S --decomposition ./loadbuild/S_rmse_SVD.dat order=50  -n mr ridge_regression=true num_features=100 -o rmse_multiple_regression_allfeat_SVD_50.txt
+
+Success - rmse = 878.80530773811
+
+
+---------------
+
+Mix of two models:
+
+paste rmse-dnae2-scaled.txt rmse_multiple_regression_allfeat_SVD_50.txt | awk '{ print ($1 + $2) / 2; }' > rmse-dnae2-scaled_plus_rmse_multiple_regression_allfeat_SVD_50.txt
+
+Success - rmse = 878.91532402028
+

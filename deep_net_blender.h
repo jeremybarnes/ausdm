@@ -67,12 +67,15 @@ struct Augmented_Deep_Net_Updates {
 struct Augmented_Deep_Net {
     Augmented_Deep_Net();
 
-    void init(const ML::Auto_Encoder_Stack & dnae, int nfeatures,
+    void init(const ML::Auto_Encoder_Stack & dnae,
+              const distribution<double> & means,
+              int nfeatures,
               int nhidden, int noutputs, Transfer_Function_Type transfer,
               Thread_Context & context);
 
-    ML::Layer_Stack<ML::Dense_Layer<float> > dnae;
-    ML::Layer_Stack<ML::Dense_Layer<float> > supervised;
+    ML::Layer_Stack<ML::Twoway_Layer> dnae;
+    ML::Layer_Stack<ML::Twoway_Layer> supervised;
+    distribution<double> means;
 
     float predict(const ML::distribution<float> & models,
                   const distribution<float> & features) const;

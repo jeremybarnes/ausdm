@@ -34,7 +34,8 @@ endif
 LIBAUSDM_SOURCES := \
 	data.cc blender.cc boosting_blender.cc gated_blender.cc \
 	decomposition.cc svd_decomposition.cc dnae_decomposition.cc \
-	deep_net_blender.cc multiple_regression_blender.cc utils.cc
+	deep_net_blender.cc multiple_regression_blender.cc utils.cc \
+	classifier_blender.cc
 
 LIBAUSDM_LINK := \
 	utils ACE boost_date_time-mt db arch boosting algebra neural

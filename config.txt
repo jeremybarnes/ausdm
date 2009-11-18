@@ -39,3 +39,13 @@ rmse {
 mr {
     type=multiple_regression;
 }
+
+classifier_auc {
+    type=classifier;
+    trainer_name=classifier_auc;
+}
+
+classifier_rmse {
+    type=classifier;
+    trainer_name=classifier_rmse;
+}

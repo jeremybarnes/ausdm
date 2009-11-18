@@ -59,20 +59,23 @@ Augmented_Deep_Net()
 
 void
 Augmented_Deep_Net::
-init(const Auto_Encoder_Stack & dnae, int nfeatures,
+init(const Auto_Encoder_Stack & dnae,
+     const distribution<double> & means,
+     int nfeatures,
      int nhidden, int noutputs, Transfer_Function_Type transfer,
      Thread_Context & context)
 {
     this->dnae = dnae;
+    this->means = means;
 
     // Create the combined model: hidden layer
-    supervised.add(new Dense_Layer<float>("hidden", nfeatures + dnae.outputs(),
-                                          nhidden, TF_TANH, MV_NONE, context));
+    supervised.add(new Twoway_Layer("hidden", nfeatures + dnae.outputs(),
+                                    nhidden, TF_TANH, MV_NONE, context));
 
     // Output layer
-    supervised.add(new Dense_Layer<float>("output", nhidden /* inputs */,
-                                          1 /* outputs */, TF_TANH, MV_NONE,
-                                          context));
+    supervised.add(new Twoway_Layer("output", nhidden /* inputs */,
+                                    1 /* outputs */, TF_TANH, MV_NONE,
+                                    context));
 }
 
 float
@@ -81,7 +84,7 @@ predict(const ML::distribution<float> & models,
         const distribution<float> & features) const
 {
     distribution<float> dnae_output
-        = dnae.apply(0.8 * models);
+        = dnae.apply(0.8 * (models - means));
 
     dnae_output.insert(dnae_output.end(), features.begin(), features.end());
 
@@ -94,8 +97,8 @@ update(const Augmented_Deep_Net_Updates & updates,
        double learning_rate)
 {
     
-    dnae.parameters().update(updates.dnae, learning_rate);
-    supervised.parameters().update(updates.supervised, learning_rate);
+    dnae.parameters().update(updates.dnae, -learning_rate);
+    supervised.parameters().update(updates.supervised, -learning_rate);
 }
 
 std::pair<double, double>
@@ -112,7 +115,7 @@ train_example(const distribution<float> & model_input,
 
     float dnae_temp_space[dnae_temp_space_required];
 
-    distribution<float> dnae_inputs = model_input;
+    distribution<float> dnae_inputs = (model_input - means) * 0.8;
     distribution<float> dnae_outputs
         = dnae.fprop(dnae_inputs, dnae_temp_space, dnae_temp_space_required);
 
@@ -129,7 +132,7 @@ train_example(const distribution<float> & model_input,
         = supervised.fprop(sup_inputs, sup_temp_space, sup_temp_space_required);
 
     /* errors */
-    distribution<float> errors = ((0.8 * label) - sup_outputs);
+    distribution<float> errors = label - 1.25 * sup_outputs;
     double error = errors.dotprod(errors);
     distribution<float> sup_derrors = -2.0 * errors;
 
@@ -152,7 +155,7 @@ train_example(const distribution<float> & model_input,
                updates.dnae,
                1.0);
 
-    return make_pair(sqrt(error), sup_outputs[0]);
+    return make_pair(error, 1.25 * sup_outputs[0]);
 }
 
 struct Train_Deep_Net_Examples_Job {
@@ -567,8 +570,8 @@ init(const Data & data,
     Thread_Context context;
     context.seed(random_seed);
 
-    net.init(decomp.stack, nfeatures, nhidden, 1 /* noutputs */, TF_TANH,
-             context);
+    net.init(decomp.stack, decomp.means, nfeatures, nhidden,
+             1 /* noutputs */, TF_TANH, context);
 
     float hold_out = 0.2;
     config.get(hold_out, "hold_out");
@@ -584,12 +587,12 @@ init(const Data & data,
     int nx = training_samples.size();
 
     for (unsigned i = 0;  i < nx;  ++i)
-        training_samples[i] = training_data.examples[i]->models *= 0.8;
+        training_samples[i] = training_data.examples[i]->models;
 
     int nxt = testing_samples.size();
 
     for (unsigned i = 0;  i < nxt;  ++i)
-        testing_samples[i] = training_data.examples[i]->models * 0.8;
+        testing_samples[i] = testing_data.examples[i]->models;
 
     vector<distribution<float> > training_features(nx), testing_features(nxt);
 

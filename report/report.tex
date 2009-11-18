@@ -1,0 +1,78 @@
+\documentclass{article}
+
+\usepackage{likeicml} 
+
+% For figures
+\usepackage{graphicx}
+\usepackage{subfigure} 
+
+% For citations
+\usepackage{mlapa}
+
+\icmltitlerunning{Team ``Barneso'' Report for the AUSDM Ensembling Challenge 2009}
+
+\begin{document} 
+
+\twocolumn[
+\icmltitle{Team ``Barneso'' Report for the AUSDM Ensembling Challenge 2009}
+
+\icmlauthor{Jeremy Barnes}{jeremy@barneso.com}
+
+\vskip 0.3in
+]
+
+\begin{abstract} 
+This is the abstract
+\end{abstract} 
+
+\section{Introduction}
+
+Here is the introduction
+
+\subsection{Competition}
+
+About the competition
+
+\section{Decompositions}
+
+One of the interesting aspects of this competition is the complete lack of any
+side-channel source of information\footnote{For example, in the original NetFlix
+competition the identities of the films were known, which allowed the
+possibility to obtain further information about the film from the internet.}.
+
+In order to determine the accuracy of a prediction of a particular model, it is
+therefore necessary to use information about predictions from the other models.
+
+\subsection{Singular Value Decomposition}
+
+The most basic
+
+Analyzing the singular vectors generated, the 
+
+
+An analysis of the utility of these features showed that only the first couple
+(which corresponded to the mean and bias of the data) had any significant
+correlation with the 
+
+\subsection{Denoising Auto-Encoder Decomposition}
+
+\subsection{Engineering}
+
+In practice, this competition turned out to be as much about software
+engineering as about data mining.  This was due to the following factors:
+\begin{itemize}
+\item There were six different, distinct tasks (three dataset sizes for each of the AUC and RMSE tasks).  These tasks varied widely in terms of data size (the large task is 15 times bigger than the small task).  Managing the different varients
+\item Due to the large amount of noise in the data, it was necessary to run models many, many times and take the average to avoid overfitting the training set.  As a result
+\item The relatively modest hardware available and the high computational demands required that the software be efficiently implemented and take full advantage of all of the CPU cores available.
+\end{itemize}
+
+\subsection{Conclusion}
+
+
+% Acknowledgements should only appear in the accepted version. 
+\section*{Acknowledgments} 
+ 
+\bibliography{report}
+\bibliographystyle{mlapa}
+
+\end{document} 

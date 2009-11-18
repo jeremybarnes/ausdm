@@ -172,3 +172,20 @@ blender_rmse : bglz2 {
 
 blender_auc : bbdt2 {
 }
+
+regression_trees {
+    type=bagging;
+    num_bags=100;
+    weak_learner {
+        type=decision_tree;
+        max_depth=3;
+        verbosity=3;
+        trace=1;
+    }
+}
+
+classifier_rmse : regression_trees {
+}
+
+classifier_auc : bbdt2 {
+}

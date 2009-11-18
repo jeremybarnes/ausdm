@@ -49,10 +49,15 @@ configure(const ML::Configuration & config_,
     num_features = 100;
     ridge_regression = true;
 
+    use_decomposition_features = true;
+    use_extra_features = true;
+
     config.find(num_iter, "num_iter");
     config.find(num_examples, "num_examples");
     config.find(num_features, "num_features");
     config.find(ridge_regression, "ridge_regression");
+    config.find(use_decomposition_features, "use_decomposition_features");
+    config.find(use_extra_features, "use_extra_features");
 
     this->random_seed = random_seed;
     this->target = target;
@@ -244,7 +249,10 @@ get_features(const ML::distribution<float> & model_outputs,
              const Target_Stats & stats) const
 {
     distribution<float> result = model_outputs;
-    result.extend(decomp);
+
+    if (use_decomposition_features) result.extend(decomp);
+
+    if (!use_extra_features) return result;
 
     result.push_back(model_outputs.min());
     result.push_back(model_outputs.max());
