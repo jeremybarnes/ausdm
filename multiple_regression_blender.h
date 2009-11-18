@@ -43,6 +43,10 @@ struct Multiple_Regression_Blender : public Blender {
     virtual std::string explain(const ML::distribution<float> & models) const;
 
     int random_seed;
+    int num_iter;
+    int num_examples;
+    int num_features;
+    bool ridge_regression;
 
     distribution<double> coefficients;
 

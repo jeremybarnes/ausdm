@@ -19,7 +19,8 @@ distribution<Float>
 perform_irls_impl(const distribution<Float> & correct,
                   const boost::multi_array<Float, 2> & outputs,
                   const distribution<Float> & w,
-                  Link_Function link_function)
+                  Link_Function link_function,
+                  bool ridge_regression)
 {
     int nx = correct.size();
     int nv = outputs.shape()[0];
@@ -106,10 +107,17 @@ perform_irls_impl(const distribution<Float> & correct,
          << outputs_reduced.shape()[1] << endl;
 #endif
 
-    Ridge_Regressor regressor(1e-5);
-
-    distribution<Float> trained
-        = run_irls(correct, outputs_reduced, w, link_function, regressor);
+    distribution<Float> trained;
+    if (ridge_regression) {
+        Ridge_Regressor regressor(1e-5);
+        trained
+            = run_irls(correct, outputs_reduced, w, link_function, regressor);
+    }
+    else {
+        Least_Squares_Regressor regressor;
+        trained
+            = run_irls(correct, outputs_reduced, w, link_function, regressor);
+    }
 
     distribution<Float> parameters(nv);
     for (unsigned v = 0;  v < nv;  ++v)
@@ -180,18 +188,22 @@ distribution<float>
 perform_irls(const distribution<float> & correct,
              const boost::multi_array<float, 2> & outputs,
              const distribution<float> & w,
-             Link_Function link_function)
+             Link_Function link_function,
+             bool ridge_regression)
 {
-    return perform_irls_impl(correct, outputs, w, link_function);
+    return perform_irls_impl(correct, outputs, w, link_function,
+                             ridge_regression);
 }
 
 distribution<double>
 perform_irls(const distribution<double> & correct,
              const boost::multi_array<double, 2> & outputs,
              const distribution<double> & w,
-             Link_Function link_function)
+             Link_Function link_function,
+             bool ridge_regression)
 {
-    return perform_irls_impl(correct, outputs, w, link_function);
+    return perform_irls_impl(correct, outputs, w, link_function,
+                             ridge_regression);
 }
 
 } // namespace ML

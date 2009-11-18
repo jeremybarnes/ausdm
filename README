@@ -1,0 +1,10 @@
+This is Jeremy Barnes's entry for the AUSDM ensembling challenge.
+
+You may use this work under the GNU Affero GPL version 3 or later.
+
+Note that you will need to download the source for JML (Jeremy's Machine Learning library) and point to it.  That code is in a Mercurial repository at http://bitbucket.org/jeremy_barnes/jml/.
+
+Approach
+--------
+
+To write...

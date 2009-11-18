@@ -36,3 +36,6 @@ rmse {
     num_models_to_train=20;
 }
 
+mr {
+    type=multiple_regression;
+}
