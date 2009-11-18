@@ -1042,7 +1042,7 @@ Success - rmse = 879.86557192177
 AUC-dnae3a.txt
 
 
-./build/x86_64/bin/ausdm -t auc auc.type=deep_net model_base=auc_decomposed_8.bin niter=500 learning_rate=0.4 -o auc-dnae3a.txt 2>&1 | tee auc-dnae3a.lo
+./build/x86_64/bin/ausdm -t auc auc.type=deep_net model_base=auc_decomposed_8.bin niter=500 learning_rate=0.4 -o auc-dnae3a.txt 2>&1 | tee auc-dnae3a.lo\
 
 Re-trained, but with the different training routine
 

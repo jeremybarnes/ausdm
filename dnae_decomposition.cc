@@ -76,7 +76,7 @@ distribution<float>
 DNAE_Decomposition::
 decompose(const distribution<float> & model_outputs) const
 {
-    distribution<float> output = 0.8 * model_outputs, result;
+    distribution<float> output = 0.8 * (model_outputs - means), result;
     
     // How many layers do we output?
     int nlayers = 1;
@@ -98,7 +98,7 @@ DNAE_Decomposition::
 recompose(const distribution<float> & model_outputs,
           const distribution<float> & decomposition, int order) const
 {
-    distribution<float> output = 0.8 * model_outputs;
+    distribution<float> output = 0.8 * (model_outputs - means);
 
     // Go down the stack
     int l;
@@ -111,7 +111,7 @@ recompose(const distribution<float> & model_outputs,
         output = stack[l - 1].iapply(output);
     }
     
-    return 1.25 * output;
+    return (1.25 * output) + means;
 }
 
 std::vector<int>
@@ -128,8 +128,9 @@ void
 DNAE_Decomposition::
 serialize(ML::DB::Store_Writer & store) const
 {
-    store << (char)1; // version
+    store << (char)2; // version
     stack.serialize(store);
+    store << means;
 }
 
 void
@@ -138,10 +139,16 @@ reconstitute(ML::DB::Store_Reader & store)
 {
     char version;
     store >> version;
-    if (version != 1)
-        throw Exception("DNAE_Decomposition: version was wrong");
+    if (version == 1) {
+        stack.reconstitute(store);
+        means.clear();
+    }
+    else if (version == 2) {
+        stack.reconstitute(store);
+        store >> means;
+    }
+    else throw Exception("DNAE_Decomposition: version was wrong");
 
-    stack.reconstitute(store);
 }
 
 std::string
@@ -165,11 +172,13 @@ train(const Data & training_data,
     vector<distribution<float> > layer_train(nx), layer_test(nxt);
 
     // Condition by removing the mean and using unit standard deviation
-    distribution<double> means(training_data.nm());
+    means.clear();
+    means.resize(training_data.nm());
 
-    for (unsigned x = 0;  x < nx;  ++x) {
-        means += training_data.examples[x]->models / nx;
-    }
+    for (unsigned x = 0;  x < nx;  ++x)
+        means += training_data.examples[x]->models;
+
+    means /= nx;
 
     distribution<double> stds(means.size());
     for (unsigned x = 0;  x < nx;  ++x) {
@@ -180,6 +189,21 @@ train(const Data & training_data,
 
     cerr << "means = " << means << endl;
     cerr << "stds  = " << stds << endl;
+
+#if 0 // temporary to fix old version
+    boost::shared_ptr<Decomposition> loaded
+        = load("auc_decomposed_10.bin");
+
+    DNAE_Decomposition & other
+        = dynamic_cast<DNAE_Decomposition &>(*loaded);
+
+    cerr << "successfully loaded old model" << endl;
+
+    stack = other.stack;
+
+    return;
+#endif // temporary code
+    
 
     for (unsigned x = 0;  x < nx;  ++x) {
         //layer_train[x] = 0.8f * training_data.examples[x];

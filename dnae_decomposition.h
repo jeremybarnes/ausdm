@@ -37,6 +37,9 @@ struct DNAE_Decomposition : public Decomposition {
     /// The auto-encoder stack that implements the decomposition
     ML::Auto_Encoder_Stack stack;
 
+    /// The means of each model; used to normalize
+    distribution<double> means;
+
     /// Apply the decomposition, returning the decomposed element
     virtual distribution<float>
     decompose(const distribution<float> & model_outputs) const;
