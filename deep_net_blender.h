@@ -71,11 +71,13 @@ struct Augmented_Deep_Net {
               const distribution<double> & means,
               int nfeatures,
               int nhidden, int noutputs, Transfer_Function_Type transfer,
-              Thread_Context & context);
+              Thread_Context & context,
+              Target target);
 
     ML::Layer_Stack<ML::Twoway_Layer> dnae;
     ML::Layer_Stack<ML::Twoway_Layer> supervised;
     distribution<double> means;
+    Target target;
 
     float predict(const ML::distribution<float> & models,
                   const distribution<float> & features) const;
@@ -148,6 +150,8 @@ struct Deep_Net_Blender : public Blender {
 
     ML::Augmented_Deep_Net net;
 
+    bool use_extra_features;
+
     ML::Configuration config;
     std::vector<int> recomposition_sizes;
 
@@ -155,6 +159,7 @@ struct Deep_Net_Blender : public Blender {
     int random_seed;
 
     const Data * data;
+    Target target;
 };
 
 #endif /* __ausdm__deep_net_blender_h__ */

@@ -63,10 +63,12 @@ init(const Auto_Encoder_Stack & dnae,
      const distribution<double> & means,
      int nfeatures,
      int nhidden, int noutputs, Transfer_Function_Type transfer,
-     Thread_Context & context)
+     Thread_Context & context,
+     Target target)
 {
     this->dnae = dnae;
     this->means = means;
+    this->target = target;
 
     // Create the combined model: hidden layer
     supervised.add(new Twoway_Layer("hidden", nfeatures + dnae.outputs(),
@@ -324,7 +326,8 @@ train_iter(const std::vector<distribution<float> > & model_outputs,
     for (unsigned i = 0;  i < nx2;  ++i)
         test_labels.push_back(labels[examples[i]]);
 
-    double auc = outputs.calc_auc(test_labels);
+    double auc = 0.0;
+    if (target == AUC) outputs.calc_auc(test_labels);
 
     return make_pair(sqrt(total_mse / nx2), auc);
 }
@@ -437,9 +440,11 @@ test(const std::vector<distribution<float> > & model_outputs,
     
     worker.run_until_finished(group);
     
-    return make_pair(sqrt(mse_total / nx),
-                     outputs.calc_auc
-                     (distribution<float>(labels.begin(), labels.end())));
+    double auc = 0.0;
+    if (target == AUC)
+        auc = outputs.calc_auc(distribution<float>(labels.begin(),
+                                                   labels.end()));
+    return make_pair(sqrt(mse_total / nx), auc);
 }
 
 }  // namespace ML
@@ -461,15 +466,21 @@ Deep_Net_Blender::
 
 void
 Deep_Net_Blender::
-configure(const ML::Configuration & config,
+configure(const ML::Configuration & config_,
           const std::string & name,
           int random_seed,
           Target target)
 {
+    Configuration config(config_, name, Configuration::PREFIX_APPEND);
+
     this->config = config;
     this->random_seed = random_seed;
+    this->target = target;
 
     config.require(model_base, "model_base");
+
+    use_extra_features = true;
+    config.get(use_extra_features, "use_extra_features");
 }
 
 distribution<float>
@@ -479,6 +490,8 @@ get_extra_features(const distribution<float> & model_outputs,
                    const Target_Stats & stats) const
 {
     distribution<float> result;
+
+    if (!use_extra_features) return result;
 
     result.push_back(model_outputs.min());
     result.push_back(model_outputs.max());
@@ -571,7 +584,7 @@ init(const Data & data,
     context.seed(random_seed);
 
     net.init(decomp.stack, decomp.means, nfeatures, nhidden,
-             1 /* noutputs */, TF_TANH, context);
+             1 /* noutputs */, TF_TANH, context, target);
 
     float hold_out = 0.2;
     config.get(hold_out, "hold_out");

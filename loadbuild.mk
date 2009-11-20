@@ -63,6 +63,27 @@ endef
 $(foreach size,S M L,$(foreach type,auc rmse,$(eval $(call do_dnae_decomposition,$(size),$(type)))))
 
 
+# Top-1 model
+# $(1): S, M or L (dataset size)
+# $(2): auc or rmse
+
+define do_top1
+loadbuild/top1/$(1)_$(2)_official.txt: loadbuild/.dir_exists loadbuild/top1/.dir_exists
+	$(BIN)/ausdm \
+		-S $(1) -t $(2) \
+		-T 0.20 \
+		--decomposition "" \
+		-o loadbuild/top1/$(1)_$(2)_merge.txt~ \
+		-O $$@~ \
+		-n top1 top1.type=linear top1.mode=best_n top1.num_models=1 \
+		2>&1 | tee $$@.log
+	mv $$@~ $$@
+	mv loadbuild/top1/$(1)_$(2)_merge.txt~ loadbuild/top1/$(1)_$(2)_merge.txt
+
+top1: loadbuild/top1/$(1)_$(2)_official.txt
+endef
+
+$(foreach size,S M L,$(foreach type,auc rmse,$(eval $(call do_top1,$(size),$(type)))))
 
 # Top-n model
 # $(1): S, M or L (dataset size)
@@ -268,7 +289,7 @@ endef
 
 $(foreach size,S M L,$(foreach type,auc rmse,$(eval $(call do_mr4,$(size),$(type)))))
 
-# Multiple regression model 3 (SVD decomposition features + extra features)
+# Multiple regression model 5 (DNAE decomposition features + extra features)
 # $(1): S, M or L (dataset size)
 # $(2): auc or rmse
 
@@ -296,3 +317,60 @@ endef
 
 $(foreach size,S M L,$(foreach type,auc rmse,$(eval $(call do_mr5,$(size),$(type)))))
 
+# Deep net model 1
+# $(1): S, M or L (dataset size)
+# $(2): auc or rmse
+
+define do_dn1
+loadbuild/dn1/$(1)_$(2)_official.txt: loadbuild/.dir_exists loadbuild/dn1/.dir_exists loadbuild/$(1)_$(2)_SVD.dat
+	/usr/bin/time \
+	$(BIN)/ausdm \
+		-S $(1) -t $(2) -T 0.20 \
+		--decomposition "" \
+		-o loadbuild/dn1/$(1)_$(2)_merge.txt~ \
+		-O $$@~ \
+		-n dn1 \
+		dn1.type=deep_net \
+		dn1.niter=500 \
+		model_base=loadbuild/$(1)_$(2)_DNAE.dat \
+		dn1.sample_proportion=$(dnae_sp_$(1)) \
+		dn1.learning_rate=0.05 \
+		dn1.use_extra_features=true \
+		dn1.hold_out=0.3 \
+	2>&1 | tee $$@.log
+	mv $$@~ $$@
+	mv loadbuild/dn1/$(1)_$(2)_merge.txt~ loadbuild/dn1/$(1)_$(2)_merge.txt
+
+dn1: loadbuild/dn1/$(1)_$(2)_official.txt
+endef
+
+$(foreach size,S M L,$(foreach type,auc rmse,$(eval $(call do_dn1,$(size),$(type)))))
+
+# Deep net model 2 (no extra features)
+# $(1): S, M or L (dataset size)
+# $(2): auc or rmse
+
+define do_dn2
+loadbuild/dn2/$(1)_$(2)_official.txt: loadbuild/.dir_exists loadbuild/dn2/.dir_exists loadbuild/$(1)_$(2)_SVD.dat
+	/usr/bin/time \
+	$(BIN)/ausdm \
+		-S $(1) -t $(2) -T 0.20 \
+		--decomposition "" \
+		-o loadbuild/dn2/$(1)_$(2)_merge.txt~ \
+		-O $$@~ \
+		-n dn2 \
+		dn2.type=deep_net \
+		dn2.niter=500 \
+		model_base=loadbuild/$(1)_$(2)_DNAE.dat \
+		dn2.sample_proportion=$(dnae_sp_$(1)) \
+		dn2.learning_rate=0.05 \
+		dn2.use_extra_features=false \
+		dn2.hold_out=0.3 \
+	2>&1 | tee $$@.log
+	mv $$@~ $$@
+	mv loadbuild/dn2/$(1)_$(2)_merge.txt~ loadbuild/dn2/$(1)_$(2)_merge.txt
+
+dn2: loadbuild/dn2/$(1)_$(2)_official.txt
+endef
+
+$(foreach size,S M L,$(foreach type,auc rmse,$(eval $(call do_dn2,$(size),$(type)))))

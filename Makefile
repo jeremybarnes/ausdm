@@ -48,6 +48,8 @@ $(eval $(call program,ausdm,ausdm utils ACE boost_program_options-mt db arch boo
 
 $(eval $(call program,decompose,ausdm utils ACE boost_program_options-mt db arch boosting neural,decompose.cc exception_hook.cc,tools))
 
+$(eval $(call program,merge,ausdm utils ACE boost_program_options-mt db arch boosting neural,merge.cc exception_hook.cc,tools))
+
 $(eval $(call program,dnae_decomposition_test,ausdm utils ACE boost_program_options-mt db arch boosting neural,dnae_decomposition_test.cc exception_hook.cc,tools))
 
 $(eval $(call test,dnae_unit_tests,ausdm,boost))
