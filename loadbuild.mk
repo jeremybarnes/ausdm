@@ -17,6 +17,19 @@ loadbuild/$(1)_$(2)_SVD.dat: loadbuild/.dir_exists
 SVD: loadbuild/$(1)_$(2)_SVD.dat
 endef
 
+# Perform an SVD decomposition
+# $(1): S, M or L (dataset size)
+# $(2): auc or rmse
+
+define do_gated
+loadbuild/$(1)_$(2)_SVD.dat: loadbuild/.dir_exists
+	$(BIN)/ausdm -T SVD -S $(1) -t $(2) -o $$@~ 2>&1 | tee $$@.log
+	mv $$@~ $$@
+
+SVD: loadbuild/$(1)_$(2)_SVD.dat
+endef
+
+
 $(foreach size,S M L,$(foreach type,auc rmse,$(eval $(call do_svd_decomposition,$(size),$(type)))))
 
 # train_top_n

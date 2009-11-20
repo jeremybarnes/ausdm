@@ -209,7 +209,7 @@ load(const std::string & filename, Target target, bool clear_first)
     int num_rows = 0;
     for (; c; ++num_rows) {
         int id = c.expect_int();
-        model_ids.push_back(id);
+        example_ids.push_back(id);
         c.expect_literal(',');
 
         distribution<float> model_values(nm);
@@ -248,7 +248,7 @@ clear()
 {
     targets.clear();
     model_names.clear();
-    model_ids.clear();
+    example_ids.clear();
     models.clear();
     model_ranking.clear();
     examples.clear();
@@ -262,7 +262,7 @@ swap(Data & other)
     std::swap(target, other.target);
     targets.swap(other.targets);
     model_names.swap(other.model_names);
-    model_ids.swap(other.model_ids);
+    example_ids.swap(other.example_ids);
     models.swap(other.models);
     model_ranking.swap(other.model_ranking);
     examples.swap(other.examples);
@@ -372,7 +372,7 @@ hold_out(Data & remove_to, float proportion,
         distribution<float> & weights
             = remove_me[i] ? remove_to_example_weights : new_example_weights;
         add_to.targets.push_back(targets[i]);
-        add_to.model_ids.push_back(model_ids[i]);
+        add_to.example_ids.push_back(example_ids[i]);
         add_to.examples.push_back(examples[i]);
         weights.push_back(example_weights[i]);
     }

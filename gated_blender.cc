@@ -911,7 +911,7 @@ predict(const ML::distribution<float> & models) const
     distribution<float> conf = this->conf(models, target_singular,
                                           target_stats);
     
-    if (target == RMSE) {
+    if (target == RMSE && false) {
         distribution<float> adjusted;
 
         for (unsigned i = 0;  i < nm;  ++i) {

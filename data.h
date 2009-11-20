@@ -200,7 +200,7 @@ struct Data {
     std::vector<std::string> model_names;
 
     /// ID values of the models
-    std::vector<int> model_ids;
+    std::vector<int> example_ids;
 
     std::vector<Model_Stats> models;
 

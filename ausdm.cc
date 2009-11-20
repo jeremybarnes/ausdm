@@ -95,8 +95,11 @@ T sqr(T val)
 
 int main(int argc, char ** argv)
 {
-    // Filename to dump output data to
-    string output_file;
+    // Filename to dump validation output data to
+    string validation_output_file;
+
+    // Filename to dump official testing data to
+    string official_output_file;
 
     // Configuration file to use
     string config_file = "config.txt";
@@ -161,8 +164,10 @@ int main(int argc, char ** argv)
              "train on testing data as well (to test biasing, etc)" )
             ("decomposition", value<string>(&decomposition_name),
              "filename or name of decomposition; empty = none")
-            ("output-file,o", value<string>(&output_file),
-             "dump output file to the given filename")
+            ("validation-output-file,o", value<string>(&validation_output_file),
+             "dump validation (blending) output file to the given filename")
+            ("official-output-file,O", value<string>(&official_output_file),
+             "dump official output file to the given filename")
             ("verbosity,v", value<int>(&verbosity),
              "set verbosity to value");
         
@@ -253,7 +258,7 @@ int main(int argc, char ** argv)
                         target);
     
     Data data_test_all;
-    if (hold_out_data == 0.0)
+    if (official_output_file != "")
         data_test_all.load("download/" + size + "_" + targ_type_uc
                            + "_Score.csv.gz", target);
     
@@ -263,7 +268,7 @@ int main(int argc, char ** argv)
         int rand_seed = hold_out_data > 0.0 ? 1 + trial : 0;
 
         Data data_train = data_train_all;
-        Data data_test = data_test_all;
+        Data data_test;
 
         if (!train_on_test && hold_out_data > 0.0)
             data_train.hold_out(data_test, hold_out_data, rand_seed);
@@ -288,9 +293,8 @@ int main(int argc, char ** argv)
             baseline_blender = get_blender(config, baseline_name, data_train,
                                            example_weights, rand_seed, target);
         
-        if (train_on_test && hold_out_data > 0.0) {
+        if (train_on_test && hold_out_data > 0.0)
             data_train.hold_out(data_test, hold_out_data, rand_seed);
-        }
 
         int np = data_test.nx();
         
@@ -338,6 +342,15 @@ int main(int argc, char ** argv)
         cerr << " done." << endl;
         
         cerr << timer.elapsed() << endl;
+
+        if (validation_output_file != "") {
+            filter_ostream out(validation_output_file);
+            for (unsigned i = 0;  i < result.size();  ++i)
+                out << format("%6d %6f %.1f",
+                              data_test.example_ids[i],
+                              data_test.targets[i],
+                              result[i] * 2000.0 + 3000.0) << endl;
+        }
 
         if (hold_out_data > 0.0) {
             int nxt = data_test.nx();
@@ -586,7 +599,50 @@ int main(int argc, char ** argv)
 
                 cerr << endl;
             }
+
+
         }
+
+        if (official_output_file == "") continue;
+        job_num = 0;
+        np = data_test_all.nx();
+
+        result.resize(np);
+        baseline_result.resize(np);
+
+        cerr << "writing " << np << " official test outputs" << endl;
+        progress.restart(np);
+
+        {
+            int parent = -1;  // no parent group
+            group = worker.get_group(NO_JOB, "dump user results task", parent);
+            
+            // Make sure the group gets unlocked once we've populated
+            // everything
+            Call_Guard guard(boost::bind(&Worker_Task::unlock_group,
+                                         boost::ref(worker),
+                                         group));
+            
+            for (unsigned i = 0;  i < np;  i += 100, ++job_num) {
+                int last = std::min<int>(np, i + 100);
+                
+                // Create the job
+                Predict_Job job(result, baseline_result,
+                                i, last,
+                                *blender, baseline_blender,
+                                data_test_all, progress, progress_lock);
+                
+                // Send it to a thread to be processed
+                worker.add(job, "blend job", group);
+            }
+        }
+        
+        // Add this thread to the thread pool until we're ready
+        worker.run_until_finished(group);
+        
+        filter_ostream out(official_output_file);
+        for (unsigned i = 0;  i < result.size();  ++i)
+            out << format("%.1f", result[i] * 2000.0 + 3000.0) << endl;
     }
 
     if (hold_out_data > 0.0) {
@@ -596,11 +652,5 @@ int main(int argc, char ** argv)
         
         cout << "scores: " << trial_scores << endl;
         cout << format("%6.4f +/- %6.4f", mean, std) << endl;
-    }
-
-    if (output_file != "" && num_trials == 1) {
-        filter_ostream out(output_file);
-        for (unsigned i = 0;  i < result.size();  ++i)
-            out << format("%.1f", result[i] * 2000.0 + 3000.0) << endl;
     }
 }
