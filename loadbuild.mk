@@ -20,6 +20,36 @@ endef
 $(foreach size,S M L,$(foreach type,auc rmse,$(eval $(call do_svd_decomposition,$(size),$(type)))))
 
 
+# Create a denoising autoencoder decomposition
+# $(1): S, M or L (dataset size)
+# $(2): auc or rmse
+
+dnae_sp_S := 0.8
+dnae_sp_M := 0.5
+dnae_sp_L := 0.1
+
+define do_dnae_decomposition
+loadbuild/$(1)_$(2)_DNAE.dat: loadbuild/.dir_exists
+	$(BIN)/decompose \
+		-T DNAE \
+		-S $(1) -t $(2) \
+		niter=500 \
+		prob_cleared=0.1 \
+		layer_sizes=250,150,100,50 \
+		minibatch_size=256 \
+		test_every=10 \
+		sample_proportion=$(dnae_sp_$(1)) \
+		-o $$@~ \
+	2>&1 | tee $$@.log
+	mv $$@~ $$@
+
+DNAE: loadbuild/$(1)_$(2)_DNAE.dat
+endef
+
+$(foreach size,S M L,$(foreach type,auc rmse,$(eval $(call do_dnae_decomposition,$(size),$(type)))))
+
+
+
 # Top-n model
 # $(1): S, M or L (dataset size)
 # $(2): auc or rmse
@@ -34,6 +64,28 @@ topn: loadbuild/topn/$(1)_$(2)_official.txt
 endef
 
 $(foreach size,S M L,$(foreach type,auc rmse,$(eval $(call do_topn,$(size),$(type)))))
+
+# Gated model
+# $(1): S, M or L (dataset size)
+# $(2): auc or rmse
+
+define do_gated
+loadbuild/gated/$(1)_$(2)_official.txt: loadbuild/.dir_exists loadbuild/gated/.dir_exists loadbuild/$(1)_$(2)_SVD.dat
+	/usr/bin/time \
+	$(BIN)/ausdm \
+		-S $(1) -t $(2) -T 0.20 \
+		--decomposition "loadbuild/$(1)_$(2)_SVD.dat" \
+		order=200 \
+		-o loadbuild/gated/$(1)_$(2)_merge.txt~ \
+		-O $$@~ -n gated \
+	2>&1 | tee $$@.log
+	mv $$@~ $$@
+	mv loadbuild/gated/$(1)_$(2)_merge.txt~ loadbuild/gated/$(1)_$(2)_merge.txt
+
+gated: loadbuild/gated/$(1)_$(2)_official.txt
+endef
+
+$(foreach size,S M L,$(foreach type,auc rmse,$(eval $(call do_gated,$(size),$(type)))))
 
 mr_nfeat_S := 100
 mr_nfeat_M := 150
@@ -50,6 +102,7 @@ mr_order_L := 200
 
 define do_mr1
 loadbuild/mr1/$(1)_$(2)_official.txt: loadbuild/.dir_exists loadbuild/mr1/.dir_exists
+	/usr/bin/time \
 	$(BIN)/ausdm \
 		-S $(1) -t $(2) -T 0.20 \
 		--decomposition "" \
@@ -77,6 +130,7 @@ $(foreach size,S M L,$(foreach type,auc rmse,$(eval $(call do_mr1,$(size),$(type
 
 define do_mr2
 loadbuild/mr2/$(1)_$(2)_official.txt: loadbuild/.dir_exists loadbuild/mr2/.dir_exists loadbuild/$(1)_$(2)_SVD.dat
+	/usr/bin/time \
 	$(BIN)/ausdm \
 		-S $(1) -t $(2) -T 0.20 \
 		--decomposition "loadbuild/$(1)_$(2)_SVD.dat" \
@@ -105,6 +159,7 @@ $(foreach size,S M L,$(foreach type,auc rmse,$(eval $(call do_mr2,$(size),$(type
 
 define do_mr3
 loadbuild/mr3/$(1)_$(2)_official.txt: loadbuild/.dir_exists loadbuild/mr3/.dir_exists loadbuild/$(1)_$(2)_SVD.dat
+	/usr/bin/time \
 	$(BIN)/ausdm \
 		-S $(1) -t $(2) -T 0.20 \
 		--decomposition "loadbuild/$(1)_$(2)_SVD.dat" \

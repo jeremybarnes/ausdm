@@ -147,11 +147,12 @@ glz2 {
     type=glz;
     verbosity=3;
     link_function=linear;
+    normalize=false;
 }
 
 bglz2 {
     type=bagging;
-    num_bags=1;
+    num_bags=10;
     weak_learner : glz2 {
     }
 }
