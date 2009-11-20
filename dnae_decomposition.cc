@@ -187,8 +187,8 @@ train(const Data & training_data,
 
     stds = sqrt(stds);
 
-    cerr << "means = " << means << endl;
-    cerr << "stds  = " << stds << endl;
+    //cerr << "means = " << means << endl;
+    //cerr << "stds  = " << stds << endl;
 
 #if 0 // temporary to fix old version
     boost::shared_ptr<Decomposition> loaded
