@@ -346,9 +346,10 @@ int main(int argc, char ** argv)
         if (validation_output_file != "") {
             filter_ostream out(validation_output_file);
             for (unsigned i = 0;  i < result.size();  ++i)
-                out << format("%6d %6f %.1f",
+                out << format("%6d %6d %.1f",
                               data_test.example_ids[i],
-                              data_test.targets[i],
+                              (target == AUC ? (int)data_test.targets[i]
+                               : (int)(data_test.targets[i] * 2000 + 3000)),
                               result[i] * 2000.0 + 3000.0) << endl;
         }
 

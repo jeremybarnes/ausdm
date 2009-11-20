@@ -1,16 +1,39 @@
 # -*- Awk -*-
 
 
-topn {
+topn_base {
     type=linear;
     mode=best_n;
     num_models=10;
 }
 
-baseline_auc : topn {
+topn {
+    auc {
+        S : topn_base {
+        }
+        M : topn_base {
+        }
+        L : topn_base {
+        }
+    }
+    rmse {
+        S : topn_base {
+            num_models=20;
+        }
+        M : topn_base {
+            num_models=20;
+        }
+        L : topn_base {
+            num_models=20;
+        }
+    }
 }
 
-baseline_rmse : topn {
+
+baseline_auc : topn_base {
+}
+
+baseline_rmse : topn_base {
 }
 
 gated {
