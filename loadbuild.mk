@@ -101,6 +101,50 @@ endef
 
 $(foreach size,S M L,$(foreach type,auc rmse,$(eval $(call do_gated,$(size),$(type)))))
 
+# Gated model with no decomposition
+# $(1): S, M or L (dataset size)
+# $(2): auc or rmse
+
+define do_gated2
+loadbuild/gated2/$(1)_$(2)_official.txt: loadbuild/.dir_exists loadbuild/gated2/.dir_exists
+	/usr/bin/time \
+	$(BIN)/ausdm \
+		-S $(1) -t $(2) -T 0.20 \
+		--decomposition "" \
+		-o loadbuild/gated2/$(1)_$(2)_merge.txt~ \
+		-O $$@~ -n gated \
+	2>&1 | tee $$@.log
+	mv $$@~ $$@
+	mv loadbuild/gated2/$(1)_$(2)_merge.txt~ loadbuild/gated2/$(1)_$(2)_merge.txt
+
+gated2: loadbuild/gated2/$(1)_$(2)_official.txt
+endef
+
+$(foreach size,S M L,$(foreach type,auc rmse,$(eval $(call do_gated2,$(size),$(type)))))
+
+# Gated model with denoising autoencoder decomposition
+# $(1): S, M or L (dataset size)
+# $(2): auc or rmse
+
+define do_gated3
+loadbuild/gated3/$(1)_$(2)_official.txt: loadbuild/.dir_exists loadbuild/gated3/.dir_exists loadbuild/$(1)_$(2)_DNAE.dat
+	/usr/bin/time \
+	$(BIN)/ausdm \
+		-S $(1) -t $(2) -T 0.20 \
+		--decomposition "" \
+		-o loadbuild/gated3/$(1)_$(2)_merge.txt~ \
+		-O $$@~ -n gated \
+	2>&1 | tee $$@.log
+	mv $$@~ $$@
+	mv loadbuild/gated3/$(1)_$(2)_merge.txt~ loadbuild/gated3/$(1)_$(2)_merge.txt
+
+gated3: loadbuild/gated3/$(1)_$(2)_official.txt
+endef
+
+$(foreach size,S M L,$(foreach type,auc rmse,$(eval $(call do_gated3,$(size),$(type)))))
+
+
+
 mr_nfeat_S := 100
 mr_nfeat_M := 150
 mr_nfeat_L := 200
