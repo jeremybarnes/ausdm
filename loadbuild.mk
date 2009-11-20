@@ -332,7 +332,7 @@ loadbuild/dn1/$(1)_$(2)_official.txt: loadbuild/.dir_exists loadbuild/dn1/.dir_e
 		-n dn1 \
 		dn1.type=deep_net \
 		dn1.niter=500 \
-		model_base=loadbuild/$(1)_$(2)_DNAE.dat \
+		dn1.model_base=loadbuild/$(1)_$(2)_DNAE.dat \
 		dn1.sample_proportion=$(dnae_sp_$(1)) \
 		dn1.learning_rate=0.05 \
 		dn1.use_extra_features=true \
@@ -361,7 +361,7 @@ loadbuild/dn2/$(1)_$(2)_official.txt: loadbuild/.dir_exists loadbuild/dn2/.dir_e
 		-n dn2 \
 		dn2.type=deep_net \
 		dn2.niter=500 \
-		model_base=loadbuild/$(1)_$(2)_DNAE.dat \
+		dn2.model_base=loadbuild/$(1)_$(2)_DNAE.dat \
 		dn2.sample_proportion=$(dnae_sp_$(1)) \
 		dn2.learning_rate=0.05 \
 		dn2.use_extra_features=false \
