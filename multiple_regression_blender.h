@@ -65,6 +65,7 @@ struct Multiple_Regression_Blender : public Blender {
     const Decomposition * decomposition;
     std::vector<int> recomposition_orders;
     std::vector<Model_Stats> model_stats;
+    std::vector<std::string> model_names;
 
     bool use_decomposition_features;
     bool use_extra_features;

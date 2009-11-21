@@ -80,10 +80,33 @@ loadbuild/$(1)_$(2)_DNAE2.dat: loadbuild/.dir_exists
 	2>&1 | tee $$@.log
 	mv $$@~ $$@
 
-DNAE: loadbuild/$(1)_$(2)_DNAE2.dat
+DNAE2: loadbuild/$(1)_$(2)_DNAE2.dat
 endef
 
 $(foreach size,S M L,$(foreach type,auc rmse,$(eval $(call do_dnae_decomposition2,$(size),$(type)))))
+
+define do_dnae_decomposition3
+loadbuild/$(1)_$(2)_DNAE3.dat: loadbuild/.dir_exists
+	/usr/bin/time \
+	$(BIN)/decompose \
+		-T DNAE \
+		-S $(1) -t $(2) \
+		niter=400 \
+		prob_cleared=0.1 \
+		layer_sizes=250,150,100,50 \
+		minibatch_size=256 \
+		test_every=$(dnae_te_$(1)) \
+		sample_proportion=$(dnae_sp_$(1)) \
+		learning_rate=$(dnae_lr_$(1)) \
+		stack_backprop_iter=200 \
+		-o $$@~ \
+	2>&1 | tee $$@.log
+	mv $$@~ $$@
+
+DNAE3: loadbuild/$(1)_$(2)_DNAE3.dat
+endef
+
+$(foreach size,S M L,$(foreach type,auc rmse,$(eval $(call do_dnae_decomposition3,$(size),$(type)))))
 
 
 # Top-1 model
@@ -207,6 +230,28 @@ gated4: loadbuild/gated4/$(1)_$(2)_official.txt
 endef
 
 $(foreach size,S M L,$(foreach type,auc rmse,$(eval $(call do_gated4,$(size),$(type)))))
+
+
+# Gated model with denoising autoencoder decomposition (fixed)
+# $(1): S, M or L (dataset size)
+# $(2): auc or rmse
+
+define do_gated5
+loadbuild/gated5/$(1)_$(2)_official.txt: loadbuild/.dir_exists loadbuild/gated5/.dir_exists loadbuild/$(1)_$(2)_DNAE3.dat
+	/usr/bin/time \
+	$(BIN)/ausdm \
+		-S $(1) -t $(2) -T 0.20 \
+		--decomposition loadbuild/$(1)_$(2)_DNAE3.dat \
+		-o loadbuild/gated5/$(1)_$(2)_merge.txt~ \
+		-O $$@~ -n gated \
+	2>&1 | tee $$@.log
+	mv $$@~ $$@
+	mv loadbuild/gated5/$(1)_$(2)_merge.txt~ loadbuild/gated5/$(1)_$(2)_merge.txt
+
+gated5: loadbuild/gated5/$(1)_$(2)_official.txt
+endef
+
+$(foreach size,S M L,$(foreach type,auc rmse,$(eval $(call do_gated5,$(size),$(type)))))
 
 
 
@@ -415,7 +460,63 @@ loadbuild/mr7/$(1)_$(2)_official.txt: loadbuild/.dir_exists loadbuild/mr7/.dir_e
 mr7: loadbuild/mr7/$(1)_$(2)_official.txt
 endef
 
-$(foreach size,S M L,$(foreach type,auc rmse,$(eval $(call do_mr7,$(size),$(type)))))
+# Multiple regression model 8 (DNAE decomposition features 3)
+# $(1): S, M or L (dataset size)
+# $(2): auc or rmse
+
+define do_mr8
+loadbuild/mr8/$(1)_$(2)_official.txt: loadbuild/.dir_exists loadbuild/mr8/.dir_exists loadbuild/$(1)_$(2)_DNAE3.dat
+	/usr/bin/time \
+	$(BIN)/ausdm \
+		-S $(1) -t $(2) -T 0.20 \
+		--decomposition loadbuild/$(1)_$(2)_DNAE3.dat \
+		-o loadbuild/mr8/$(1)_$(2)_merge.txt~ \
+		-O $$@~ \
+		-n mr \
+		mr.type=multiple_regression \
+		mr.num_iter=500 \
+		mr.num_examples=6000 \
+		mr.num_features=$(mr_nfeat_$(1)) \
+		mr.use_decomposition_features=true \
+		mr.use_extra_features=false \
+	2>&1 | tee $$@.log
+	mv $$@~ $$@
+	mv loadbuild/mr8/$(1)_$(2)_merge.txt~ loadbuild/mr8/$(1)_$(2)_merge.txt
+
+mr8: loadbuild/mr8/$(1)_$(2)_official.txt
+endef
+
+$(foreach size,S M L,$(foreach type,auc rmse,$(eval $(call do_mr8,$(size),$(type)))))
+
+# Multiple regression model 9 (DNAE decomposition features 3 + extra features)
+# $(1): S, M or L (dataset size)
+# $(2): auc or rmse
+
+define do_mr9
+loadbuild/mr9/$(1)_$(2)_official.txt: loadbuild/.dir_exists loadbuild/mr9/.dir_exists loadbuild/$(1)_$(2)_DNAE3.dat
+	/usr/bin/time \
+	$(BIN)/ausdm \
+		-S $(1) -t $(2) -T 0.20 \
+		--decomposition loadbuild/$(1)_$(2)_DNAE3.dat \
+		-o loadbuild/mr9/$(1)_$(2)_merge.txt~ \
+		-O $$@~ \
+		-n mr \
+		mr.type=multiple_regression \
+		mr.num_iter=500 \
+		mr.num_examples=6000 \
+		mr.num_features=$(mr_nfeat_$(1)) \
+		mr.use_decomposition_features=true \
+		mr.use_extra_features=true \
+	2>&1 | tee $$@.log
+	mv $$@~ $$@
+	mv loadbuild/mr9/$(1)_$(2)_merge.txt~ loadbuild/mr9/$(1)_$(2)_merge.txt
+
+mr9: loadbuild/mr9/$(1)_$(2)_official.txt
+endef
+
+
+
+$(foreach size,S M L,$(foreach type,auc rmse,$(eval $(call do_mr9,$(size),$(type)))))
 
 # Deep net model 1
 # $(1): S, M or L (dataset size)
@@ -474,4 +575,33 @@ dn2: loadbuild/dn2/$(1)_$(2)_official.txt
 endef
 
 $(foreach size,S M L,$(foreach type,auc rmse,$(eval $(call do_dn2,$(size),$(type)))))
+
+# Deep net model 2 (no extra features)
+# $(1): S, M or L (dataset size)
+# $(2): auc or rmse
+
+define do_dn3
+loadbuild/dn3/$(1)_$(2)_official.txt: loadbuild/.dir_exists loadbuild/dn3/.dir_exists loadbuild/$(1)_$(2)_DNAE3.dat
+	/usr/bin/time \
+	$(BIN)/ausdm \
+		-S $(1) -t $(2) -T 0.20 \
+		--decomposition "" \
+		-o loadbuild/dn3/$(1)_$(2)_merge.txt~ \
+		-O $$@~ \
+		-n dn3 \
+		dn3.type=deep_net \
+		dn3.niter=500 \
+		dn3.model_base=loadbuild/$(1)_$(2)_DNAE3.dat \
+		dn3.sample_proportion=$(dnae_sp_$(1)) \
+		dn3.learning_rate=0.2 \
+		dn3.use_extra_features=false \
+		dn3.hold_out=0.3 \
+	2>&1 | tee $$@.log
+	mv $$@~ $$@
+	mv loadbuild/dn3/$(1)_$(2)_merge.txt~ loadbuild/dn3/$(1)_$(2)_merge.txt
+
+dn3: loadbuild/dn3/$(1)_$(2)_official.txt
+endef
+
+$(foreach size,S M L,$(foreach type,auc rmse,$(eval $(call do_dn3,$(size),$(type)))))
 

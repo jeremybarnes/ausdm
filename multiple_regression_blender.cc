@@ -90,7 +90,6 @@ train_model(const Data & data,
     }
 
     vector<int> kept_features(features_done.begin(), features_done.end());
-    
 
     // Choose examples randomly
     set<int> examples_done;
@@ -102,7 +101,7 @@ train_model(const Data & data,
 
     typedef double Float;
     distribution<Float> correct(nx_me);
-    boost::multi_array<Float, 2> outputs(boost::extents[nf_me][nx_me]);
+    boost::multi_array<Float, 2> outputs(boost::extents[nf_me + 1][nx_me]);
     distribution<Float> w(nx_me, 1.0);
 
     for (unsigned i = 0;  i < nx_me;  ++i) {
@@ -114,6 +113,8 @@ train_model(const Data & data,
         for (unsigned j = 0;  j < nf_me;  ++j)
             outputs[j][i] = features[kept_features[j]];
 
+        outputs[nf_me][i] = 1.0;  // bias
+
         correct[i] = data.targets[examples[i]];
         if (target == AUC)
             correct[i] = (correct[i] == 1.0);
@@ -122,12 +123,11 @@ train_model(const Data & data,
     distribution<Float> trained_params
         = perform_irls(correct, outputs, w, link_function, ridge_regression);
 
-    //cerr << "trained_params = " << trained_params << endl;
-
-    distribution<float> result(nf);
+    distribution<float> result(nf + 1);
 
     for (unsigned i = 0;  i < kept_features.size();  ++i)
         result[kept_features[i]] = trained_params[i];
+    result[nf] = trained_params.back();  // bias
 
     return result;
 }
@@ -179,6 +179,7 @@ init(const Data & training_data,
 
     this->decomposition = training_data.decomposition;
     this->model_stats = training_data.models;
+    this->model_names = training_data.model_names;
 
     if (decomposition)
         recomposition_orders = decomposition->recomposition_orders();
@@ -188,7 +189,7 @@ init(const Data & training_data,
                           training_data.examples[0]->stats).size();
 
     coefficients.clear();
-    coefficients.resize(squashed ? 1 : num_iter, distribution<double>(nf));
+    coefficients.resize(squashed ? 1 : num_iter, distribution<double>(nf + 1));
     
     Thread_Context context;
     context.seed(random_seed);
@@ -228,6 +229,17 @@ init(const Data & training_data,
     worker.run_until_finished(group);
 
     if (squashed) coefficients[0] /= num_iter;
+
+    distribution<double> totals(nf + 1);
+    for (unsigned i = 0;  i < coefficients.size();  ++i)
+        totals += coefficients[i];
+
+    for (unsigned i = 0;  i <= nf;  ++i) {
+        cerr << format("%-30s %9.5f",
+                       (i == nf ? "bias" : model_names[i].c_str()),
+                       totals[i])
+             << endl;
+    }
 }
 
 distribution<float>
@@ -323,6 +335,7 @@ Multiple_Regression_Blender::
 predict(const ML::distribution<float> & models) const
 {
     distribution<float> features = get_features(models);
+    features.push_back(1.0);
 
     double total = 0.0;
 

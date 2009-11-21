@@ -49,6 +49,11 @@ configure(const ML::Configuration & config_,
     trainer_name = (target == AUC ? "auc" : "rmse");
     config.find(trainer_name, "trainer_name");
 
+    use_decomposition_features = true;
+    use_extra_features = true;
+    config.find(use_decomposition_features, "use_decomposition_features");
+    config.find(use_extra_features, "use_extra_features");
+
     this->random_seed = random_seed;
     this->target = target;
 }
@@ -159,12 +164,14 @@ feature_space() const
 {
     boost::shared_ptr<Dense_Feature_Space> result
         (new Dense_Feature_Space());
-    
+
     for (unsigned i = 0;  i != nm;  ++i)
         result->add_feature(model_names[i], REAL);
-    
-    for (unsigned i = 0;  i  !=  ndecomposed;  ++i)
+
+    for (unsigned i = 0;  i  !=  ndecomposed && use_decomposition_features;  ++i)
         result->add_feature(format("decomp%03d", i), REAL);
+    
+    if (!use_extra_features) return result;
     
     result->add_feature("min_model", REAL);
     result->add_feature("max_model", REAL);
@@ -228,7 +235,10 @@ get_features(const ML::distribution<float> & model_outputs,
              const Target_Stats & stats) const
 {
     distribution<float> result = model_outputs;
-    result.extend(decomp);
+
+    if (use_decomposition_features) result.extend(decomp);
+
+    if (!use_extra_features) return result;
 
     result.push_back(model_outputs.min());
     result.push_back(model_outputs.max());

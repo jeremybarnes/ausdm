@@ -65,6 +65,9 @@ struct Classifier_Blender : public Blender {
     std::vector<int> recomposition_orders;
     std::vector<Model_Stats> model_stats;
     std::vector<std::string> model_names;
+
+    bool use_decomposition_features;
+    bool use_extra_features;
 };
 
 #endif /* __ausdm__classifier_blender_h__ */

@@ -8,11 +8,79 @@
 #include "utils.h"
 #include "algebra/lapack.h"
 #include "stats/distribution_ops.h"
+#include "algebra/matrix_ops.h"
 
 using namespace std;
 
 
 namespace ML {
+
+
+namespace {
+
+boost::multi_array<double, 2>
+cholesky(const boost::multi_array<double, 2> & A_)
+{
+    if (A_.shape()[0] != A_.shape()[1])
+        throw Exception("cholesky: matrix isn't square");
+    
+    int n = A_.shape()[0];
+
+    boost::multi_array<double, 2> A(boost::extents[n][n]);
+    std::copy(A_.begin(), A_.end(), A.begin());
+    
+    int res = LAPack::potrf('U', n, A.data(), n);
+    
+    if (res < 0)
+        throw Exception(format("cholesky: potrf: argument %d was illegal", -res));
+    else if (res > 0)
+        throw Exception(format("cholesky: potrf: leading minor %d of %d "
+                               "not positive definite", res, n));
+    
+    for (unsigned i = 0;  i < n;  ++i)
+        std::fill(&A[i][0] + i + 1, &A[i][0] + n, 0.0);
+
+    return A;
+
+#if 0
+    //cerr << "residuals = " << endl << (A * transpose(A)) - A_ << endl;
+
+    boost::multi_array<float, 2> result(boost::extents[n][n]);
+    std::copy(A.begin(), A.end(), result.begin());
+
+    return result;
+#endif
+}
+
+template<typename Float>
+boost::multi_array<Float, 2>
+lower_inverse(const boost::multi_array<Float, 2> & A)
+{
+    if (A.shape()[0] != A.shape()[1])
+        throw Exception("lower_inverse: matrix isn't square");
+    
+    int n = A.shape()[0];
+
+    boost::multi_array<Float, 2> L = A;
+    
+    for (int j = 0;  j < n;  ++j) {
+        L[j][j] = 1.0 / L[j][j];
+
+        for (int i = j + 1;  i < n;  ++i) {
+            double sum = 0.0;
+            for (unsigned k = j;  k < i;  ++k)
+                sum -= L[i][k] * L[k][j];
+            L[i][j] = sum / L[i][i];
+        }
+    }
+    
+    //cerr << "L * A = " << endl << L * A << endl;
+
+    return L;
+}
+
+} // file scope
+
 
 template<class Float>
 distribution<Float>
@@ -47,6 +115,8 @@ perform_irls_impl(const distribution<Float> & correct,
     
         if (result != 0)
             throw Exception("error in SVD");
+
+        cerr << "svalues1 = " << svalues1 << endl;
     }
     
     boost::multi_array<Float, 2> outputs3 = outputs;
@@ -95,6 +165,8 @@ perform_irls_impl(const distribution<Float> & correct,
     
     double svreduced = svalues1[nkeep - 1];
 
+    //cerr << "svreduced = " << svreduced << endl;
+
     if (verify && svreduced < 0.001)
         throw Exception("not all linearly dependent columns were removed");
 
@@ -107,16 +179,93 @@ perform_irls_impl(const distribution<Float> & correct,
          << outputs_reduced.shape()[1] << endl;
 #endif
 
+
+
+
+
+
+
+
+
+#if 0
+
+    /* Calculate the covariance matrix over those that are left.  Note that
+       we could decorrelate them with the orthogonalization that we did above,
+       but then we wouldn't be able to save it as a covariance matrix.
+    */
+    distribution<double> mean(nkeep, 0.0);
+    distribution<double> stdev(nkeep, 0.0);
+    boost::multi_array<double, 2> covar(boost::extents[nkeep][nkeep]);
+
+    {
+        for (unsigned f = 0;  f < nkeep;  ++f) {
+            mean[f] = SIMD::vec_sum_dp(&outputs_reduced[f][0], nx) / nx;
+            for (unsigned x = 0;  x < nx;  ++x)
+                outputs_reduced[f][x] -= mean[f];
+        }
+    }
+    
+    {
+        for (unsigned f = 0;  f < nkeep;  ++f) {
+            for (unsigned f2 = 0;  f2 <= f;  ++f2)
+                covar[f][f2] = covar[f2][f]
+                    = SIMD::vec_dotprod_dp(&outputs_reduced[f][0], &outputs_reduced[f2][0], nx) / nx;
+        }
+        
+        for (unsigned f = 0;  f < nkeep;  ++f)
+            stdev[f] = sqrt(covar[f][f]);
+    }
+    
+    cerr << "mean = " << mean << endl;
+    cerr << "stdev = " << stdev << endl;
+
+    boost::multi_array<Float, 2> transform(boost::extents[nkeep][nkeep]);
+    
+    /* Do the cholevsky stuff */
+    transform = transpose(lower_inverse(cholesky(covar)));
+    
+
+
+    boost::multi_array<Float, 2> decorrelated(boost::extents[nx][nkeep]);
+    float fv_in[nkeep];
+
+    for (unsigned x = 0;  x < nx;  ++x) {
+        for (unsigned f = 0;  f < nkeep;  ++f)
+            fv_in[f] = outputs_reduced[f][x];
+
+        distribution<Float> correlated(fv_in, fv_in + nkeep);
+        distribution<Float> decorrelated
+            = transform * correlated;
+
+        //cerr << "correlated = " << correlated << endl;
+        //cerr << "decorrelated = " << decorrelated << endl;
+    }
+
+#endif
+
     distribution<Float> trained;
-    if (ridge_regression) {
-        Ridge_Regressor regressor(1e-5);
-        trained
-            = run_irls(correct, outputs_reduced, w, link_function, regressor);
+
+    if (link_function == LINEAR && (w.min() == w.max())) {
+        if (ridge_regression) {
+            Ridge_Regressor regressor;
+            trained = regressor.calc(transpose(outputs_reduced), correct);
+        }
+        else {
+            Least_Squares_Regressor regressor;
+            trained = regressor.calc(transpose(outputs_reduced), correct);
+        }
     }
     else {
-        Least_Squares_Regressor regressor;
-        trained
-            = run_irls(correct, outputs_reduced, w, link_function, regressor);
+        if (ridge_regression) {
+            Ridge_Regressor regressor(1e-5);
+            trained
+                = run_irls(correct, outputs_reduced, w, link_function, regressor);
+        }
+        else {
+            Least_Squares_Regressor regressor;
+            trained
+                = run_irls(correct, outputs_reduced, w, link_function, regressor);
+        }
     }
 
     distribution<Float> parameters(nv);

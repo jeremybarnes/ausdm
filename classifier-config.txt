@@ -179,9 +179,9 @@ regression_trees {
     num_bags=100;
     weak_learner {
         type=decision_tree;
-        max_depth=3;
+        max_depth=10;
         verbosity=3;
-        trace=1;
+#        trace=1;
     }
 }
 

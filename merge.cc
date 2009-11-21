@@ -110,6 +110,9 @@ int main(int argc, char ** argv)
     // Which verbosity level?
     int verbosity = 3;
 
+    // Use rankings of models?
+    bool use_rankings = true;
+
     {
         using namespace boost::program_options;
 
@@ -137,8 +140,9 @@ int main(int argc, char ** argv)
             ("official-output-file,O", value<string>(&official_output_file),
              "dump official output file to the given filename")
             ("verbosity,v", value<int>(&verbosity),
-             "set verbosity to value");
-        
+             "set verbosity to value")
+            ("use-rankings,r", value<bool>(&use_rankings),
+             "use ranking features as extra models");
 
         positional_options_description p;
         p.add("extra-config-option", -1);
@@ -245,25 +249,27 @@ int main(int argc, char ** argv)
         model_names.push_back(data_files[i]);
         models_train.push_back(current_model);
 
-        // We add two models: the actual output, as well as a sorted version
-        // giving the rank.
-
-        vector<pair<int, float> > sorted_predictions;
-        for (unsigned r = 0;  r < row_ids.size();  ++r)
-            sorted_predictions.push_back(make_pair(r, current_model[r]));
-
-        sort_on_second_ascending(sorted_predictions);
-
-        
-        Model_Output current_ranked;
-        current_ranked.resize(row_ids.size());
-        for (unsigned r = 0;  r < sorted_predictions.size();  ++r) {
-            current_ranked[sorted_predictions[r].first]
-                = -1.0 + (r * 2.0 / sorted_predictions.size());
+        if (use_rankings) {
+            // We add two models: the actual output, as well as a sorted version
+            // giving the rank.
+            
+            vector<pair<int, float> > sorted_predictions;
+            for (unsigned r = 0;  r < row_ids.size();  ++r)
+                sorted_predictions.push_back(make_pair(r, current_model[r]));
+            
+            sort_on_second_ascending(sorted_predictions);
+            
+            
+            Model_Output current_ranked;
+            current_ranked.resize(row_ids.size());
+            for (unsigned r = 0;  r < sorted_predictions.size();  ++r) {
+                current_ranked[sorted_predictions[r].first]
+                    = -1.0 + (r * 2.0 / sorted_predictions.size());
+            }
+            
+            model_names.push_back(data_files[i] + "_rank");
+            models_train.push_back(current_ranked);
         }
-
-        model_names.push_back(data_files[i] + "_rank");
-        models_train.push_back(current_ranked);
 
 #if 0
         cerr << "model " << data_files[i] << ": "
@@ -306,20 +312,22 @@ int main(int argc, char ** argv)
 
         models_test.push_back(current_model_test);
 
-        sorted_predictions.clear();
-        for (unsigned r = 0;  r < num_rows_test;  ++r)
-            sorted_predictions.push_back(make_pair(r, current_model_test[r]));
-        
-        sort_on_second_ascending(sorted_predictions);
-        
-        current_ranked.clear();
-        current_ranked.resize(num_rows_test);
-        for (unsigned r = 0;  r < sorted_predictions.size();  ++r) {
-            current_ranked[sorted_predictions[r].first]
-                = -1.0 + (r * 2.0 / sorted_predictions.size());
-        }
+        if (use_rankings) {
+            vector<pair<int, float> > sorted_predictions;
+            for (unsigned r = 0;  r < num_rows_test;  ++r)
+                sorted_predictions.push_back(make_pair(r, current_model_test[r]));
+            
+            sort_on_second_ascending(sorted_predictions);
+            
+            Model_Output current_ranked;
+            current_ranked.resize(num_rows_test);
+            for (unsigned r = 0;  r < sorted_predictions.size();  ++r) {
+                current_ranked[sorted_predictions[r].first]
+                    = -1.0 + (r * 2.0 / sorted_predictions.size());
+            }
 
-        models_test.push_back(current_ranked);
+            models_test.push_back(current_ranked);
+        }
     }
 
     if (models_train.size() != models_test.size())
