@@ -1065,3 +1065,27 @@ paste rmse-dnae2-scaled.txt rmse_multiple_regression_allfeat_SVD_50.txt | awk '{
 
 Success - rmse = 878.91532402028
 
+-----------------
+
+Merge:
+
+./build/x86_64/bin/merge -t auc -S S top1 topn gated gated2 gated3 mr1 mr2 mr3 mr4 mr5 dn1 dn2 -n mr mr.type=multiple_regression mr.num_iter=200 mr.num_examples=2000 mr.num_features=40 -o test1.txt -O test2.txt --decomposition SVD
+
+Success
+Gini = 0.88077047664284
+AUC = 0.94038523832142
+
+./build/x86_64/bin/merge -t rmse -S S top1 topn gated gated2 gated3 mr1 mr2 mr3 mr4 mr5 dn1 dn2 -n mr mr.type=multiple_regression mr.num_iter=200 mr.num_examples=2000 mr.num_features=40 -o test1.txt -O test2.txt --decomposition SVD
+
+Success - rmse = 880.51670920129
+
+Best model (mr5):
+
+Gini = 0.88041239814155
+AUC = 0.94020619907078
+
+
+Best RMSE model (mr2):
+
+Success - rmse = 879.21304676246
+

@@ -23,8 +23,10 @@
 #include "utils/guard.h"
 #include "arch/threads.h"
 #include "stats/distribution_ops.h"
+#include "utils/parse_context.h"
 
 #include "boosting/worker_task.h"
+#include "boosting/thread_context.h"
 
 #include <boost/program_options/cmdline.hpp>
 #include <boost/program_options/options_description.hpp>
@@ -41,6 +43,44 @@ using namespace std;
 using namespace ML;
 
 
+struct Predict_Job {
+    Model_Output & result;
+    int first, last;
+    const Blender & blender;
+    const Data & data;
+    boost::progress_display & progress;
+    Lock & progress_lock;
+
+    Predict_Job(Model_Output & result,
+                int first, int last,
+                const Blender & blender,
+                const Data & data,
+                boost::progress_display & progress,
+                Lock & progress_lock)
+        : result(result),
+          first(first), last(last), blender(blender),
+          data(data), progress(progress), progress_lock(progress_lock)
+    {
+    }
+
+    void operator () ()
+    {
+        for (int j = first;  j < last;  ++j) {
+            const distribution<float> & model_inputs
+                = data.examples[j]->models;
+
+            correct_prediction = data.targets[j];
+
+            float val = blender.predict(model_inputs);
+            result.at(j) = val;
+
+            Guard guard(progress_lock);
+            ++progress;
+        }
+    }
+};
+
+
 int main(int argc, char ** argv)
 {
     // Filename to dump validation output data to
@@ -55,26 +95,14 @@ int main(int argc, char ** argv)
     // Name of blender in config file
     string blender_name;
 
-    // Name of baseline in config file
-    string baseline_name;
-
     // Extra configuration options
     vector<string> extra_config_options;
-
-    // Do we perform a fake test (with held-out data)?
-    float hold_out_data = 0.0;
 
     // What type of target do we predict?
     string target_type;
 
-    // How many cross-validation trials do we perform?
-    int num_trials = 1;
-
-    // Do we train on testing data?
-    bool train_on_test = false;
-
     // What is the decomposition?  Either a filename or a type.
-    string decomposition_name = "SVD";
+    string decomposition_name = "";
 
     // Which size (S, M, L for Small, Medium and Large)
     string size = "S";
@@ -92,24 +120,16 @@ int main(int argc, char ** argv)
              "configuration file to read configuration options from")
             ("blender-name,n", value<string>(&blender_name),
              "name of blender in configuration file")
-            ("baseline-name", value<string>(&baseline_name),
-             "name of baseline blender in configuration file")
             ("extra-config-option", value<vector<string> >(&extra_config_options),
              "extra configuration option=value (can go directly on command line)");
 
         options_description control_options("Control Options");
 
         control_options.add_options()
-            ("hold-out-data,T", value<float>(&hold_out_data),
-             "run a local test and score on held out data")
             ("target-type,t", value<string>(&target_type),
              "select target type: auc or rmse")
             ("size,S", value<string>(&size),
              "size: S (small), M (medium) or L (large)")
-            ("num-trials,r", value<int>(&num_trials),
-             "select number of trials to perform")
-            ("train-on-test", value<bool>(&train_on_test)->zero_tokens(),
-             "train on testing data as well (to test biasing, etc)" )
             ("decomposition", value<string>(&decomposition_name),
              "filename or name of decomposition; empty = none")
             ("validation-output-file,o", value<string>(&validation_output_file),
@@ -153,66 +173,212 @@ int main(int argc, char ** argv)
     if (blender_name == "")
         blender_name = target_type;
 
-    if (baseline_name == "")
-        baseline_name = "baseline_" + target_type;
-
     // Load up configuration
     Configuration config;
     if (config_file != "") config.load(config_file);
 
-    // Allow configuration to be overridden on the command line
-    config.parse_command_line(extra_config_options);
+    vector<string> data_files;
+    vector<string> config_overrides;
+    
+    for (unsigned i = 0;  i < extra_config_options.size();  ++i) {
+        if (extra_config_options[i].find('=') != string::npos)
+            config_overrides.push_back(extra_config_options[i]);
+        else data_files.push_back(extra_config_options[i]);
+    }
 
+    // Allow configuration to be overridden on the command line
+    config.parse_command_line(config_overrides);
+    
     // Load up the data
     Timer timer;
 
+    cerr << "loading data...";
+
     vector<int> row_ids;
-    vector<Model_Output> models;
+    vector<Model_Output> models_train, models_test;
     vector<string> model_names;
-    vector<float> targets;
+    distribution<float> labels;
+    int num_rows_test = 0;
     
     for (unsigned i = 0;  i < data_files.size();  ++i) {
-        Parse_Context context(data_files[i] + "_merge.txt");
+        Parse_Context context("loadbuild/" + data_files[i] + "/"
+                              + size + "_" + target_type + "_merge.txt");
 
         int row = 0;
+
+        Model_Output current_model;
+
         for (;  context;  ++row) {
+            if (i != 0 && row >= row_ids.size())
+                context.exception("mismatch in number of rows");
+
             // Format: row ID target prediction
             context.skip_whitespace();
             int row_id = context.expect_int();
-
-            if (row == 0) row_ids.push_back(row_id);
+            
+            if (i == 0) row_ids.push_back(row_id);
             else if (row_id != row_ids[row])
                 context.exception("row ID doesn't match other models");
+
             context.expect_whitespace();
-            int target = context.expect_int();
+            float label = context.expect_int();
+
+            if (target == RMSE) label = (label - 3000.0) / 2000.0;
+            if (i == 0)
+                labels.push_back(label);
+            else if (labels[row] != label)
+                context.exception("label doesn't match");
+
             context.expect_whitespace();
             float prediction = context.expect_float();
-            context.expect_eol();
 
+            if (target == RMSE || true) prediction = (prediction - 3000.0) / 2000.0;
+            
+            current_model.push_back(prediction);
+
+            context.expect_eol();
         }
+
+        if (i != 0 && row < row_ids.size())
+            context.exception("not enough rows");
+
+        model_names.push_back(data_files[i]);
+        models_train.push_back(current_model);
+
+        // We add two models: the actual output, as well as a sorted version
+        // giving the rank.
+
+        vector<pair<int, float> > sorted_predictions;
+        for (unsigned r = 0;  r < row_ids.size();  ++r)
+            sorted_predictions.push_back(make_pair(r, current_model[r]));
+
+        sort_on_second_ascending(sorted_predictions);
+
+        
+        Model_Output current_ranked;
+        current_ranked.resize(row_ids.size());
+        for (unsigned r = 0;  r < sorted_predictions.size();  ++r) {
+            current_ranked[sorted_predictions[r].first]
+                = -1.0 + (r * 2.0 / sorted_predictions.size());
+        }
+
+        model_names.push_back(data_files[i] + "_rank");
+        models_train.push_back(current_ranked);
+
+#if 0
+        cerr << "model " << data_files[i] << ": "
+             << distribution<float>(current_model.begin(),
+                                    current_model.begin() + 10)
+             << endl;
+
+        cerr << "model " << data_files[i] << " ranked: "
+             << distribution<float>(current_ranked.begin(),
+                                    current_ranked.begin() + 10)
+             << endl;
+#endif
+        
+        
+        Parse_Context context2("loadbuild/" + data_files[i] + "/"
+                               + size + "_" + target_type + "_official.txt");
+
+        Model_Output current_model_test;
+
+        row = 0;
+        for (;  context2;  ++row) {
+            if (i != 0 && row >= num_rows_test)
+                context2.exception("mismatch in number of rows");
+
+            // Format: prediction
+            context2.skip_whitespace();
+
+            float prediction = context2.expect_float();
+            
+            if (target == RMSE || true) prediction = (prediction - 3000.0) / 2000.0;
+            
+            current_model_test.push_back(prediction);
+            
+            context2.expect_eol();
+        }
+
+        if (i != 0 && row < num_rows_test)
+            context2.exception("not enough rows");
+        num_rows_test = row;
+
+        models_test.push_back(current_model_test);
+
+        sorted_predictions.clear();
+        for (unsigned r = 0;  r < num_rows_test;  ++r)
+            sorted_predictions.push_back(make_pair(r, current_model_test[r]));
+        
+        sort_on_second_ascending(sorted_predictions);
+        
+        current_ranked.clear();
+        current_ranked.resize(num_rows_test);
+        for (unsigned r = 0;  r < sorted_predictions.size();  ++r) {
+            current_ranked[sorted_predictions[r].first]
+                = -1.0 + (r * 2.0 / sorted_predictions.size());
+        }
+
+        models_test.push_back(current_ranked);
     }
 
-    Data data_train, data_official;
+    if (models_train.size() != models_test.size())
+        throw Exception("models are a different size");
 
-    cerr << "loading data...";
+    int nm = models_train.size();
+    
+    Data data_train, data_test;
 
-    string targ_type_uc;
-    if (target == AUC) targ_type_uc = "AUC";
-    else if (target == RMSE) targ_type_uc = "RMSE";
-    else throw Exception("unknown target type");
+    data_train.target = data_test.target = target;
+    data_train.model_names = data_test.model_names = model_names;
+    data_train.example_ids = row_ids;
+    for (unsigned i = 0;  i < num_rows_test;  ++i)
+        data_test.example_ids.push_back(i);
+    data_train.targets = labels;
+    data_test.targets.resize(num_rows_test);
 
+    int num_rows = row_ids.size();
+    
+    for (unsigned i = 0;  i < num_rows;  ++i) {
+        distribution<float> ex_models(nm);
+
+        for (unsigned m = 0;  m < nm;  ++m)
+            ex_models[m] = models_train[m][i];
+
+        boost::shared_ptr<Data::Example> example
+            (new Data::Example(ex_models, labels[i], target));
+
+        data_train.examples.push_back(example);
+    }
+
+    data_train.models.resize(nm);
+
+    data_train.calc_scores();
+
+    data_test.models = data_train.models;
+    data_test.model_ranking = data_train.model_ranking;
+
+    for (unsigned i = 0;  i < num_rows_test;  ++i) {
+        distribution<float> ex_models(nm);
+        
+        for (unsigned m = 0;  m < nm;  ++m)
+            ex_models[m] = models_test[m][i];
+        
+        boost::shared_ptr<Data::Example> example
+            (new Data::Example(ex_models, labels[i], target));
+
+        data_test.examples.push_back(example);
+    }
+
+    cerr << "data_train.nm() = " << data_train.nm() << endl;
 
     boost::shared_ptr<Decomposition> decomposition;
     if (Decomposition::known_type(decomposition_name)) {
         decomposition = Decomposition::create(decomposition_name);
         
-        Data decompose_training_data;
-        decompose_training_data.load("download/" + size + "_"
-                                     + targ_type_uc + "_Score.csv.gz", target);
-        
         cerr << "training decomposition" << endl;
-        decomposition->train(decompose_training_data,
-                             decompose_training_data,
+        decomposition->train(data_train,
+                             data_train,
                              config);
         cerr << "done" << endl;
     }
@@ -221,68 +387,68 @@ int main(int argc, char ** argv)
         decomposition->init(config);
     }
 
-    vector<double> trial_scores;
+    Model_Output result;
 
-    if (hold_out_data == 0.0 && num_trials > 1)
-        throw Exception("need to hold out data for multiple trials");
+    int nx = data_train.nx();
 
-    Model_Output result, baseline_result;
+    if (decomposition) {
+        cerr << "applying decomposition" << endl;
+        data_train.apply_decomposition(*decomposition);
+        cerr << "done." << endl;
+        data_test.apply_decomposition(*decomposition);
+    }
 
-    Data data_train_all;
-    data_train_all.load("download/" + size + "_" + targ_type_uc
-                        + "_Train.csv.gz",
-                        target);
-    
-    Data data_test_all;
-    if (official_output_file != "")
-        data_test_all.load("download/" + size + "_" + targ_type_uc
-                           + "_Score.csv.gz", target);
-    
-    for (unsigned trial = 0;  trial < num_trials;  ++trial) {
-        if (num_trials > 1) cerr << "trial " << trial << endl;
 
-        int rand_seed = hold_out_data > 0.0 ? 1 + trial : 0;
+    int nfolds = 10;
 
-        Data data_train = data_train_all;
-        Data data_test;
+    Thread_Context context;
 
-        if (!train_on_test && hold_out_data > 0.0)
-            data_train.hold_out(data_test, hold_out_data, rand_seed);
+    // Assign each example to a fold
+    distribution<int> example_folds(nx);
+    for (unsigned i = 0;  i < nx;  ++i)
+        example_folds[i] = context.random01() * nfolds;
 
-        if (decomposition) {
-            cerr << "applying decomposition" << endl;
-            data_train.apply_decomposition(*decomposition);
-            cerr << "done." << endl;
-            
-        }
-        
-        distribution<float> example_weights(data_train.nx(),
-                                            1.0 / data_train.nx());
+    cerr << "data_test.nx = " << data_test.nx() << endl;
+
+    Model_Output train_output;
+    train_output.resize(nx);
+    Model_Output test_output;
+    test_output.resize(data_test.nx());
+
+    for (unsigned fold = 0;  fold < nfolds;  ++fold) {
+        cerr << "fold " << fold << " of " << nfolds << endl;
+
+        Data data_train_fold = data_train;
+        Data data_test_fold;
+
+        //cerr << "data_train_fold.labels = " << data_train_fold.targets
+        //     << endl;
+
+        // Hold out those that are in our fold
+        distribution<bool> held_out = (example_folds == fold);
+        data_train_fold.hold_out(data_test_fold, held_out);
+
+        cerr << "examples: train " << data_train_fold.nx() << " test "
+             << data_test_fold.nx() << endl;
+
+        distribution<float> example_weights(data_train_fold.nx(),
+                                            1.0 / data_train_fold.nx());
 
         boost::shared_ptr<Blender> blender
-            = get_blender(config, blender_name, data_train,
-                          example_weights, rand_seed, target);
+            = get_blender(config, blender_name, data_train_fold,
+                          example_weights, fold, target);
         
 
-        boost::shared_ptr<Blender> baseline_blender;
-        if (baseline_name != "")
-            baseline_blender = get_blender(config, baseline_name, data_train,
-                                           example_weights, rand_seed, target);
-        
-        if (train_on_test && hold_out_data > 0.0)
-            data_train.hold_out(data_test, hold_out_data, rand_seed);
-
-        int np = data_test.nx();
+        int nxt = data_test_fold.nx();
         
         // Now run the model
-        result.resize(np);
-        baseline_result.resize(np);
+        result.resize(nxt);
         
         static Worker_Task & worker = Worker_Task::instance(num_threads() - 1);
         
-        cerr << "processing " << np << " predictions..." << endl;
+        cerr << "processing " << nxt << " predictions..." << endl;
         
-        boost::progress_display progress(np, cerr);
+        boost::progress_display progress(nxt, cerr);
         Lock progress_lock;
         
         // Now, submit it as jobs to the worker task to be done multithreaded
@@ -298,14 +464,14 @@ int main(int argc, char ** argv)
                                          boost::ref(worker),
                                          group));
             
-            for (unsigned i = 0;  i < np;  i += 100, ++job_num) {
-                int last = std::min<int>(np, i + 100);
+            for (unsigned i = 0;  i < nxt;  i += 100, ++job_num) {
+                int last = std::min<int>(nxt, i + 100);
                 
                 // Create the job
-                Predict_Job job(result, baseline_result,
+                Predict_Job job(result,
                                 i, last,
-                                *blender, baseline_blender,
-                                data_test, progress, progress_lock);
+                                *blender,
+                                data_test_fold, progress, progress_lock);
                 
                 // Send it to a thread to be processed
                 worker.add(job, "blend job", group);
@@ -317,278 +483,28 @@ int main(int argc, char ** argv)
         
         cerr << " done." << endl;
         
+        // Put back the training output entries
+        int n = 0;
+        for (unsigned i = 0;  i < nx;  ++i) {
+            if (held_out[i]) {
+                if (train_output[i] != 0.0)
+                    throw Exception("result written twice");
+                train_output[i] = result[n];
+                ++n;
+            }
+        }
+
         cerr << timer.elapsed() << endl;
 
-        if (validation_output_file != "") {
-            filter_ostream out(validation_output_file);
-            for (unsigned i = 0;  i < result.size();  ++i)
-                out << format("%6d %6d %.1f",
-                              data_test.example_ids[i],
-                              (target == AUC ? (int)data_test.targets[i]
-                               : (int)(data_test.targets[i] * 2000 + 3000)),
-                              result[i] * 2000.0 + 3000.0) << endl;
-        }
-
-        if (hold_out_data > 0.0) {
-            int nxt = data_test.nx();
-
-            //cerr << "result = " << result << endl;
-            //cerr << "baseline = " << baseline_result << endl;
-
-            double score = result.calc_score(data_test.targets, target);
-            cerr << format("score: %0.4f", score);
-            if (baseline_blender) {
-                double baseline_score
-                    = baseline_result.calc_score(data_test.targets, target);
-                cerr << format("  baseline: %0.4f  diff: %0.5f",
-                               baseline_score, score - baseline_score);
-                cerr << endl;
-
-                vector<pair<float, float> > ranked_targets, baseline_ranked_targets;
-                for (unsigned i = 0;  i < nxt;  ++i) {
-                    ranked_targets.push_back(make_pair(result[i],
-                                                       data_test.targets[i]));
-                    baseline_ranked_targets.push_back
-                        (make_pair(baseline_result[i], data_test.targets[i]));
-                }
-
-                sort_on_first_ascending(ranked_targets);
-                sort_on_first_ascending(baseline_ranked_targets);
-
-                distribution<float> pos_scores, neg_scores, bl_pos_scores, bl_neg_scores;
-                int pos_total = 0, neg_total = 0;
-                pos_scores.push_back(0);  neg_scores.push_back(0);
-                for (unsigned i = 0;  i < nxt;  ++i) {
-                    if (ranked_targets[i].second == -1.0)
-                        ++neg_total;
-                    else ++pos_total;
-                    pos_scores.push_back(pos_total);
-                    neg_scores.push_back(neg_total);
-                }
-
-                pos_scores /= pos_scores.max();
-                neg_scores = (1.0f - (neg_scores / neg_scores.max()));
-
-                pos_total = 0; neg_total = 0;
-                bl_pos_scores.push_back(0);  bl_neg_scores.push_back(0);
-                for (unsigned i = 0;  i < nxt;  ++i) {
-                    if (baseline_ranked_targets[i].second == -1.0)
-                        ++neg_total;
-                    else ++pos_total;
-                    bl_pos_scores.push_back(pos_total);
-                    bl_neg_scores.push_back(neg_total);
-                }
-
-                bl_pos_scores /= bl_pos_scores.max();
-                bl_neg_scores = (1.0f - (bl_neg_scores / bl_neg_scores.max()));
-
-                distribution<float> ranked = result;
-                distribution<float> baseline_ranked = baseline_result;
-
-                std::sort(ranked.begin(), ranked.end());
-                std::sort(baseline_ranked.begin(), baseline_ranked.end());
-
-                // Look at individual error terms
-                vector<pair<int, float> > improvements;
-
-                vector<float> errors_pred, errors_bl;
-
-                distribution<double>
-                    category_errors(4),
-                    category_counts(4),
-                    baseline_category_errors(4),
-                    category_improvements(4);
-
-                for (unsigned i = 0;  i < nxt;  ++i) {
-                    float pred  = result[i];
-                    float bl    = baseline_result[i];
-                    float label = data_test.targets[i];
-
-                    float improvement;
-                    float error_pred, error_bl;
-                    if (target == AUC) {
-                        int upos, lpos, bl_upos, bl_lpos, needed;
-                        lpos = std::lower_bound(ranked.begin(),
-                                                ranked.end(),
-                                                pred)
-                            - ranked.begin();
-                        bl_lpos = std::lower_bound(baseline_ranked.begin(),
-                                                   baseline_ranked.end(),
-                                                   bl)
-                            - baseline_ranked.begin();
-                        upos = std::upper_bound(ranked.begin(),
-                                                ranked.end(),
-                                                pred)
-                            - ranked.begin();
-                        bl_upos = std::upper_bound(baseline_ranked.begin(),
-                                                   baseline_ranked.end(),
-                                                   bl)
-                            - baseline_ranked.begin();
-
-                        needed = nxt;
-
-                        if (label == -1.0) {
-                            error_pred = (pos_scores.at(lpos) + pos_scores.at(upos)) / 2.0;
-                            error_bl = (bl_pos_scores.at(bl_lpos) + bl_pos_scores.at(bl_upos)) / 2.0;
-                        }
-                        else {
-                            error_pred = (neg_scores.at(lpos) + neg_scores.at(upos)) / 2.0;
-                            error_bl = (bl_neg_scores.at(bl_lpos) + bl_neg_scores.at(bl_upos)) / 2.0;
-                        }
-
-                        improvement = error_bl - error_pred;
-                    }
-                    else {
-                        error_pred  = sqr(pred - label);
-                        error_bl    = sqr(bl - label);
-                        improvement = error_bl - error_pred;
-                    }
-
-                    errors_pred.push_back(error_pred);
-                    errors_bl.push_back(error_bl);
-                    improvements.push_back(make_pair(i, improvement));
-
-                    int cat = data_test.examples[i]->difficulty.category;
-                    category_errors[cat] += error_pred;
-                    category_counts[cat] += 1.0;
-                    baseline_category_errors[cat] += error_bl;
-                    category_improvements[cat] += improvement;
-                }
-
-                distribution<double> avg_error
-                    = xdiv(category_errors, category_counts);
-                distribution<double> bl_avg_error
-                    = xdiv(baseline_category_errors, category_counts);
-                distribution<double> avg_improvement
-                    = xdiv(category_improvements, category_counts);
-
-                for (unsigned i = 0;  i < 4;  ++i) {
-                    Difficulty_Category cat = (Difficulty_Category)i;
-                    cerr << "category " << cat << ": count "
-                         << category_counts[i]
-                         << " avg error " << avg_error[i]
-                         << " baseline avg error " << bl_avg_error[i]
-                         << " avg improvement "
-                         << avg_improvement[i] << endl;
-                }
-                cerr << "overall: count " << category_counts.total()
-                     << " avg error "
-                     << avg_error.dotprod(category_counts)
-                          / category_counts.total()
-                     << " baseline avg error "
-                     << bl_avg_error.dotprod(category_counts)
-                          / category_counts.total()
-                     << " avg improvement "
-                     << avg_improvement.dotprod(category_counts)
-                          / category_counts.total()
-                     << endl;
-
-
-                sort_on_second_ascending(improvements);
-
-                if (verbosity > 2)
-                    cerr << "worst entries: " << endl;
-                for (unsigned ii = 0;  ii < min(nxt, 50) && verbosity > 2;
-                     ++ii) {
-                    int i = improvements[ii].first;
-
-                    float pred  = result[i];
-                    float bl    = baseline_result[i];
-                    float label = data_test.targets[i];
-
-                    cerr << ii << ": " << i << " " << " label: " << label
-                         << " pred: " << pred << " bl: " << bl
-                         << " " << data_test.examples[i]->difficulty.category;
-
-                    float improvement = improvements[ii].second;
-                    float error_pred  = errors_pred[i];
-                    float error_bl    = errors_bl[i];
-
-                    cerr << " error_pred: " << error_pred
-                         << " error_bl: " << error_bl;
-
-                    cerr << " improvement: " << improvement << endl;
-
-                    const distribution<float> & model_inputs
-                        = data_test.examples[i]->models;
-
-                    cerr << "    min: " << model_inputs.min()
-                         << "  max: " << model_inputs.max() << " avg: "
-                         << model_inputs.mean() << endl;
-
-                    cerr << "explanation: " << endl;
-                    cerr << blender->explain(model_inputs) << endl << endl;
-                }
-
-                if (verbosity > 2)
-                    cerr << "best entries: " << endl;
-                for (unsigned ii = 0;  ii < min(nxt, 50) && verbosity > 2;  ++ii) {
-                    int i = improvements[improvements.size() - ii - 1].first;
-
-                    float pred  = result[i];
-                    float bl    = baseline_result[i];
-                    float label = data_test.targets[i];
-
-                    cerr << ii << ": " << i << " " << " label: " << label
-                         << " pred: " << pred << " bl: " << bl
-                         << " " << data_test.examples[i]->difficulty.category;
-
-                    float improvement = improvements[improvements.size() - ii - 1].second;
-                    float error_pred  = errors_pred[i];
-                    float error_bl    = errors_bl[i];
-
-                    cerr << " error_pred: " << error_pred
-                         << " error_bl: " << error_bl;
-
-                    cerr << " improvement: " << improvement << endl;
-                }
-
-            }
-            cerr << endl;
-
-            trial_scores.push_back(score);
-
-            vector<distribution<float> > weights(4, distribution<float>(nxt, 0.0));
-            for (unsigned i = 0;  i < nxt;  ++i) {
-                //cerr << "cat = " << data_test.target_difficulty[i].category
-                //     << endl;
-                weights.at(data_test.examples[i]->difficulty.category)[i] = 1.0;
-            }
-
-            for (unsigned i = 0;  i < 4;  ++i) {
-                Difficulty_Category cat = (Difficulty_Category)i;
-                cerr << "total is " << weights[i].total() << endl;
-                //weights[i].normalize();
-                double score = result.calc_score(data_test.targets,
-                                                 weights[i],
-                                                 target);
-                cerr << "score for " << cat << ": "
-                     << format("%.4f", score);
-
-                if (baseline_blender) {
-                    double baseline_score
-                        = baseline_result.calc_score(data_test.targets,
-                                                     weights[i],
-                                                     target);
-                    cerr << format(" baseline: %.4f diff: %6.4f",
-                                   baseline_score, score - baseline_score);
-                }
-
-                cerr << endl;
-            }
-
-
-        }
-
         if (official_output_file == "") continue;
+
         job_num = 0;
-        np = data_test_all.nx();
+        nxt = data_test.nx();
 
-        result.resize(np);
-        baseline_result.resize(np);
+        result.resize(nxt);
 
-        cerr << "writing " << np << " official test outputs" << endl;
-        progress.restart(np);
+        cerr << "calculation " << nxt << " official test outputs" << endl;
+        progress.restart(nxt);
 
         {
             int parent = -1;  // no parent group
@@ -600,14 +516,14 @@ int main(int argc, char ** argv)
                                          boost::ref(worker),
                                          group));
             
-            for (unsigned i = 0;  i < np;  i += 100, ++job_num) {
-                int last = std::min<int>(np, i + 100);
+            for (unsigned i = 0;  i < nxt;  i += 100, ++job_num) {
+                int last = std::min<int>(nxt, i + 100);
                 
                 // Create the job
-                Predict_Job job(result, baseline_result,
+                Predict_Job job(result,
                                 i, last,
-                                *blender, baseline_blender,
-                                data_test_all, progress, progress_lock);
+                                *blender,
+                                data_test, progress, progress_lock);
                 
                 // Send it to a thread to be processed
                 worker.add(job, "blend job", group);
@@ -616,18 +532,39 @@ int main(int argc, char ** argv)
         
         // Add this thread to the thread pool until we're ready
         worker.run_until_finished(group);
-        
-        filter_ostream out(official_output_file);
-        for (unsigned i = 0;  i < result.size();  ++i)
-            out << format("%.1f", result[i] * 2000.0 + 3000.0) << endl;
+
+        // Accumulate the official test output from all of the folds
+        test_output += result / nfolds;
     }
 
-    if (hold_out_data > 0.0) {
-        double mean = ML::mean(trial_scores.begin(), trial_scores.end());
-        double std = ML::std_dev(trial_scores.begin(), trial_scores.end(),
-                                    mean);
-        
-        cout << "scores: " << trial_scores << endl;
-        cout << format("%6.4f +/- %6.4f", mean, std) << endl;
+    for (unsigned i = 0;  i < nm;  ++i) {
+        float score = models_train[i].calc_score(labels, target);
+        cerr << format("%-30s %6.4f", model_names[i].c_str(), score)
+             << endl;
+    }
+    
+    float score = train_output.calc_score(labels, target);
+    cerr << format("%-30s %6.4f", "combined", score) << endl;
+
+    if (validation_output_file != "") {
+        filter_ostream out(validation_output_file);
+        for (unsigned i = 0;  i < train_output.size();  ++i)
+            out << format("%6d %6d %.1f",
+                          row_ids[i],
+                          (target == AUC ? (int)labels[i]
+                           : (int)(labels[i] * 2000 + 3000)),
+                          (target == AUC ? train_output[i] * 1000.0
+                           : train_output[i] * 2000.0 + 3000.0)) << endl;
+    }
+    
+    if (official_output_file != "") {
+        filter_ostream out(official_output_file);
+
+        cerr << "test_output.size() = " << test_output.size() << endl;
+
+        for (unsigned i = 0;  i < test_output.size();  ++i)
+            out << format("%.1f",
+                          (target == AUC ? test_output[i] * 1000.0
+                           : test_output[i] * 2000.0 + 3000.0)) << endl;
     }
 }

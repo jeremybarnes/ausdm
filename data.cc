@@ -346,12 +346,40 @@ hold_out(Data & remove_to, float proportion,
     to_remove.erase(to_remove.begin() + proportion * to_remove.size(),
                     to_remove.end());
 
-    vector<int> remove_me(nx(), false);
+    vector<bool> remove_me(nx(), false);
     for (unsigned i = 0;  i < to_remove.size();  ++i)
         remove_me[to_remove[i]] = true;
 
+    hold_out(remove_to, remove_me, example_weights,
+             remove_to_example_weights);
+}
+
+void
+Data::
+hold_out(Data & remove_to, const vector<bool> & to_remove)
+{
+    distribution<float> example_weights(nx());
+    distribution<float> remove_to_example_weights;
+
+    hold_out(remove_to, to_remove, example_weights,
+             remove_to_example_weights);
+}
+
+void
+Data::
+hold_out(Data & remove_to, const vector<bool> & remove_me,
+         distribution<float> & example_weights,
+         distribution<float> & remove_to_example_weights)
+{
     remove_to.clear();
     
+    if (remove_me.size() != nx())
+        throw Exception("remove_me size was wrong");
+
+    int num_to_remove = 0;
+    for (unsigned i = 0;  i < remove_me.size();  ++i)
+        if (remove_me[i]) ++num_to_remove;
+
     Data new_me;
 
     new_me.target = remove_to.target = target;
@@ -362,10 +390,10 @@ hold_out(Data & remove_to, float proportion,
     remove_to.models.resize(model_names.size());
 
     distribution<float> new_example_weights;
-    new_example_weights.reserve(nx() - to_remove.size());
+    new_example_weights.reserve(nx() - num_to_remove);
 
     remove_to_example_weights.clear();
-    remove_to_example_weights.reserve(to_remove.size());
+    remove_to_example_weights.reserve(num_to_remove);
 
     for (unsigned i = 0;  i < nx();  ++i) {
         Data & add_to = remove_me[i] ? remove_to : new_me;

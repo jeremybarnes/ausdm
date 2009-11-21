@@ -99,7 +99,7 @@ perform_irls_impl(const distribution<Float> & correct,
         throw Exception("not all linearly dependent columns were removed");
 
 #if 0
-    cerr << "v.size() = " << w.size() << endl;
+    cerr << "w.size() = " << w.size() << endl;
     cerr << "correct.size() = " << correct.size() << endl;
     cerr << "w.total() = " << w.total() << endl;
 

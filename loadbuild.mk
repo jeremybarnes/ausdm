@@ -24,6 +24,7 @@ $(foreach size,S M L,$(foreach type,auc rmse,$(eval $(call do_svd_decomposition,
 # Create a denoising autoencoder decomposition
 # $(1): S, M or L (dataset size)
 # $(2): auc or rmse
+# NOTE: these were originally created with a buggy auto encoder implementation
 
 # Sample which proportion of the training examples per iteration
 dnae_sp_S := 0.8
@@ -61,6 +62,28 @@ DNAE: loadbuild/$(1)_$(2)_DNAE.dat
 endef
 
 $(foreach size,S M L,$(foreach type,auc rmse,$(eval $(call do_dnae_decomposition,$(size),$(type)))))
+
+define do_dnae_decomposition2
+loadbuild/$(1)_$(2)_DNAE2.dat: loadbuild/.dir_exists
+	/usr/bin/time \
+	$(BIN)/decompose \
+		-T DNAE \
+		-S $(1) -t $(2) \
+		niter=800 \
+		prob_cleared=0.1 \
+		layer_sizes=250,150,100,50 \
+		minibatch_size=256 \
+		test_every=$(dnae_te_$(1)) \
+		sample_proportion=$(dnae_sp_$(1)) \
+		learning_rate=$(dnae_lr_$(1)) \
+		-o $$@~ \
+	2>&1 | tee $$@.log
+	mv $$@~ $$@
+
+DNAE: loadbuild/$(1)_$(2)_DNAE2.dat
+endef
+
+$(foreach size,S M L,$(foreach type,auc rmse,$(eval $(call do_dnae_decomposition2,$(size),$(type)))))
 
 
 # Top-1 model
@@ -160,6 +183,27 @@ loadbuild/gated3/$(1)_$(2)_official.txt: loadbuild/.dir_exists loadbuild/gated3/
 	mv loadbuild/gated3/$(1)_$(2)_merge.txt~ loadbuild/gated3/$(1)_$(2)_merge.txt
 
 gated3: loadbuild/gated3/$(1)_$(2)_official.txt
+endef
+
+$(foreach size,S M L,$(foreach type,auc rmse,$(eval $(call do_gated3,$(size),$(type)))))
+
+# Gated model with denoising autoencoder decomposition
+# $(1): S, M or L (dataset size)
+# $(2): auc or rmse
+
+define do_gated4
+loadbuild/gated3/$(1)_$(2)_official.txt: loadbuild/.dir_exists loadbuild/gated3/.dir_exists loadbuild/$(1)_$(2)_DNAE.dat
+	/usr/bin/time \
+	$(BIN)/ausdm \
+		-S $(1) -t $(2) -T 0.20 \
+		--decomposition "" \
+		-o loadbuild/gated3/$(1)_$(2)_merge.txt~ \
+		-O $$@~ -n gated \
+	2>&1 | tee $$@.log
+	mv $$@~ $$@
+	mv loadbuild/gated3/$(1)_$(2)_merge.txt~ loadbuild/gated3/$(1)_$(2)_merge.txt
+
+gated4: loadbuild/gated3/$(1)_$(2)_official.txt
 endef
 
 $(foreach size,S M L,$(foreach type,auc rmse,$(eval $(call do_gated3,$(size),$(type)))))

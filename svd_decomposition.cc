@@ -66,8 +66,8 @@ train(const Data & data,
         
     nvalues = std::min(nm, nx);
         
-    //cerr << "nx = " << nx << " nm = " << nm
-    //     << " nvalues = " << nvalues << endl;
+    cerr << "nx = " << nx << " nm = " << nm
+         << " nvalues = " << nvalues << endl;
         
     singular_values.resize(nvalues);
     distribution<float> svalues(nvalues);

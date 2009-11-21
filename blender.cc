@@ -83,6 +83,7 @@ init(const Data & data,
 
         for (unsigned i = 0;  i < num_models;  ++i) {
             int m = data.model_ranking[i];
+            cerr << "chose model " << m << " " << data.model_names[m] << endl;
             float score
                 = (mode == "best_n_weighted")
                 ? data.models[m].score

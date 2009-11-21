@@ -179,6 +179,12 @@ struct Data {
                   distribution<float> & remove_to_example_weights,
                   int random_seed = 1);
 
+    void hold_out(Data & remove_to, const std::vector<bool> & to_remove,
+                  distribution<float> & example_weights,
+                  distribution<float> & remove_to_example_weights);
+
+    void hold_out(Data & remove_to, const std::vector<bool> & to_remove);
+
     void clear();
 
     void swap(Data & other);
@@ -233,7 +239,6 @@ struct Data {
 
     size_t decomposition_size() const;
 
-protected:
     void calc_scores();
 };
 
