@@ -1089,3 +1089,15 @@ Best RMSE model (mr2):
 
 Success - rmse = 879.21304676246
 
+
+-----------------
+
+Final merged submit for small dataset:
+
+Success
+Gini = 0.88008495005618
+AUC = 0.94004247502809
+
+Success - rmse = 880.08936060645
+
+

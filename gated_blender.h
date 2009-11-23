@@ -12,6 +12,7 @@
 #include "blender.h"
 #include "boosting/dense_features.h"
 #include "boosting/classifier.h"
+#include "boosting/thread_context.h"
 #include "algebra/irls.h"
 #include "utils/filter_streams.h"
 
@@ -66,18 +67,27 @@ struct Gated_Blender : public Blender {
                        const distribution<float> & target_singular,
                        const Target_Stats & stats) const;
 
-    ML::Link_Function link_function;
+    distribution<float>
+    train_blender_model(const Data & data,
+                        ML::Thread_Context & thread_context,
+                        int num_examples,
+                        std::vector<distribution<float> *>
+                            & example_features) const;
+
+    ML::Link_Function link_function, blend_link_function;
     int num_models_to_train;
     bool debug_conf;
     bool debug_predict;
-
+    bool blend_with_classifier;
+    
     std::vector<int> recomposition_sizes;
 
     std::vector<ML::distribution<float> > model_coefficients;
-    distribution<float> blend_coefficients;
+    std::vector<distribution<double> > blend_coefficients;
     boost::shared_ptr<ML::Dense_Feature_Space> blender_fs;
     boost::shared_ptr<ML::Classifier_Impl> blender;
     Target target;
+    int random_seed;
 
     std::string blender_trainer_config_file;
     std::string blender_trainer_name;

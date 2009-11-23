@@ -54,6 +54,26 @@ bbdt2 {
     num_bags=500;
 }
 
+bbdt3 {
+    type=bagging;
+    verbosity=1;
+    weak_learner {
+        type=boosting;
+        verbosity=3;
+        weak_learner {
+            type=decision_tree;
+            max_depth=3;
+            verbosity=0;
+            update_alg=gentle;
+            random_feature_propn=0.2;
+        }
+        min_iter=5;
+        max_iter=10;
+        verbosity=0;
+    }
+    num_bags=50;
+}
+
 # Bagged boosted neural networks
 bbnn {
     type=bagging;
@@ -98,6 +118,13 @@ glz {
 bglz {
     type=bagging;
     num_bags=100;
+    weak_learner : glz {
+    }
+}
+
+bglz2 {
+    type=bagging;
+    num_bags=20;
     weak_learner : glz {
     }
 }
@@ -147,13 +174,20 @@ glz2 {
     type=glz;
     verbosity=3;
     link_function=linear;
-    normalize=false;
 }
 
 bglz2 {
     type=bagging;
-    num_bags=10;
+    num_bags=50;
     weak_learner : glz2 {
+    }
+}
+
+bglz3 {
+    type=bagging;
+    num_bags=50;
+    weak_learner : glz2 {
+        link_function=logit;
     }
 }
 
@@ -176,12 +210,13 @@ blender_auc : bbdt2 {
 
 regression_trees {
     type=bagging;
-    num_bags=100;
+    num_bags=200;
     weak_learner {
         type=decision_tree;
         max_depth=10;
-        verbosity=3;
-#        trace=1;
+        random_feature_propn=0.2;
+#        verbosity=3;
+#        trace=3;
     }
 }
 

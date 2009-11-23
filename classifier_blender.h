@@ -46,7 +46,13 @@ struct Classifier_Blender : public Blender {
 
     virtual boost::shared_ptr<ML::Dense_Feature_Space>
     feature_space() const;
+
+    void generate_training_data(ML::Training_Data & cls_training_data,
+                                const Data & train) const;
     
+    distribution<float>
+    predict_rmse_binary_features(const ML::Feature_Set & fset) const;
+
     std::string trainer_config_file;
     std::string trainer_name;
     
@@ -54,7 +60,12 @@ struct Classifier_Blender : public Blender {
 
     boost::shared_ptr<ML::Dense_Feature_Space> fs;
     boost::shared_ptr<ML::Classifier_Impl>     classifier;
-    boost::shared_ptr<ML::GLZ_Probabilizer>    probabilizer;
+
+    std::vector<boost::shared_ptr<ML::Classifier_Impl> > classifiers;
+    std::vector<ML::GLZ_Probabilizer> probabilizers;
+
+    // For final GLM to get probabilities
+    distribution<double> params;
 
     Target target;
 
@@ -68,6 +79,10 @@ struct Classifier_Blender : public Blender {
 
     bool use_decomposition_features;
     bool use_extra_features;
+    bool use_recomp_features;
+    bool use_regression;
+    bool debug_predict;
+    bool flatten_range;
 };
 
 #endif /* __ausdm__classifier_blender_h__ */

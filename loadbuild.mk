@@ -254,6 +254,51 @@ endef
 $(foreach size,S M L,$(foreach type,auc rmse,$(eval $(call do_gated5,$(size),$(type)))))
 
 
+# Gated model with denoising autoencoder decomposition, regression tree final
+# $(1): S, M or L (dataset size)
+# $(2): auc or rmse
+
+define do_gated6
+loadbuild/gated6/$(1)_$(2)_official.txt: loadbuild/.dir_exists loadbuild/gated6/.dir_exists loadbuild/$(1)_$(2)_DNAE3.dat
+	/usr/bin/time \
+	$(BIN)/ausdm \
+		-S $(1) -t $(2) -T 0.20 \
+		--decomposition loadbuild/$(1)_$(2)_DNAE3.dat \
+		gated.blender.trainer_name=regression_trees \
+		-o loadbuild/gated6/$(1)_$(2)_merge.txt~ \
+		-O $$@~ -n gated \
+	2>&1 | tee $$@.log
+	mv $$@~ $$@
+	mv loadbuild/gated6/$(1)_$(2)_merge.txt~ loadbuild/gated6/$(1)_$(2)_merge.txt
+
+gated6: loadbuild/gated6/$(1)_$(2)_official.txt
+endef
+
+$(foreach size,S M L,$(foreach type,rmse,$(eval $(call do_gated6,$(size),$(type)))))
+
+# Gated model with denoising autoencoder decomposition, regression tree final
+# $(1): S, M or L (dataset size)
+# $(2): auc or rmse
+
+define do_gated7
+loadbuild/gated7/$(1)_$(2)_official.txt: loadbuild/.dir_exists loadbuild/gated7/.dir_exists loadbuild/$(1)_$(2)_DNAE3.dat
+	/usr/bin/time \
+	$(BIN)/ausdm \
+		-S $(1) -t $(2) -T 0.20 \
+		--decomposition loadbuild/$(1)_$(2)_DNAE3.dat \
+		gated.blend_with_classifier=false \
+		-o loadbuild/gated7/$(1)_$(2)_merge.txt~ \
+		-O $$@~ -n gated \
+	2>&1 | tee $$@.log
+	mv $$@~ $$@
+	mv loadbuild/gated7/$(1)_$(2)_merge.txt~ loadbuild/gated7/$(1)_$(2)_merge.txt
+
+gated7: loadbuild/gated7/$(1)_$(2)_official.txt
+endef
+
+$(foreach size,S M L,$(foreach type,rmse,$(eval $(call do_gated7,$(size),$(type)))))
+
+
 
 mr_nfeat_S := 100
 mr_nfeat_M := 150
@@ -576,7 +621,7 @@ endef
 
 $(foreach size,S M L,$(foreach type,auc rmse,$(eval $(call do_dn2,$(size),$(type)))))
 
-# Deep net model 2 (no extra features)
+# Deep net model 3 (no extra features)
 # $(1): S, M or L (dataset size)
 # $(2): auc or rmse
 
@@ -603,5 +648,122 @@ loadbuild/dn3/$(1)_$(2)_official.txt: loadbuild/.dir_exists loadbuild/dn3/.dir_e
 dn3: loadbuild/dn3/$(1)_$(2)_official.txt
 endef
 
-$(foreach size,S M L,$(foreach type,auc rmse,$(eval $(call do_dn3,$(size),$(type)))))
+$(foreach size,S M L,$(foreach type,auc rmse,$(eval $(call do_dn4,$(size),$(type)))))
 
+# Deep net model 3 (no extra features)
+# $(1): S, M or L (dataset size)
+# $(2): auc or rmse
+
+define do_dn4
+loadbuild/dn4/$(1)_$(2)_official.txt: loadbuild/.dir_exists loadbuild/dn4/.dir_exists loadbuild/$(1)_$(2)_DNAE3.dat
+	/usr/bin/time \
+	$(BIN)/ausdm \
+		-S $(1) -t $(2) -T 0.20 \
+		--decomposition "" \
+		-o loadbuild/dn4/$(1)_$(2)_merge.txt~ \
+		-O $$@~ \
+		-n dn4 \
+		dn4.type=deep_net \
+		dn4.niter=800 \
+		dn4.model_base=loadbuild/$(1)_$(2)_DNAE3.dat \
+		dn4.sample_proportion=$(dnae_sp_$(1)) \
+		dn4.learning_rate=0.05 \
+		dn4.use_extra_features=true \
+		dn4.hold_out=0.3 \
+	2>&1 | tee $$@.log
+	mv $$@~ $$@
+	mv loadbuild/dn4/$(1)_$(2)_merge.txt~ loadbuild/dn4/$(1)_$(2)_merge.txt
+
+dn4: loadbuild/dn4/$(1)_$(2)_official.txt
+endef
+
+$(foreach size,S M L,$(foreach type,auc rmse,$(eval $(call do_dn4,$(size),$(type)))))
+
+# Regression trees
+# $(1): S, M or L (dataset size)
+# $(2): auc or rmse
+
+define do_rtrees
+loadbuild/rtrees/$(1)_$(2)_official.txt: loadbuild/.dir_exists loadbuild/rtrees/.dir_exists loadbuild/$(1)_$(2)_DNAE3.dat
+	/usr/bin/time \
+	$(BIN)/ausdm \
+		-S $(1) -t $(2) -T 0.20 \
+		--decomposition "loadbuild/$(1)_$(2)_DNAE3.dat" \
+		-o loadbuild/rtrees/$(1)_$(2)_merge.txt~ \
+		-O $$@~ \
+		-n rtrees \
+		rtrees.type=classifier \
+		rtrees.trainer_name=regression_trees \
+	2>&1 | tee $$@.log
+	mv $$@~ $$@
+	mv loadbuild/rtrees/$(1)_$(2)_merge.txt~ loadbuild/rtrees/$(1)_$(2)_merge.txt
+
+rtrees: loadbuild/rtrees/$(1)_$(2)_official.txt
+endef
+
+$(foreach size,S M L,$(foreach type,rmse,$(eval $(call do_rtrees,$(size),$(type)))))
+
+# Multiple class
+# $(1): S, M or L (dataset size)
+# $(2): auc or rmse
+
+define do_mclass
+loadbuild/mclass/$(1)_$(2)_official.txt: loadbuild/.dir_exists loadbuild/mclass/.dir_exists loadbuild/$(1)_$(2)_DNAE3.dat
+	/usr/bin/time \
+	$(BIN)/ausdm \
+		-S $(1) -t $(2) -T 0.20 \
+		--decomposition "loadbuild/$(1)_$(2)_DNAE3.dat" \
+		-o loadbuild/mclass/$(1)_$(2)_merge.txt~ \
+		-O $$@~ \
+		-n mclass \
+		mclass.type=classifier \
+		mclass.use_regression=false \
+		mclass.trainer_name=bbdt3 \
+	2>&1 | tee $$@.log
+	mv $$@~ $$@
+	mv loadbuild/mclass/$(1)_$(2)_merge.txt~ loadbuild/mclass/$(1)_$(2)_merge.txt
+
+mclass: loadbuild/mclass/$(1)_$(2)_official.txt
+endef
+
+$(foreach size,S M L,$(foreach type,rmse,$(eval $(call do_mclass,$(size),$(type)))))
+
+merged_auc_models := dn1 dn2 dn3 dn4 gated gated2 gated3 gated4 gated5 mr1 mr2 mr3 mr4 mr5 mr6 mr7 mr8 mr9
+merged_rmse_models := dn1 dn2 dn3 dn4 gated gated2 gated3 gated4 gated5 mr1 mr2 mr3 mr4 mr5 mr6 mr7 mr8 mr9 gated6 gated7 rtrees mclass
+
+merged_nf_auc := 15
+merged_nf_rmse := 15
+
+merged_nx_S := 2200
+merged_nx_M := 3000
+merged_nx_L := 6000
+
+
+
+# Merged model
+# $(1): S, M or L (dataset size)
+# $(2): auc or rmse
+
+define do_merged
+loadbuild/merged/$(1)_$(2)_official.txt: loadbuild/.dir_exists loadbuild/merged/.dir_exists loadbuild/$(1)_$(2)_DNAE3.dat
+	/usr/bin/time \
+	$(BIN)/merge \
+		-S $(1) -t $(2) \
+		--decomposition "" \
+		-o loadbuild/merged/$(1)_$(2)_merge.txt~ \
+		-O $$@~ \
+		-r false \
+		-n mr \
+		mr.type=multiple_regression \
+		mr.use_extra_features=false \
+		mr.num_features=$(merged_nf_$(2)) \
+		mr.num_examples=$(merged_nx_$(1)) \
+		$(merged_$(2)_models) \
+	2>&1 | tee $$@.log
+	mv $$@~ $$@
+	mv loadbuild/merged/$(1)_$(2)_merge.txt~ loadbuild/merged/$(1)_$(2)_merge.txt
+
+merged: loadbuild/merged/$(1)_$(2)_official.txt
+endef
+
+$(foreach size,S M L,$(foreach type,rmse auc,$(eval $(call do_merged,$(size),$(type)))))

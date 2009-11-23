@@ -18,22 +18,26 @@
 
 \icmlauthor{Jeremy Barnes}{jeremy@barneso.com}
 
-(Shameless plug: Please note that I am looking for consulting contracts at the moment: in Data Mining, Machine Learning or Computational Linguistics.  Please contact me if you are interested).
+\vskip 0.3in
+
+(Shameless plug: I am looking for consulting work: Data Mining, Machine Learning or Computational Linguistics).
 
 \vskip 0.3in
 ]
 
 \begin{abstract} 
-This is the abstract
+Several models to combine multiple predictions of
+The AUSDM challenge 
+Team ``barneso'' 's AUSDM challenge entry is descI describe my entry in the AUSDM ensembling challenge.  
 \end{abstract} 
 
 \section{Introduction}
 
 Here is the introduction
 
-\subsection{Open Source}
+\subsection{Problem Analysis}
 
-The source code for this submission is available.  The machine learning library used to perform the heavy lifting is available at http://bitbucket.org/jeremy\_barnes/jml/.  The source code of the actual ausdm submission is abailable at http://github.com/jeremybarnes/ausdm.  Both are available under the Affero GNU Public License version 3.
+
 
 \subsection{Competition}
 
@@ -62,17 +66,165 @@ correlation with the
 
 \subsection{Denoising Auto-Encoder Decomposition}
 
-\subsection{Engineering}
+One of my goals for this competition was to explore the use of deep neural network architectures.  The architecture that I choose was that of denoising autoencoders.
 
-In practice, this competition turned out to be as much about software
-engineering as about data mining.  This was due to the following factors:
+The goal of a standard auto encoder is to learn the identity function: two functions $f(\cdot)$ and $g(\cdot)$ such that $f(g(\mathbf{x})) = \mathbf{x}$.  Generally, in order to be interesting an auto-encoder will include some kind of restriction: for example, the number of dimensions in the range of $f$ is smaller than the number of dimentions in its domain.
+
+In neural networks, the most commonly used formulation shares an activation matrix $\mathbf{W}$ between the forward and reverse directions:
+
+$$
+f(\mathbf{x}) = t(\mathbf{Wx} + \mathbf{b})
+$$
+$$
+g(\mathbf{x}) = t(\mathbf{W}^T\mathbf{x} + \mathbf{c})
+$$
+
+The output of $f(x)$ is the \emph{encoded} form of the input $\mathbf{x}$, and the function $f$ is the \emph{encoder function}.  Similarly, $g$ is the \emph{decoder} function.  When we train the auto encoder over a 
+
+In some circumstances, it may encode nearly the same information as in $\mathbf{x}$.  For example, if $t$ is the identity function and $\mathbf{W}$ is the left-singular matrix of a set of 
+
+When $t$ is the identity function, this formulation reduces (essentially, see below) to the singular value decomposition.
+
+When $t(\cdot)$ is a non-linear squashing function such as (in my case) $t(\mathbf{x}) = \tanh(\mathbf{x})$, we can use this neural network to learn a nonlinear decomposition.
+
+Note that these auto-encoders can be stacked one on top of the other, so that we apply all of the forward functions one after the other and then all of the reverse directions in the opposite order.
+
+In order to make the auto encoder generalize (and learn higher level features), we need to do one of two things:
+
 \begin{itemize}
-\item There were six different, distinct tasks (three dataset sizes for each of the AUC and RMSE tasks).  These tasks varied widely in terms of data size (the large task is 15 times bigger than the small task).  Managing the different varients
-\item Due to the large amount of noise in the data, it was necessary to run models many, many times and take the average to avoid overfitting the training set.  As a result
-\item The relatively modest hardware available and the high computational demands required that the software be efficiently implemented and take full advantage of all of the CPU cores available.
+\item Add noise to the input, but train the network to reconstruct the non-noisy input (remove the noise).  This is where it becomes a ``denoising'' auto-encoder;
+\item Create an information bottleneck, whereby the number of features from which the input is reconstructed is lower than the number of features in the input.
 \end{itemize}
 
-\subsection{Conclusion}
+\subsubsection{Addition of noise}
+
+\subsubsection{Information bottleneck}
+
+In addition to adding noise as described above, I also created an information bottleneck.
+
+\section{Derived Features}
+
+In order to make it easier for the classifiers to work, several features were derived from the outputs of the models:
+
+\begin{itemize}
+\item The minimum, maximum, mean and standard deviation of the model outputs;
+\item For of the 10 highest ranking models:
+  \begin{itemize}
+    \item The minimum, maximum and mean value;
+    \item The difference between the spread of values over these 10 models and the spread of values over all of the models;
+    \item For each of the 10 models, the output of the model;
+    \item For each of the 10 models, the number of standard deviations from the mean;
+    \item The difference between the output of this model and the closest integer (for example, 4.513 which corresponds to 4513 in the data files would return 0.487);
+    \item If a decomposition was done, the error of the reconstruction of this model by the decomposition;
+  \end{itemize}
+\item The output of the decomposition (SVD or Denoising Auto-Encoder), if there was any;
+\item The overall RMS error of the decomposition on this example.
+
+\end{itemize}
+
+
+\section{Models}
+
+There were three main models used in the entry:
+
+\begin{itemize}
+\item A multiple regression model;
+\item A gated classifier model;
+\item A deep neural network model.
+\end{itemize}
+
+In addition, several other models were tried:
+
+\begin{itemize}
+\item A boosting model
+\item A standard classifier model
+\end{itemize}
+
+Each will be described briefly in the following sections.
+
+\subsection{Multiple Regression Models}
+
+\subsection{Gated Classifier Models}
+
+\subsection{Deep Neural Network Model}
+
+This model started with the denoising autoencoders
+
+\section{Results Generation}
+
+In order to generate results, a large number of predictors were trained individually based upon the models above.  Each of these predictors was trained on 80\% of the training data, with the other 20\% (always the same part) held out in order to train the final blending model.  Once each model was run, it created:
+
+\begin{enumerate}
+\item A blending results file containing the model's unbiased prediction for each entry of the 20\% of final blending data held out;
+\item A submission results file containing the model's prediction for each entry of the scoring set (for which labels weren't available).
+\end{enumerate}
+
+Once all of the files were available, they were blended together by the final blender, and this result became the submitted output.
+
+\subsection{Models Used}
+
+There were four main classes of models that were used to contribute to the final score.
+
+\subsubsection{Multiple Regression}
+
+The multiple regression models turned out to be the most powerful models, particularly in the RMSE task.  This is largely due to their ability to reject noise due to their inherent smoothness, the regularization provided by ridge regression and the smoothing provided by the random selection of features and examples.
+
+\subsubsection{Deep Neural Networks}
+
+The very first results obtained from the deep neural network were extremely good, and placed quite high on the leaderboard.  However, all attempts to reproduce these results failed\footnote{The code that generated these results had a bug in it which caused the execution to be non-deterministic}: the training error of the deep net stopped improving far before the point observed on the first run.  The results from the deep net are included as they tend to be more diverse than the other models, but they did not contribute greatly to the final score.
+
+\subsubsection{Gated Merger}
+
+Several models of the gated merger were tried.  This model tended to perform reasonably well for the AUC task, but poorly for the RMSE task.  Presumably, this is because the two-stage nature of the model caused the noise to be amplified between the stages.
+
+The models differed in which decomposition they used (no decomposition, the SVD or the denoising autoencoders), whether or not they used extra features, and the technique used for the final score once the confidence-modified values had been produced.
+
+\subsubsection{Classifier Models}
+
+For the RMSE data, two classifier models were used.  One, \texttt{rtrees} used a random forest of 200 regression trees.  The other, \texttt{mclass}, learnt a binary classifier for each discrete movie rating (1, 2, 3, 4 or 5 stars) using a random forest of 500 decision trees, and combined these predictions using linear regression.  Neither model performed particularly well.
+
+
+\subsection{Final Blending}
+
+Final blending was performed using a cross-validation training on the 20\% held out data.  The held out data was broken into 10 folds, and 10 different multiple regression models were trained, each leaving out one fold.  The performance of the merged model on the entire 20\% held out was then evaluated.  The submission results were generated by running each of the 10 multiple regression models and averaging the results.
+
+This strategy was adapted in order to reduce the impact that a ``rogue'' model (with a high error rate) would have on the final blend.  It is unlikely that performing (yet another) round of blending of already blended models would significantly improve the results.  Straight linear blending worked just as well, especially for the RMSE task.
+
+The final blending provided a substantial improvement in the AUC task.  On the RMSE task, final blending was ineffectual: the score of the blended result was slightly worse than the best individual result\footnote{The submitted results were still the blended ones, however, as they should be more resistant to the selection bias in the validation set}.
+
+This is probably due to there not being enough diversity in the models blended: there were only a few really distinct models, and these frequently used the same features (from the DNAE, the SVD and the derived features).
+
+\section{Discussion}
+
+
+
+\subsection{Engineering}
+
+In practice, this competition turned out (for me, anyway) to be as much about software engineering as about data mining.
+
+The biggest reason for this was the amount of noise in the data compared to the size of the data itself.  The variation over even very sparesly parameterized models such as linear regression was extremely large, and for non-linear models (especially those using algorithms such as boost) was even worse.  As a result, it was necessary to run each model as many times as possible over different random subsets of the data and average the results (for example, 5000 decision trees were trained for the random forest classifier in the gated model).
+
+Due to the limited hardware resources available\footnote{One quad core ``hyperthreaded'' (8 virtual cores) desktop machine with 6GB of RAM, one dual core laptop with 2GB of RAM} and the large number of tasks, it was necessary that the software be both memory and CPU efficient.
+The entire code was vectorized to take advantage of the vector unit, multi-threaded\footnote{On the desktop machine, 8 threads were run to fully exploit the hyper-threaded processor} and the bottlenecks were profiled and carefully optimized.  Single precision arithmetic was used wherever possible\footnote{It is frequently not possible.  For example, whenever accumulating a series of numbers it is necessary to accumulate in double precision even if the numbers being accumulated are only in single precision.} due to its advantage in execution speed.
+
+In addition, parameters were saved using as small a precision as possible and care was taken not to duplicate memory when splitting datasets into training and validation sets.
+
+The fact that there were six different tasks (AUC and RMSE for the small, medium and large datasets) also increased the amount of CPU time and engineering work required, as anything that was model or dataset-specific needed to be parameterized out and a method found to calculate the parameter for the task at hand.
+
+In the end, about 5,000 lines of C++ code were written to handle the competition directly, and about 15,000 lines added to the underlying machine learning library (primarily the code to perform Ridge Regression and the denoising auto-encoder routines).  The entire set of results could be reproduced in about 24 hours on the desktop machine.
+
+\subsection{Open Source}
+
+The source code for this submission is available.  The machine learning library used to perform the heavy lifting is available at http://bitbucket.org/jeremy\_barnes/jml/.  The source code of the actual ausdm submission is abailable at http://github.com/jeremybarnes/ausdm.  Both are available under the Affero GNU Public License version 3.
+
+\subsection{Directions for Further Investigation}
+
+\begin{itemize}
+\item Non-linear but noise resistant regression models
+\end{itemize}
+
+
+\section{Conclusion}
 
 
 % Acknowledgements should only appear in the accepted version. 

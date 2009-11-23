@@ -49,6 +49,9 @@ struct Multiple_Regression_Blender : public Blender {
     get_features(const ML::distribution<float> & models,
                  const ML::distribution<float> & decomp,
                  const Target_Stats & stats) const;
+
+    virtual boost::shared_ptr<ML::Dense_Feature_Space>
+    feature_space() const;
     
     int random_seed;
     int num_iter;
@@ -66,6 +69,8 @@ struct Multiple_Regression_Blender : public Blender {
     std::vector<int> recomposition_orders;
     std::vector<Model_Stats> model_stats;
     std::vector<std::string> model_names;
+    int nm;
+    int ndecomposed;
 
     bool use_decomposition_features;
     bool use_extra_features;

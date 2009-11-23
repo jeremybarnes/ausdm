@@ -11,6 +11,7 @@
 #include "boosting/worker_task.h"
 #include "utils/guard.h"
 #include <boost/bind.hpp>
+#include <boost/progress.hpp>
 #include "algebra/lapack.h"
 #include "algebra/least_squares.h"
 #include "stats/distribution_ops.h"
@@ -18,7 +19,7 @@
 #include "boosting/classifier_generator.h"
 #include "decomposition.h"
 #include "utils.h"
-
+#include "stats/distribution_ops.h"
 
 using namespace ML;
 using namespace std;
@@ -65,7 +66,11 @@ configure(const ML::Configuration & config_,
     blender_trainer_name = (target == AUC ? "blender_auc" : "blender_rmse");
     config.find(blender_trainer_name, "blender.trainer_name");
 
+    blend_with_classifier = true;
+    config.find(blend_with_classifier, "blend_with_classifier");
+
     this->target = target;
+    this->random_seed = random_seed;
 }
 
 void
@@ -369,6 +374,146 @@ train_conf(int model,
 struct Generate_Blend_Data_Job {
 };
 
+distribution<float>
+Gated_Blender::
+train_blender_model(const Data & data,
+                    Thread_Context & thread_context,
+                    int num_examples,
+                    vector<distribution<float> *> & example_features) const
+{
+    if (data.nx() == 0)
+        throw Exception("can't train with no data");
+
+    int nf = get_blend_features(data.examples[0]->models,
+                                data.examples[0]->models,
+                                data.examples[0]->decomposed,
+                                data.examples[0]->stats).size();
+
+
+    // Number of examples to take
+    int nx_me = std::min(data.nx(), num_examples);
+
+    // Number of models to take
+    int nf_me = nf;
+    
+    int nx = data.nx();
+
+    // Choose models randomly
+#if 0
+    set<int> features_done;
+    while (features_done.size() < nf_me) {
+        features_done.insert(thread_context.random01() * nf);
+    }
+
+    vector<int> kept_features(features_done.begin(), features_done.end());
+#else
+    vector<int> kept_features;
+    for (unsigned i = 0;  i < nf;  ++i)
+        kept_features.push_back(i);
+#endif
+
+    // Choose examples randomly
+    set<int> examples_done;
+    while (examples_done.size() < nx_me) {
+        examples_done.insert(thread_context.random01() * nx);
+    }
+
+    vector<int> examples(examples_done.begin(), examples_done.end());
+
+    typedef double Float;
+    distribution<Float> correct(nx_me);
+    boost::multi_array<Float, 2> outputs(boost::extents[nf_me + 1][nx_me]);
+    distribution<Float> w(nx_me, 1.0);
+
+    for (unsigned i = 0;  i < nx_me;  ++i) {
+        correct_prediction = data.targets[examples[i]];
+
+        if (!example_features[examples[i]]) {
+            distribution<float> conf
+                = this->conf(data.examples[examples[i]]->models,
+                             data.examples[examples[i]]->decomposed,
+                             data.examples[examples[i]]->stats);
+
+            //conf = (conf != 0.0).cast<float>();
+            
+            distribution<float> features
+                = get_blend_features(data.examples[examples[i]]->models,
+                                     conf,
+                                     data.examples[examples[i]]->decomposed,
+                                     data.examples[examples[i]]->stats);
+            
+            atomic_init(example_features[examples[i]],
+                        new distribution<float>(features));
+        }
+
+        const distribution<float> & features
+            = *example_features[examples[i]];
+
+        for (unsigned j = 0;  j < nf_me;  ++j)
+            outputs[j][i] = features[kept_features[j]];
+
+        outputs[nf_me][i] = 1.0;  // bias
+
+        correct[i] = data.targets[examples[i]];
+        if (target == AUC)
+            correct[i] = (correct[i] == 1.0);
+    }
+
+    distribution<Float> trained_params
+        = perform_irls(correct, outputs, w, blend_link_function,
+                       true /* ridge_regression */);
+
+    distribution<float> result(nf + 1);
+
+    for (unsigned i = 0;  i < kept_features.size();  ++i)
+        result[kept_features[i]] = trained_params[i];
+    result[nf] = trained_params.back();  // bias
+
+    return result;
+}
+
+namespace {
+
+struct Train_Model_Job {
+    const Gated_Blender & blender;
+    distribution<double> & result;
+    Lock & lock;
+    const Data & train;
+    int random_seed;
+    boost::progress_display & progress;
+    int num_examples;
+    vector<distribution<float> *> & example_features;
+
+    Train_Model_Job(const Gated_Blender & blender,
+                    distribution<double> & result,
+                    Lock & lock,
+                    const Data & train,
+                    int random_seed,
+                    boost::progress_display & progress,
+                    int num_examples,
+                    vector<distribution<float> *> & example_features)
+        : blender(blender), result(result), lock(lock), train(train),
+          random_seed(random_seed), progress(progress),
+          num_examples(num_examples), example_features(example_features)
+    {
+    }
+
+    void operator () ()
+    {
+        Thread_Context context;
+        context.seed(random_seed);
+        distribution<float> params
+            = blender.train_blender_model(train, context, num_examples,
+                                          example_features);
+        Guard guard(lock);
+        if (result.empty()) result = params;
+        else result += params;
+        ++progress;
+    }
+};
+
+} // file scope
+
 void
 Gated_Blender::
 init(const Data & training_data_in,
@@ -474,6 +619,118 @@ init(const Data & training_data_in,
 
     cerr << "generating blend data" << endl;
 
+    int num_iter = 5;
+
+    if (!blend_with_classifier) {
+        cerr << "training blender" << endl;
+        
+        blend_link_function
+            = (target == AUC ? LOGIT : LINEAR);
+
+        bool squashed = (blend_link_function == LINEAR);
+
+        blend_coefficients.clear();
+        blend_coefficients.resize(squashed ? 1 : num_iter);
+        
+        Thread_Context context;
+        context.seed(random_seed);
+
+        Lock lock;
+
+        static Worker_Task & worker = Worker_Task::instance(num_threads() - 1);
+    
+        cerr << "training " << num_iter << " models" << endl;
+        boost::progress_display progress(num_iter, cerr);
+
+        vector<distribution<float> *> example_features(nx);
+
+        // Now, submit it as jobs to the worker task to be done multithreaded
+        int group;
+        {
+            int parent = -1;  // no parent group
+            group = worker.get_group(NO_JOB, "train model task", parent);
+            
+            // Make sure the group gets unlocked once we've populated
+            // everything
+            Call_Guard guard(boost::bind(&Worker_Task::unlock_group,
+                                         boost::ref(worker),
+                                         group));
+
+            for (unsigned i = 0;  i < num_iter;  ++i) {
+                worker.add
+                    (Train_Model_Job(*this,
+                                     (squashed
+                                      ? blend_coefficients[0]
+                                      : blend_coefficients[i]),
+                                     lock, blend_training_data,
+                                     context.random(), progress,
+                                     0.8 * nx, example_features),
+                     "train model job",
+                     group);
+            }
+        }
+
+        // Add this thread to the thread pool until we're ready
+        worker.run_until_finished(group);
+
+        if (squashed) blend_coefficients[0] /= num_iter;
+
+        boost::shared_ptr<Dense_Feature_Space> fs
+            = blend_feature_space();
+
+        distribution<double> totals
+            = blend_coefficients[0] / blend_coefficients.size();
+        for (unsigned i = 1;  i < blend_coefficients.size();  ++i)
+            totals += blend_coefficients[i] / blend_coefficients.size();
+
+        int nf = totals.size() - 1;
+
+
+        distribution<double> means(nf);
+        distribution<float> mins(nf, INFINITY);
+        distribution<float> maxs(nf, -INFINITY);
+        int nvals = 0;
+
+        for (unsigned i = 0;  i < example_features.size();  ++i) {
+            if (example_features[i]) {
+                means += *example_features[i];
+                mins = min(mins, *example_features[i]);
+                maxs = max(maxs, *example_features[i]);
+                ++nvals;
+            }
+        }
+
+        means /= nvals;
+
+        distribution<double> variances(nf);
+
+        for (unsigned i = 0;  i < example_features.size();  ++i)
+            if (example_features[i])
+                variances += sqr(*example_features[i] - means);
+
+        variances /= nvals;
+        distribution<double> stds = sqrt(variances);
+
+        means.resize(nf + 1);
+        mins.resize(nf + 1);
+        maxs.resize(nf + 1);
+        stds.resize(nf + 1);
+
+
+        for (unsigned i = 0;  i <= nf;  ++i) {
+            cerr << format("%4d %-30s %9.5f %9.5f %9.5f %9.5f %9.5f", i, 
+                           (i == nf ? "bias" : fs->print(Feature(i)).c_str()),
+                           totals[i], mins[i], means[i], stds[i], maxs[i])
+                 << endl;
+        }
+
+        for (unsigned i = 0;  i < example_features.size();  ++i)
+            delete example_features[i];
+
+        return;
+    }
+
+
     typedef double BlendFloat;
 
     // Assemble the labels
@@ -526,6 +783,8 @@ init(const Data & training_data_in,
         distribution<float> conf
             = this->conf(model_outputs, target_singular, target_stats);
 
+        //conf = (conf != 0.0).cast<float>();
+
         distribution<float> features
             = get_blend_features(model_outputs, conf, target_singular,
                                  target_stats);
@@ -548,32 +807,19 @@ init(const Data & training_data_in,
 
     }
 
-#if 0
-    cerr << "training blender" << endl;
-
-    Link_Function blend_link_function
-        = (target == AUC ? LOGIT : LINEAR);
-
-    distribution<BlendFloat> parameters
-        = perform_irls(correct, outputs, w, blend_link_function);
-    
-    cerr << "blend coefficients: " << parameters << endl;
-
-    blend_coefficients = parameters;
-#endif
-
     Configuration config;
     config.load(blender_trainer_config_file);
-
+    
     boost::shared_ptr<Classifier_Generator> trainer
         = get_trainer(blender_trainer_name, config);
-
+    
     trainer->init(fs, Feature(nv));
-
+    
     Thread_Context context;
-
-    blender = trainer->generate(context, training_data, blend_example_weights,
-                                training_data.all_features());
+    
+    blender
+        = trainer->generate(context, training_data, blend_example_weights,
+                            training_data.all_features());
 }
 
 boost::shared_ptr<Dense_Feature_Space>
@@ -722,7 +968,13 @@ blend_feature_space() const
     boost::shared_ptr<Dense_Feature_Space> result
         (new Dense_Feature_Space());
 
-    result->add_feature("bias", REAL);
+#if 0
+    for (unsigned i = 0;  i < data->nm();  ++i) {
+        result->add_feature(data->model_names[i], REAL);
+    }
+
+    return result;
+#endif
 
     result->add_feature("min_model", REAL);
     result->add_feature("max_model", REAL);
@@ -796,7 +1048,11 @@ get_blend_features(const distribution<float> & model_outputs,
 {
     distribution<float> result;
 
-    result.push_back(1.0);  // bias
+#if 0
+    result.extend(model_outputs);
+
+    return result;
+#endif
 
     result.push_back(model_outputs.min());
     result.push_back(model_outputs.max());
@@ -807,11 +1063,17 @@ get_blend_features(const distribution<float> & model_outputs,
 
     result.push_back(avg_model_chosen);
 
-    distribution<float> weighted = model_outputs * model_conf;
+    distribution<float> weighted;
+    if (target == AUC) weighted = model_outputs * model_conf;
+    else weighted = model_outputs + model_conf;
+
     result.push_back(weighted.min());
     result.push_back(weighted.max());
     result.push_back(weighted.total() / (model_conf != 0.0).count());
-    result.push_back(weighted.total() / model_conf.total());
+
+    if (target == AUC)
+        result.push_back(weighted.total() / model_conf.total());
+    else result.push_back(model_conf.mean());
 
     distribution<float> dense_model, dense_conf;
 
@@ -911,6 +1173,8 @@ predict(const ML::distribution<float> & models) const
     distribution<float> conf = this->conf(models, target_singular,
                                           target_stats);
     
+    //conf = (conf != 0.0).cast<float>();
+
     if (target == RMSE && false) {
         distribution<float> adjusted;
 
@@ -936,36 +1200,60 @@ predict(const ML::distribution<float> & models) const
     distribution<float> blend_features
         = get_blend_features(models, conf, target_singular, target_stats);
 
-#if 0
-    Link_Function blend_link_function
-        = (target == AUC ? LOGIT : LINEAR);
-
-    float result
-        = apply_link_inverse(blend_features.dotprod(blend_coefficients),
-                             blend_link_function);
-#endif
-
-    blend_features.push_back(correct_prediction);
-
-    boost::shared_ptr<Mutable_Feature_Set> features
-        = blender_fs->encode(blend_features);
-
-    if (dump_predict_features != "") {
-        Guard guard(predict_feature_lock);
-        predict_feature_file << blender_fs->print(*features) << endl;
-    }
-
-    //ML::Output_Encoding encoding
-    //    = blender->output_encoding();
-    //cerr << "output encoding is " << encoding << endl;
-
     float result;
-    if (target == AUC)
-        result = blender->predict(1, *features);
-    else result = blender->predict(0, *features);
 
-    if (debug) cerr << "result before scaling = "
-                    << result << endl;
+    if (!blend_with_classifier) {
+        blend_features.push_back(1.0);
+
+        double total = 0.0;
+        for (unsigned i = 0;  i < blend_coefficients.size();  ++i) {
+            total 
+                += apply_link_inverse
+                (blend_features.dotprod(blend_coefficients[i]),
+                       blend_link_function);
+        }
+        result = total / blend_coefficients.size();
+
+        if (debug_predict) {
+            distribution<double> total_features = blend_coefficients[0];
+            for (unsigned i = 1;  i < blend_coefficients.size();  ++i)
+                total_features += blend_coefficients[i];
+            
+            total_features /= blend_coefficients.size();
+            
+            total_features *= blend_features;
+            
+            vector<pair<float, int> > sorted;
+            for (unsigned i = 0;  i < total_features.size();  ++i)
+                sorted.push_back(make_pair(abs(total_features[i]), i));
+            
+            sort_on_first_descending(sorted);
+            
+            for (unsigned i = 0;  i < 20;  ++i) {
+                int f = sorted[i].second;
+                cerr << i << ": feat " << f << " "
+                     << blend_feature_space()->print(Feature(f))
+                     << " val " << blend_features[f] << " ctrb "
+                     << total_features[f] << endl;
+            }
+        }
+    }
+    else {
+
+        blend_features.push_back(correct_prediction);
+        
+        boost::shared_ptr<Mutable_Feature_Set> features
+            = blender_fs->encode(blend_features);
+        
+        if (dump_predict_features != "") {
+            Guard guard(predict_feature_lock);
+            predict_feature_file << blender_fs->print(*features) << endl;
+        }
+
+        if (target == AUC)
+            result = blender->predict(1, *features);
+        else result = blender->predict(0, *features);
+    }
 
     if (debug) cerr << "result = " << result << " correct = "
                     << correct_prediction << endl;
@@ -990,17 +1278,24 @@ explain(const ML::distribution<float> & models) const
     
     distribution<float> conf = this->conf(models, target_singular,
                                           target_stats);
+
+    //conf = (conf != 0.0).cast<float>();
     
     distribution<float> blend_features
         = get_blend_features(models, conf, target_singular, target_stats);
 
-    blend_features.push_back(correct_prediction);
-
-    boost::shared_ptr<Mutable_Feature_Set> features
-        = blender_fs->encode(blend_features);
-
-    ML::Explanation explanation
-        = blender->explain(*features, target == AUC);
-
-    return explanation.print();
+    if (blend_with_classifier) {
+        blend_features.push_back(correct_prediction);
+        
+        boost::shared_ptr<Mutable_Feature_Set> features
+            = blender_fs->encode(blend_features);
+        
+        ML::Explanation explanation
+            = blender->explain(*features, target == AUC);
+        
+        return explanation.print();
+    }
+    else {
+        return "";
+    }
 }

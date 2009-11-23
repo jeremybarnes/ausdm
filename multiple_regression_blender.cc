@@ -180,9 +180,13 @@ init(const Data & training_data,
     this->decomposition = training_data.decomposition;
     this->model_stats = training_data.models;
     this->model_names = training_data.model_names;
+    this->nm = model_names.size();
 
-    if (decomposition)
+    if (decomposition) {
         recomposition_orders = decomposition->recomposition_orders();
+        ndecomposed = decomposition->size();
+    }
+    else ndecomposed = 0;
 
     int nf = get_features(training_data.examples[0]->models,
                           training_data.examples[0]->decomposed,
@@ -230,13 +234,22 @@ init(const Data & training_data,
 
     if (squashed) coefficients[0] /= num_iter;
 
+    boost::shared_ptr<Dense_Feature_Space> fs
+        = feature_space();
+    if (fs->variable_count() != nf) {
+        cerr << "nf = " << nf << endl;
+        cerr << "fs->variable_count() = " << fs->variable_count()
+             << endl;
+        throw Exception("feature counts don't match");
+    }
+
     distribution<double> totals(nf + 1);
     for (unsigned i = 0;  i < coefficients.size();  ++i)
-        totals += coefficients[i];
+        totals += coefficients[i] / coefficients.size();
 
     for (unsigned i = 0;  i <= nf;  ++i) {
         cerr << format("%-30s %9.5f",
-                       (i == nf ? "bias" : model_names[i].c_str()),
+                       (i == nf ? "bias" : fs->print(Feature(i)).c_str()),
                        totals[i])
              << endl;
     }
@@ -309,7 +322,6 @@ get_features(const ML::distribution<float> & model_outputs,
         result.push_back((reconst - model_outputs).two_norm());
     }
     
-    result.push_back(model_outputs.total() / model_outputs.size());
     float avg_model_chosen = dense_model.mean();
 
     result.push_back(avg_model_chosen);
@@ -327,6 +339,64 @@ get_features(const ML::distribution<float> & model_outputs,
     result.push_back(stats.mean - avg_model_chosen);
     result.push_back(abs(stats.mean - avg_model_chosen));
 
+    return result;
+}
+
+boost::shared_ptr<Dense_Feature_Space>
+Multiple_Regression_Blender::
+feature_space() const
+{
+    boost::shared_ptr<Dense_Feature_Space> result
+        (new Dense_Feature_Space());
+
+    for (unsigned i = 0;  i != nm;  ++i)
+        result->add_feature(model_names[i], REAL);
+
+    for (unsigned i = 0;  i  !=  ndecomposed && use_decomposition_features;  ++i)
+        result->add_feature(format("decomp%03d", i), REAL);
+    
+    if (!use_extra_features) return result;
+    
+    result->add_feature("min_model", REAL);
+    result->add_feature("max_model", REAL);
+         
+    
+    for (unsigned i = 0;  i < nm;  ++i) {
+        if (model_stats[i].rank >= 10)
+            continue;
+        string s = model_names[i];
+        result->add_feature(s + "_output", REAL);
+        result->add_feature(s + "_dev_from_mean", REAL);
+        result->add_feature(s + "_diff_from_int", REAL);
+
+        for (unsigned i = 0;  i < recomposition_orders.size();  ++i) {
+            string s2 = format("%s_recomp_error_%d", s.c_str(),
+                               recomposition_orders[i]);
+            result->add_feature(s2, REAL);
+            result->add_feature(s2 + "_abs", REAL);
+            result->add_feature(s2 + "_sqr", REAL);
+        }
+    }
+
+    for (unsigned i = 0;  i < recomposition_orders.size();  ++i) {
+        string s = format("recomp_error_%d", recomposition_orders[i]);
+        result->add_feature(s + "_rmse", REAL);
+    }
+    
+    result->add_feature("avg_model_chosen", REAL);
+
+    result->add_feature("models_mean", REAL);
+    result->add_feature("models_std", REAL);
+    result->add_feature("models_min", REAL);
+    result->add_feature("models_max", REAL);
+    
+    result->add_feature("models_range", REAL);
+    result->add_feature("models_range_dev_high", REAL);
+    result->add_feature("models_range_dev_low", REAL);
+
+    result->add_feature("diff_mean_10_all", REAL);
+    result->add_feature("abs_diff_mean_10_all", REAL);
+    
     return result;
 }
 

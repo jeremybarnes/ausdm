@@ -247,7 +247,7 @@ perform_irls_impl(const distribution<Float> & correct,
 
     if (link_function == LINEAR && (w.min() == w.max())) {
         if (ridge_regression) {
-            Ridge_Regressor regressor;
+            Ridge_Regressor regressor(1e-5);
             trained = regressor.calc(transpose(outputs_reduced), correct);
         }
         else {
