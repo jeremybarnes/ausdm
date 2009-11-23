@@ -27,7 +27,7 @@
 
 \begin{abstract} 
 
-We describe how we combined 1152 ``black box'' models into a more powerful ensemble predictor.  Several models that achieved significant success on the AUC task were produced: a deep neural network model, a gated classifier and a multiple logistic regression model.  Further improvement was achieved by adding features derived from the model input, and by adding unsupervised features from decomposing the model inputs (using a SVD or denoising auto-encoders).
+We describe how we combined 1151 ``black box'' models into a more powerful ensemble predictor.  Several models that achieved significant success on the AUC task were produced: a deep neural network model, a gated classifier and a multiple logistic regression model.  Further improvement was achieved by adding features derived from the model input, and by adding unsupervised features from decomposing the model inputs (using a SVD or denoising auto-encoders).
 
 On the large AUC task, the baseline performance\footnote{The average of the most accurate 20 models over a held-out set of 20\% of the training set.  These scores are not the official scores, which are calculated on data for which the labels were not available.} of 0.1635 was reduced to 0.1461.  On the more difficult medium task, the baseline performance of 0.3384 was reduced to 0.3144.  On the simpler small task, the baseline of 0.0597 was reduced to 0.0571.
 
@@ -39,11 +39,94 @@ The ``black box'' nature of the competition and the underlying noise in the labe
 
 \section{Introduction}
 
-The AUSDM ensembling challenge is based upon the NetFlix Competition \cite{NetFlixPrize} which recently finished.
+The AUSDM ensembling challenge is based upon the NetFlix Prize \cite{NetFlixPrize} which recently finished.
+
+\subsection{NetFlix Prize}
+
+ The goal of this competition was to predict the rating (from 1 to 5) that a person would give to a film on a particular date, given a training dataset that contained examples of predictions that had already been made.  The score was evaluated with the Root Mean Squared Error (RMSE):
+
+$$
+E = \sqrt{\frac{1}{n} \sum_{i=1}^{n} (x_i - \hat{x}_i)^2} \label{RMSE}.
+$$
+
+A ``probe'' dataset was also made available, which included 1.4 million (user, date, rating) triplets that were not included in the training set.  Finally, a third dataset was provided; this dataset included (user, date) pairs, and the goal of the competition was to predict the rating for each of these pairs.
+
+The leading entries in this competition were from coalitions of collaborating teams.  The teams would independently produce models that were trained only on the training set.  These models would then be run to predict the values in both the probe and testing datasets.  These predicted results would then be exchanged within the group of collaborators, and a final blended model would be produced, with the parameters for the blend learned from the probe set.
+
+\subsection{AUSDM Competition}
+
+The organisers of the AUSDM competition first approached the two leading coelitions and obtained from them the results of all of their models (some 1151 in total) on the probe set.  From this large combined set of data, random sampling was used to produce twelve datasets, with three data sizes (Small, Medium and Large as decribed in table \ref{problems}), two problem types (AUC and RMSE) and two datasets for each (a training set including target values, and a testing set with the target values removed).
+
+\begin{table}[t]
+\caption{Problem sizes and row counts.}
+\label{problems}
+\vskip 0.15in
+\begin{center}
+\begin{small}
+\begin{sc}
+\begin{tabular}{lrrrr}
+\hline
+\abovespace\belowspace
+Size & Training & Testing & Models & Size \\
+\hline
+\abovespace
+Small    & 15,000 & 15,000 & 200 & 300MB \\
+Medium   & 25,000 & 25,000 & 250 &  25MB \\
+\belowspace
+Large    & 50,000 & 50,000 & 1151 & 15MB \\
+\hline
+\end{tabular}
+\end{sc}
+\end{small}
+\end{center}
+\vskip -0.1in
+\end{table}
+
+Note that all information about the movies, users, dates and models was removed from the dataset.  This was presumably due to the probe set being publicly available for the duration of the NetFlix Prize; it would be very easy to use the probe scores to improve performance (either accidentally or on purpose).  The result was to make the contest a complete ``black box'', and preclude the use of any side-channel information.  This point will be discussed below.
+
+\subsubsection{RMSE Task}
+
+The RMSE problem in the AUSDM Challenge was identical to that in the NetFlix Prize: minimize the RMSE in equation \ref{RMSE}.
+
+\subsubsection{AUC Task}
+
+The AUC task was a binary ranking problem.  Two ratings were selected (for example, 1 star and 5 stars), and only rows with one of these ratings were samples.  These two rows were then assigned the labels $+1$ and $-1$.  The goal was to minimize the AUC score, which is the average false rate (the sum of the average false positive rate over negative examples and the average false negative rate over positive examples).
+
+Intuitively, the goal of this task is to separate the two classes as much as possible.  For this task, only the order of the scores mattered, not their magnitudes.  As a result, it is possible to use the RMSE score as a surrogate to calculate the AUC.
+
+Table \ref{auc} shows details of the three tasks and the likely correspondence between the $\pm 1$ values and the number of stars.  A baseline AUC score using the average RMSE of the 20 models with the highest AUC score is also provided\footnote{I used the AOC (area over the curve, $\mathrm{AOC} = 1 - \mathrm{AUC}$) as my score so that the score could be interpreted as an error.}
+The medium task is much more difficult than the large task, which is more difficult than the small task.  On the other hand, the more difficult tasks had more scope for improvement than the small task.
+
+\begin{table}[t]
+\caption{AUC Task and guessed correspondence between $\pm 1$ and star values.}
+\label{auc}
+\vskip 0.15in
+\begin{center}
+\begin{small}
+\begin{sc}
+\begin{tabular}{lrrr}
+\hline
+\abovespace\belowspace
+Size & -1 & +1 & AOC Top 20 \\
+\hline
+\abovespace
+Small    & 1 & 5 & 0.0597 \\
+Medium   & 2 & 3 & 0.3384 \\
+\belowspace
+Large    & 2 & 4 & 0.1635 \\
+\hline
+\end{tabular}
+\end{sc}
+\end{small}
+\end{center}
+\vskip -0.1in
+\end{table}
+
+As a one-person team with limited time and labour, I choose to concentrate mostly on this task.  I consider that this represents better the real-world application of recommendation engines (for example, NetFlix presumably wants to optimize the probability that someone who sees a recommendation rents the film\footnote{Or rents the film and doesn't hate it}, as this increases revenue by making people take out more profitable subscriptions and reducing the chance that they will let their subscription lapse.
 
 \subsection{Problem Analysis}
 
-As time and labour are limited, I choose to concentrate mostly on the AUC task, as I feel that this represents better the real-world application of recommendation engines (for example, NetFlix presumably wants to optimize the probability that someone who sees a recommendation rents the film\footnote{Or rents the film and doesn't hate it}, as this reduces the chances that someone lets their subscription lapse.
+Clearly, the NetFlix competition 
 
 
 \subsection{Competition}
@@ -166,7 +249,7 @@ In order to generate results, a large number of predictors were trained individu
 \item A submission results file containing the model's prediction for each entry of the scoring set (for which labels weren't available).
 \end{enumerate}
 
-Once all of the files were available, they were blended together by the final blender, and this result became the submitted output.
+Once all of the files were available, they were combined a final blender, and this result became the submitted output.
 
 \subsection{Models Used}
 
@@ -201,11 +284,7 @@ The final blending provided a substantial improvement in the AUC task.  On the R
 
 This is probably due to there not being enough diversity in the models blended: there were only a few really distinct models, and these frequently used the same features (from the DNAE, the SVD and the derived features).
 
-\section{Discussion}
-
-
-
-\subsection{Engineering}
+\subsection{Implementation}
 
 In practice, this competition turned out (for me, anyway) to be as much about software engineering as about data mining.
 
@@ -227,6 +306,50 @@ The software was developed on Linux.  The only significant external libraries us
 \subsection{Open Source}
 
 The source code for this submission is available.  The machine learning library used to perform the heavy lifting is available at http://bitbucket.org/jeremy\_barnes/jml/.  The source code of the actual ausdm submission is abailable at http://github.com/jeremybarnes/ausdm.  Both are available under the Affero GNU Public License version 3.
+
+Some of the data files used in the building of the results are available (the full set of files could not be provided as they are too large for the version control hosting service that is used).  These could be used to verify the results and to perform further experiments.  Please note that these files are only available to the AUSDM or NetFlix challenge participants, as they contain ranking values from the original NetFlix dataset that are not freely redistributable.
+
+\section{Discussion}
+
+\subsection{Difficulty Values of Rows}
+
+It is instructive to break the dataset into different types of rows, based upon the ease with which a prediction can be made.  For RMSE, we could define a row to be \emph{impossible} if the predictions of all of the models are closer to the target value than the
+
+\begin{table}[t]
+\caption{RMSE large set broken down by row difficulty.  In the last column, we see that 1/3 of the MSE comes from the impossible positions, which account for just 5.7\% of the data.}
+\label{rowtypesrmse}
+\vskip 0.15in
+\begin{center}
+\begin{small}
+\begin{sc}
+\begin{tabular}{lrrr}
+\hline
+\abovespace\belowspace
+Category & Freq & Avg MSE & Total MSE \\
+\hline
+\abovespace
+Automatic     & 0.329 & 0.019 & 0.0063 \\
+Possible      & 0.614 & 0.198 & 0.1216 \\
+\belowspace
+Impossible    & 0.057 & 1.189 & 0.0678 \\
+\hline
+Total         & 1.000 & 0.195 & 0.1953 \\
+\hline
+\end{tabular}
+\end{sc}
+\end{small}
+\end{center}
+\vskip -0.1in
+\end{table}
+
+
+
+
+\subsection{Black Box Model}
+
+
+\subsection{}
+
 
 \subsection{Directions for Further Investigation}
 
