@@ -9,7 +9,7 @@
 % For citations
 \usepackage{mlapa}
 
-\icmltitlerunning{Team ``Barneso'' Report for the AUSDM Ensembling Challenge 2009}
+\icmltitlerunning{AUSDM Challenge 2009: Team ``Barneso''}
 
 \begin{document} 
 
@@ -20,23 +20,30 @@
 
 \vskip 0.3in
 
-(Shameless plug: I am looking for consulting work: Data Mining, Machine Learning or Computational Linguistics).
+(Shameless plug: I am looking for consulting work: Recommendation Engines, Data Mining, Machine Learning or Computational Linguistics).
 
 \vskip 0.3in
 ]
 
 \begin{abstract} 
-Several models to combine multiple predictions of
-The AUSDM challenge 
-Team ``barneso'' 's AUSDM challenge entry is descI describe my entry in the AUSDM ensembling challenge.  
-\end{abstract} 
+
+We describe how we combined 1152 ``black box'' models into a more powerful ensemble predictor.  Several models that achieved significant success on the AUC task were produced: a deep neural network model, a gated classifier and a multiple logistic regression model.  Further improvement was achieved by adding features derived from the model input, and by adding unsupervised features from decomposing the model inputs (using a SVD or denoising auto-encoders).
+
+On the large AUC task, the baseline performance\footnote{The average of the most accurate 20 models over a held-out set of 20\% of the training set.  These scores are not the official scores, which are calculated on data for which the labels were not available.} of 0.1635 was reduced to 0.1461.  On the more difficult medium task, the baseline performance of 0.3384 was reduced to 0.3144.  On the simpler small task, the baseline of 0.0597 was reduced to 0.0571.
+
+Less attention was given to the RMSE task.  On the small task, the baseline of 0.4398\footnote{These RMSE scores are calculated on a ratings scale of [-1,1] not [1000,5000] as in the competition, and so are not directly comparable.} to the was reduced to 0.4381.  On the medium task, the baseline of 0.4307 was reduced to 0.4277.  On the large task, the baseline of 0.4419 was improved to 0.4385.  It was observed that very little improvement was possible on this task.
+
+The ``black box'' nature of the competition and the underlying noise in the labels (to which the RMSE score is particularly sensitive) make progress difficult.  An alternative framework for ensembling is discussed which, whilst placing more requirements on model builders, would likely lead to better improvement in the ensembles.
+
+\end{abstract}
 
 \section{Introduction}
 
-Here is the introduction
+The AUSDM ensembling challenge is based upon the NetFlix Competition \cite{NetFlixPrize} which recently finished.
 
 \subsection{Problem Analysis}
 
+As time and labour are limited, I choose to concentrate mostly on the AUC task, as I feel that this represents better the real-world application of recommendation engines (for example, NetFlix presumably wants to optimize the probability that someone who sees a recommendation rents the film\footnote{Or rents the film and doesn't hate it}, as this reduces the chances that someone lets their subscription lapse.
 
 
 \subsection{Competition}
@@ -213,6 +220,10 @@ The fact that there were six different tasks (AUC and RMSE for the small, medium
 
 In the end, about 5,000 lines of C++ code were written to handle the competition directly, and about 15,000 lines added to the underlying machine learning library (primarily the code to perform Ridge Regression and the denoising auto-encoder routines).  The entire set of results could be reproduced in about 24 hours on the desktop machine.
 
+\subsection{Platform}
+
+The software was developed on Linux.  The only significant external libraries used were LAPACK and BLAS for the linear algebra routines.
+
 \subsection{Open Source}
 
 The source code for this submission is available.  The machine learning library used to perform the heavy lifting is available at http://bitbucket.org/jeremy\_barnes/jml/.  The source code of the actual ausdm submission is abailable at http://github.com/jeremybarnes/ausdm.  Both are available under the Affero GNU Public License version 3.
@@ -229,7 +240,12 @@ The source code for this submission is available.  The machine learning library 
 
 % Acknowledgements should only appear in the accepted version. 
 \section*{Acknowledgments} 
- 
+
+Thanks to Phil Brierley for organizing and running the competition, and to my family for putting up with the late evenings.
+
+The \LaTeX style file for this report is based upon that for ICML 2009, by P Langley, Terran Lane, Jennifer Dy, Kristian Kersting and Ricardo Silva.
+
+
 \bibliography{report}
 \bibliographystyle{mlapa}
 
