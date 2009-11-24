@@ -232,9 +232,26 @@ Each will be described briefly in the following sections.
 
 \subsection{Gated Classifier Models}
 
+It is likely that different models have differing circumstances under which they are accurate.  For example, a pure statistical model would probably be more accurate on those users and movies for which it had lots of data than on those for which it had little or no data.  An algorithm that looked at the words in the title of the movie would probably be less accurate on foreign titled films, and so on.
+
+The goal of the gated classifier model was to learn which models were more likely to be accurate, and weight these disproportionately in the output.
+
+
 \subsection{Deep Neural Network Model}
 
+The denoising auto-encoders are trained with no knowledge of the target feature.  By adding an extra output layer or two and training the entire resulting network with backpropagation, the features that it has learned in its internal representation can be fine-tuned to help produce a target output (here, the label for the AUC or RMSE model).  This kind of model has already been used successfully for 
+
 This model started with the denoising autoencoders
+
+\begin{figure}[ht]
+\vskip 0.2in
+\begin{center}
+\centerline{\includegraphics{deepnet}}
+\caption{Deep Network Model.}
+\label{figure:deepnet}
+\end{center}
+\vskip -0.2in
+\end{figure} 
 
 \section{Results Generation}
 
@@ -255,15 +272,109 @@ There were four main classes of models that were used to contribute to the final
 
 The multiple regression models turned out to be the most powerful models, particularly in the RMSE task.  This is largely due to their ability to reject noise due to their inherent smoothness, the regularization provided by ridge regression and the smoothing provided by the random selection of features and examples.
 
+Table \ref{table:multiple-regression-models} describes the parameters for the different models.  In all cases, 500 separate regression models were combined (linear regression for the RMSE task; logistic regression for the AUC task) on 6,000 randomly selected examples.  On the small task, the number of features sampled and the decomposition order were set to 100; for the medium task 150 and for the large task 200.
+
+\begin{table}
+\caption{Multiple Regression Models Used}
+\label{table:multiple-regression-models}
+\vskip 0.15in
+\begin{center}
+\begin{small}
+\begin{sc}
+\begin{tabular}{llc}
+\hline
+\abovespace\belowspace
+Model & Decomposition & Extra Features \\
+\hline
+\abovespace
+mr1   &        &         \\
+mr2   & SVD    &         \\
+mr3   & SVD    & $\surd$ \\
+mr4   & DNAE1  &         \\
+mr5   & DNAE1  & $\surd$ \\
+mr6   & DNAE2  &         \\
+mr7   & DNAE2  & $\surd$ \\
+mr8   & DNAE3  &         \\
+\belowspace
+mr9   & DNAE3  & $\surd$ \\
+\hline
+\end{tabular}
+\end{sc}
+\end{small}
+\end{center}
+\vskip -0.1in
+\end{table}
+
+
 \subsubsection{Deep Neural Networks}
 
 The very first results obtained from the deep neural network were extremely good, and placed quite high on the leaderboard.  However, all attempts to reproduce these results failed\footnote{The code that generated these results had a bug in it which caused the execution to be non-deterministic}: the training error of the deep net stopped improving far before the point observed on the first run.  The results from the deep net are included as they tend to be more diverse than the other models, but they did not contribute greatly to the final score.
+
+Table \ref{table:deep-net-models} describes the deep network models used.  Each of these had an architecture with 250, 150, 100, 50 and 50 hidden units.  The 50 outputs of the autoencoder phase were added to the extra features which were fed into the last hidden layer.
+
+\begin{table}
+\caption{Deep Network Models Used}
+\label{table:deep-net-models}
+\vskip 0.15in
+\begin{center}
+\begin{small}
+\begin{sc}
+\begin{tabular}{llc}
+\hline
+\abovespace\belowspace
+Model & Decomposition & Extra Features \\
+\hline
+\abovespace
+dn1   & DNAE2  & $\surd$  \\
+dn2   & DNAE2  &   \\
+dn3   & DNAE3  &   \\
+\belowspace
+dn4   & DNAE3  & $\surd$  \\
+\hline
+\end{tabular}
+\end{sc}
+\end{small}
+\end{center}
+\vskip -0.1in
+\end{table}
+
+
 
 \subsubsection{Gated Merger}
 
 Several models of the gated merger were tried.  This model tended to perform reasonably well for the AUC task, but poorly for the RMSE task.  Presumably, this is because the two-stage nature of the model caused the noise to be amplified between the stages.
 
 The models differed in which decomposition they used (no decomposition, the SVD or the denoising autoencoders), whether or not they used extra features, and the technique used for the final score once the confidence-modified values had been produced.
+
+
+\begin{table}
+\caption{Gated Merger Models Used}
+\label{table:gated-models}
+\vskip 0.15in
+\begin{center}
+\begin{small}
+\begin{sc}
+\begin{tabular}{lccc}
+\hline
+\abovespace\belowspace
+Model & Decomp. & Blend RMSE & Blend AUC \\
+\hline
+\abovespace
+gated   & SVD(200)  & LR & Rand Forest  \\
+gated2  &           & LR & Rand Forest  \\
+gated3  & DNAE1     & LR & Rand Forest  \\
+gated4  & DNAE2     & LR & Rand Forest  \\
+gated5  & DNAE3     & LR & Rand Forest  \\
+gated6  & DNAE3     & Rand Forest & N/A  \\
+\belowspace
+gated7  & DNAE3     & Multi LR & N/A   \\
+\hline
+\end{tabular}
+\end{sc}
+\end{small}
+\end{center}
+\vskip -0.1in
+\end{table}
 
 \subsubsection{Classifier Models}
 
@@ -284,7 +395,7 @@ This is probably due to there not being enough diversity in the models blended: 
 
 In practice, this competition turned out (for me, anyway) to be as much about software engineering as about data mining.
 
-The biggest reason for this was the amount of noise in the data compared to the size of the data itself.  The variation over even very sparesly parameterized models such as linear regression was extremely large, and for non-linear models (especially those using algorithms such as boost) was even worse.  As a result, it was necessary to run each model as many times as possible over different random subsets of the data and average the results (for example, 5000 decision trees were trained for the random forest classifier in the gated model).
+The biggest reason for this was the amount of noise in the data compared to the size of the data itself.  The variation over even very sparesly parameterized models such as linear regression was extremely large, and for non-linear models (especially those using algorithms such as boosting) was even worse.  As a result, it was necessary to run each model as many times as possible over different random subsets of the data and average the results (for example, 5000 decision trees were trained for the random forest classifier in the gated model).
 
 Due to the limited hardware resources available\footnote{One quad core ``hyperthreaded'' (8 virtual cores) desktop machine with 6GB of RAM, one dual core laptop with 2GB of RAM} and the large number of tasks, it was necessary that the software be both memory and CPU efficient.
 The entire code was vectorized to take advantage of the vector unit, multi-threaded\footnote{On the desktop machine, 8 threads were run to fully exploit the hyper-threaded processor} and the bottlenecks were profiled and carefully optimized.  Single precision arithmetic was used wherever possible\footnote{It is frequently not possible.  For example, whenever accumulating a series of numbers it is necessary to accumulate in double precision even if the numbers being accumulated are only in single precision.} due to its advantage in execution speed.
@@ -317,8 +428,8 @@ Looking first at the AUC scores.
 
 %(cat ../loadbuild/merged/S_auc_official.txt.log; echo "next"; cat ../loadbuild/merged/M_auc_official.txt.log; echo "next"; cat ../loadbuild/merged/L_auc_official.txt.log; echo "next") | awk -v baseline1=0.0597 -v baseline2=0.3384 -v baseline3=0.1635 -f tabulate_results.awk | sort
 
-\begin{table*}
-\caption{AUC Blending Results}
+\begin{table*}[t]
+\caption{AUC Blending Results.  The lift is 1000 times the improvement over the baseline score.  The weight values are reported as mean $pm$ standard deviation.}
 \label{table:auc-results}
 \vskip 0.15in
 \begin{center}
@@ -369,7 +480,7 @@ combined   & 0.0571 &   2.6 &  & 0.3144 &  24.0 &  & 0.1461 &  17.4 &   \\
 
 %cat ../loadbuild/merged/S_rmse_official.txt.log; echo "next"; cat ../loadbuild/merged/M_rmse_official.txt.log; echo "next"; cat ../loadbuild/merged/L_rmse_official.txt.log; echo "next") | awk -v baseline1=0.4398 -v baseline2=0.4307 -v baseline3=0.4419 -f tabulate_results.awk | sort
 
-\begin{table*}
+\begin{table*}[b]
 \caption{RMSE Blending Results}
 \label{table:rmse-results}
 \vskip 0.15in
@@ -424,252 +535,13 @@ combined   & 0.4381 &   1.7 &  & 0.4277 &   3.0 &  & 0.4385 &   3.4 &   \\
 \vskip -0.1in
 \end{table*}
 
-
-
-\begin{table}[t]
-\caption{Large AUC blending results}
-\label{problems}
-\vskip 0.15in
-\begin{center}
-\begin{small}
-\begin{sc}
-\begin{tabular}{lrrr}
-\hline
-\abovespace\belowspace
-Model & AOC (lift) & Weight$\pm$Std \\
-\hline
-\abovespace
-dn1        & 0.1581( 0.0054) & -0.4145$\pm$0.1967 \\
-dn2        & 0.1634( 0.0001) & -0.0544$\pm$0.2138 \\
-dn3        & 0.1634( 0.0001) & -0.6044$\pm$0.2300 \\
-dn4        & 0.1581( 0.0054) & -0.8349$\pm$0.3135 \\
-\abovespace
-gated      & 0.1497( 0.0138) &  1.0936$\pm$0.2731 \\
-gated2     & 0.1528( 0.0107) &  0.3231$\pm$0.2441 \\
-gated3     & 0.1524( 0.0111) &  0.1850$\pm$0.3196 \\
-gated4     & 0.1528( 0.0107) & -0.6375$\pm$0.3273 \\
-gated5     & 0.1519( 0.0116) &  0.3164$\pm$0.1278 \\
-\abovespace
-mr1        & 0.1581( 0.0054) & -0.0790$\pm$0.3933 \\
-mr2        & 0.1584( 0.0051) & -0.8821$\pm$0.2953 \\
-mr3        & 0.1499( 0.0136) &  1.8421$\pm$0.6877 \\
-mr4        & 0.1508( 0.0127) & -0.7505$\pm$0.3829 \\
-mr5        & 0.1485( 0.0150) &  1.5781$\pm$0.4709 \\
-mr6        & 0.1505( 0.0130) &  0.1290$\pm$0.2908 \\
-mr7        & 0.1485( 0.0150) &  0.7378$\pm$0.4254 \\
-mr8        & 0.1500( 0.0135) &  2.0444$\pm$0.5735 \\
-mr9        & 0.1484( 0.0151) &  0.5794$\pm$0.6626 \\
-\abovespace
-bias       &                 & -2.5664$\pm$0.3154 \\
-\abovespace\belowspace
-merged     & 0.1461( 0.0174) &                    \\
-\hline
-\end{tabular}
-\end{sc}
-\end{small}
-\end{center}
-\vskip -0.1in
-\end{table}
-
-
-\begin{table}[t]
-\caption{Medium AUC blending results}
-\label{problems}
-\vskip 0.15in
-\begin{center}
-\begin{small}
-\begin{sc}
-\begin{tabular}{lrrr}
-\hline
-\abovespace\belowspace
-Model & AOC (lift) & Weight$\pm$Std \\
-\hline
-\abovespace
-dn1        & 0.3299( 0.0085) &  0.0436$\pm$0.2257 \\
-dn2        & 0.3431(-0.0047) & -0.5098$\pm$0.2247 \\
-dn3        & 0.3432(-0.0048) & -0.4862$\pm$0.1872 \\
-dn4        & 0.3300( 0.0084) &  0.0501$\pm$0.2440 \\
-\abovespace
-gated      & 0.3239( 0.0145) &  0.6045$\pm$0.2547 \\
-gated2     & 0.3318( 0.0066) & -0.0787$\pm$0.2708 \\
-gated3     & 0.3282( 0.0102) &  0.0882$\pm$0.2929 \\
-gated4     & 0.3303( 0.0081) & -0.2602$\pm$0.4433 \\
-gated5     & 0.3264( 0.0120) &  0.1066$\pm$0.3105 \\
-\abovespace
-mr1        & 0.3208( 0.0176) &  0.4715$\pm$0.4715 \\
-mr2        & 0.3203( 0.0181) &  0.4565$\pm$0.4902 \\
-mr3        & 0.3174( 0.0210) &  0.0335$\pm$0.5070 \\
-mr4        & 0.3196( 0.0188) &  0.8224$\pm$0.3427 \\
-mr5        & 0.3128( 0.0256) &  0.8031$\pm$0.4444 \\
-mr6        & 0.3201( 0.0183) &  0.6071$\pm$0.2200 \\
-mr7        & 0.3135( 0.0249) &  0.6473$\pm$0.4200 \\
-mr8        & 0.3186( 0.0198) & -0.0595$\pm$0.3033 \\
-mr9        & 0.3146( 0.0238) &  0.2392$\pm$0.2422 \\
-\abovespace
-bias       &                 & -2.0994$\pm$0.3393 \\
-\abovespace\belowspace
-merged     & 0.3144( 0.0240) &                    \\
-\hline
-\end{tabular}
-\end{sc}
-\end{small}
-\end{center}
-\vskip -0.1in
-\end{table}
-
-\begin{table}[t]
-\caption{Small AUC blending results}
-\label{problems}
-\vskip 0.15in
-\begin{center}
-\begin{small}
-\begin{sc}
-\begin{tabular}{lrrr}
-\hline
-\abovespace\belowspace
-Model & AOC (lift) & Weight$\pm$Std \\
-\hline
-\abovespace
-dn1        & 0.0585( 0.0012) & -0.3635$\pm$0.3233 \\
-dn2        & 0.0611(-0.0014) &  0.1990$\pm$0.1926 \\
-dn3        & 0.0611(-0.0014) &  0.1860$\pm$0.1678 \\
-dn4        & 0.0585( 0.0012) & -0.3431$\pm$0.3013 \\
-\abovespace
-gated      & 0.0565( 0.0032) &  0.8025$\pm$0.2296 \\
-gated2     & 0.0584( 0.0013) &  0.2572$\pm$0.2424 \\
-gated3     & 0.0592( 0.0005) & -0.5532$\pm$0.3477 \\
-gated4     & 0.0586( 0.0011) & -0.0201$\pm$0.2874 \\
-gated5     & 0.0580( 0.0017) &  0.3666$\pm$0.1365 \\
-\abovespace
-mr1        & 0.0639(-0.0042) &  0.2347$\pm$0.3261 \\
-mr2        & 0.0633(-0.0036) &  0.1754$\pm$0.3324 \\
-mr3        & 0.0575( 0.0022) &  0.5730$\pm$0.5081 \\
-mr4        & 0.0573( 0.0024) &  0.3864$\pm$0.2689 \\
-mr5        & 0.0574( 0.0023) & -0.2887$\pm$0.2947 \\
-mr6        & 0.0573( 0.0024) &  0.5057$\pm$0.3039 \\
-mr7        & 0.0573( 0.0024) & -0.2075$\pm$0.2457 \\
-mr8        & 0.0572( 0.0025) &  0.9016$\pm$0.6035 \\
-mr9        & 0.0574( 0.0023) & -0.0358$\pm$0.1632 \\
-\abovespace
-bias       &                 & -1.0878$\pm$0.4551 \\
-\abovespace\belowspace
-merged     & 0.0571( 0.0026) &                    \\
-\hline
-\end{tabular}
-\end{sc}
-\end{small}
-\end{center}
-\vskip -0.1in
-\end{table}
-
-
-
-
-
-\begin{table}[t]
-\caption{Large RMSE blending results}
-\label{problems}
-\vskip 0.15in
-\begin{center}
-\begin{small}
-\begin{sc}
-\begin{tabular}{lrrr}
-\hline
-\abovespace\belowspace
-Model & RMSE (lift) & Weight$\pm$Std \\
-\hline
-\abovespace
-dn1        & 0.4442(-0.0023) & -0.0581$\pm$0.0306 \\
-dn2        & 0.4495(-0.0076) & -0.0176$\pm$0.0355 \\
-dn3        & 0.4497(-0.0078) &  0.0227$\pm$0.0658 \\
-dn4        & 0.4442(-0.0023) & -0.0582$\pm$0.0360 \\
-\abovespace
-gated      & 0.4418( 0.0001) &  0.0878$\pm$0.0394 \\
-gated2     & 0.4414( 0.0005) &  0.0892$\pm$0.0421 \\
-gated3     & 0.4428(-0.0009) &  0.0474$\pm$0.0406 \\
-gated4     & 0.4419( 0.0000) &  0.0420$\pm$0.0458 \\
-gated5     & 0.4460(-0.0041) &  0.0072$\pm$0.0240 \\
-gated6     & 0.4421(-0.0002) &  0.0204$\pm$0.0464 \\
-gated7     & 0.4405( 0.0014) & -0.0500$\pm$0.1015 \\
-\abovespace
-mr1        & 0.4386( 0.0033) &  0.1260$\pm$0.0403 \\
-mr2        & 0.4387( 0.0032) &  0.0957$\pm$0.0228 \\
-mr3        & 0.4386( 0.0033) &  0.1075$\pm$0.0266 \\
-mr4        & 0.4386( 0.0033) &  0.1047$\pm$0.0606 \\
-mr5        & 0.4386( 0.0033) &  0.1029$\pm$0.0589 \\
-mr6        & 0.4386( 0.0033) &  0.1104$\pm$0.0211 \\
-mr7        & 0.4385( 0.0034) &  0.1467$\pm$0.0945 \\
-mr8        & 0.4389( 0.0030) &  0.0691$\pm$0.0213 \\
-mr9        & 0.4389( 0.0030) &  0.0531$\pm$0.0268 \\
-\abovespace
-mclass     & 0.4417( 0.0002) & -0.0047$\pm$0.0412 \\
-rtrees     & 0.4427(-0.0008) & -0.0510$\pm$0.0513 \\
-\abovespace
-bias       &                 & -0.0042$\pm$0.0063 \\
-\abovespace\belowspace
-merged     & 0.4385( 0.0034) &                    \\
-\hline
-\end{tabular}
-\end{sc}
-\end{small}
-\end{center}
-\vskip -0.1in
-\end{table}
-
-
-\begin{table}[t]
-\caption{Medium RMSE blending results}
-\label{problems}
-\vskip 0.15in
-\begin{center}
-\begin{small}
-\begin{sc}
-\begin{tabular}{lrrr}
-\hline
-\abovespace\belowspace
-Model & RMSE (lift) & Weight$\pm$Std \\
-\hline
-\abovespace
-dn1        & 0.4332(-0.0025) &  0.0376$\pm$0.0178 \\
-dn2        & 0.4407(-0.0100) &  0.0317$\pm$0.0193 \\
-dn3        & 0.4409(-0.0102) &  0.0270$\pm$0.0300 \\
-dn4        & 0.4332(-0.0025) &  0.0346$\pm$0.0177 \\
-\abovespace
-gated      & 0.4462(-0.0155) &  0.0182$\pm$0.0386 \\
-gated2     & 0.4315(-0.0008) &  0.0722$\pm$0.0414 \\
-gated3     & 0.4420(-0.0113) &  0.0178$\pm$0.0371 \\
-gated4     & 0.4393(-0.0086) &  0.0012$\pm$0.0326 \\
-gated5     & 0.4487(-0.0180) & -0.0369$\pm$0.0446 \\
-gated6     & 0.4317(-0.0010) &  0.0277$\pm$0.0392 \\
-gated7     & 0.4295( 0.0012) &  0.0427$\pm$0.0266 \\
-\abovespace
-mr1        & 0.4277( 0.0030) &  0.1041$\pm$0.0238 \\
-mr2        & 0.4275( 0.0032) &  0.1029$\pm$0.0398 \\
-mr3        & 0.4276( 0.0031) &  0.0852$\pm$0.0253 \\
-mr4        & 0.4278( 0.0029) &  0.0805$\pm$0.0330 \\
-mr5        & 0.4277( 0.0030) &  0.0832$\pm$0.0405 \\
-mr6        & 0.4277( 0.0030) &  0.0886$\pm$0.0259 \\
-mr7        & 0.4278( 0.0029) &  0.0553$\pm$0.0366 \\
-mr8        & 0.4275( 0.0032) &  0.0986$\pm$0.0387 \\
-mr9        & 0.4278( 0.0029) &  0.0520$\pm$0.0550 \\
-\abovespace
-rtrees     & 0.4321(-0.0014) &  0.0152$\pm$0.0411 \\
-mclass     & 0.4319(-0.0012) &  0.0212$\pm$0.0315 \\
-\abovespace
-bias       &                 & -0.0160$\pm$0.0095 \\
-\abovespace\belowspace
-merged     & 0.4277( 0.0030) &                    \\
-\hline
-\end{tabular}
-\end{sc}
-\end{small}
-\end{center}
-\vskip -0.1in
-\end{table}
-
-
-
 \section{Discussion}
+
+\subsection{RMSE Task}
+
+The overall lift achieved for the RMSE task was very poor, and far below the level where a person using the system would notice a difference in the quality of the recommendations.  Even the highest placed teams on the leaderboard achieved a lift of 10\% or so more than was achieved here.
+
+This phenomena is probably explained by the use of a RMSE metric, and the amount of noise in the data.  The RMSE metric penalizes very heavily incorrect predictions at the extreme ends of the scale: a prediction of 1 has 4 times the potential error.
 
 \subsection{Difficulty Values of Rows}
 
