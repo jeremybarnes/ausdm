@@ -31,7 +31,7 @@ We describe how we combined 1151 ``black box'' models into a more powerful ensem
 
 On the large AUC task, the baseline AOC\footnote{AOC = 1 - AUC} performance\footnote{The average of the most accurate 20 models over a held-out set of 20\% of the training set.  These scores are not the official scores, which are calculated on data for which the labels were not available.} of 0.1635 was improved to 0.1461.  On the more difficult medium task, the baseline performance of 0.3384 was improved to 0.3144.  On the simpler small task, the baseline of 0.0597 was improved to 0.0571.
 
-Less attention was given to the RMSE task.  On the small task, the baseline of 0.4398\footnote{These RMSE scores are calculated on a ratings scale of [-1,1] not [1000,5000] as in the competition, and so are not directly comparable.} to the was reduced to 0.4381.  On the medium task, the baseline of 0.4307 was reduced to 0.4277.  On the large task, the baseline of 0.4419 was improved to 0.4385.  It was observed that very little improvement was possible on this task.
+Less attention was given to the RMSE task, and very little improvement was possible.  The best result, on the large task, reduced the baseline of 0.4419 to 0.4385\footnote{These RMSE scores are calculated on a ratings scale of [-1,1] not [1000,5000] as in the competition, and so are not directly comparable.}.
 
 The ``black box'' nature of the competition and the underlying noise in the labels (to which the RMSE score is particularly sensitive) make progress difficult.  An alternative framework for ensembling is discussed which, whilst placing more requirements on model builders, would likely lead to better improvement in the ensembles.
 
@@ -51,11 +51,11 @@ E = \sqrt{\frac{1}{n} \sum_{i=1}^{n} (x_i - \hat{x}_i)^2} \label{RMSE}.
 
 A ``probe'' dataset was also made available, which included 1.4 million (user, date, rating) triplets that were not included in the training set.  Finally, a third dataset was provided; this dataset included (user, date) pairs, and the goal of the competition was to predict the rating for each of these pairs.
 
-The leading entries in this competition were from coalitions of collaborating teams.  The teams would independently produce models that were trained only on the training set.  These models would then be run to predict the values in both the probe and testing datasets.  These predicted results would then be exchanged within the group of collaborators, and a final blended model would be produced, with the parameters for the blend learned from the probe set.
+The leading entries in this competition were from coalitions of collaborating teams.  The teams would independently produce models that were trained only on the training set.  These models would then be run to predict the values in both the probe and testing datasets.  These predicted results would then be exchanged within the group of collaborators, and a final blended model would be produced, with the parameters for the blend learnt from the probe set.
 
 \subsection{AUSDM Competition}
 
-The organisers of the AUSDM competition first approached the two leading coalitions and obtained from them the results of all of their models (some 1151 in total) on the probe set.  From this large combined set of data, random sampling was used to produce twelve datasets, with three data sizes (Small, Medium and Large as decribed in table \ref{problems}), two problem types (AUC and RMSE) and two datasets for each (a training set including target values, and a testing set with the target values removed).
+The organisers of the AUSDM competition first approached the two leading coalitions and obtained from them the results of all of their models (some 1151 in total) on the probe set.  From this large combined set of data, random sampling was used to produce twelve datasets, with three data sizes (Small, Medium and Large as described in table \ref{problems}), two problem types (AUC and RMSE) and two datasets for each (a training set including target values, and a testing set with the target values removed).
 
 \begin{table}[t]
 \caption{Problem sizes and row counts.}
@@ -88,15 +88,15 @@ It is unknown if any of the probe sets collected were in fact blended versions o
 
 \subsubsection{RMSE Task}
 
-The RMSE problem in the AUSDM Challenge was identical to that in the NetFlix Prize: minimize the RMSE in equation \ref{RMSE}.
+The RMSE problem in the AUSDM Challenge was identical to that in the NetFlix Prize: minimise the RMSE in equation \ref{RMSE}.
 
 \subsubsection{AUC Task}
 
-The AUC task was a binary ranking problem.  Two ratings were selected (for example, 1 star and 5 stars), and only rows with one of these ratings were samples.  These two rows were then assigned the labels $+1$ and $-1$.  The goal was to minimize the AUC score, which is the average false rate (the sum of the average false positive rate over negative examples and the average false negative rate over positive examples).
+The AUC task was a binary ranking problem.  Two ratings were selected (for example, 1 star and 5 stars), and only rows with one of these ratings were samples.  These two rows were then assigned the labels $+1$ and $-1$.  The goal was to minimise the AUC score, which is the average false rate (the sum of the average false positive rate over negative examples and the average false negative rate over positive examples).
 
 Intuitively, the goal of this task is to separate the two classes as much as possible.  For this task, only the order of the scores mattered, not their magnitudes.  As a result, it is possible to use the RMSE score as a surrogate to calculate the AUC.
 
-Table \ref{auc} shows details of the three tasks and the likely correspondence between the $\pm 1$ values and the number of stars.  A baseline AUC score using the average RMSE of the 20 models with the highest AUC score is also provided\footnote{I used the AOC (area over the curve, $\mathrm{AOC} = 1 - \mathrm{AUC}$) as my score so that the score could be interpreted as an error.}
+Table \ref{auc} shows details of the three tasks and the likely correspondence between the $\pm 1$ values and the number of stars.  A baseline AUC score using the average RMSE of the 20 models with the highest AUC score is also provided\footnote{The AOC (area over the curve, $\mathrm{AOC} = 1 - \mathrm{AUC}$) was used so that the score could be interpreted as an error like the RMSE.}
 The medium task is much more difficult than the large task, which is more difficult than the small task.  On the other hand, the more difficult tasks had more scope for improvement than the small task.
 
 \begin{table}[t]
@@ -124,83 +124,167 @@ Large    & 2 & 4 & 0.1635 \\
 \vskip -0.1in
 \end{table}
 
-As a one-person team with limited time and labour, I choose to concentrate mostly on this task.  I consider that this represents better the real-world application of recommendation engines (for example, NetFlix presumably wants to optimize the probability that someone who sees a recommendation rents the film\footnote{Or rents the film and doesn't hate it}, as this increases revenue by making people take out more profitable subscriptions and reducing the chance that they will let their subscription lapse.
+As a one-person team with limited time and labour, most effort was expended on this task.  It is arguable that it represents better the real-world application of recommendation engines\footnote{For example, NetFlix presumably wants to optimise the probability that someone who sees a recommendation rents the film (or rents the film and doesn't hate it): their revenue is increased by people renting more films (more active members have more profitable subscription levels and are less likely to let their subscription lapse).}.
 
-\subsection{Problem Analysis}
+\section{Solution Strategy}
 
-Clearly, the NetFlix competition 
+Upon initial investigation of the problem, it became obvious that highly non-linear methods (boosting, decision trees, etc) were completely unsuitable to the task at hand due to their high sensitivity to noise\footnote{It was rare that any of these techniques would even approach the baseline accuracy}.  Even the parameters for linear regression, one of the smoothest models possible, would vary wildly.  These experiments led to the formulation of the following strategy:
+
+\begin{enumerate}
+\item Model the accuracy of the models over the different regions of the state-space;
+\item Use a decomposition with an information bottleneck to reject noise and model the variation of models explicitly;
+\item Add hand-coded smooth features derived from the model outputs to make model-building easier and to reject noise.
+\item Reject noise as aggressively as possible:
+  \begin{enumerate}
+  \item Use random sampling of derived models to reject noise;
+  \item Use noise-rejecting variants (such as ridge regression) wherever possible to reduce noise.
+    \end{enumerate}
+\item Produce multiple models with as much diversity as possible and merge them to produce the final result.
+\end{enumerate}
+
+This solution strategy was broadly applicable to the small AUC task, which was particularly noisy.
+One explanation for this would be due to the selection of target values for this task, which look to be $-1 \rightarrow 1$ and $+1 \rightarrow 5$.  
+These two values, and particularly the value 1, are associated with extreme emotional reactions to films by users.  
+The relative scarcity of 1 rankings in the dataset also makes them more susceptible to noise (accidental mouse clicks, distraction, cats walking on keyboards, etc) compared to other values.
+When adapting the work to the large and particularly the medium task at the end of the competition, it was observed that noise was much less of a problem in these two tasks.
+
+\subsection{Modelling State-Space Accuracy}
+
+It is unlikely that ensembling algorithm would ever be sufficiently well informed to extrapolate outside the range spanned by its component models, especially in a black-box setting.
+One way to look at the task, then, is to select those component models that are likely to be more accurate than the others in a particular situation, and to have these influence the final result more heavily.
+For example, it may be that model A is nearly always worse than model C, except when model B is in agreement with model A.  In this case, an optimal strategy would be to choose the result of model C, unless models A and B agreed with each other.
+
+One way to do this is to use a confidence function, which models explicitly the accuracy of each model on each data point.
+For the RMSE task, we could try to learn the probability that the output of a given model was within one ranking of the correct ranking.  
+For the AUC task, we could try to learn the probability that the given model is closer to the $+1$ value than the $-1$ value.
+
+Once these accuracy values are obtained, we can produce an improved estimate by gating each model by the probability that it is correct.
+
+It proved to be extremely difficult to learn sufficiently accurate confidence functions for this task (the confidence functions of all models tended to be highly correlated).
+
+\subsection{Decompositions}
+
+By decomposition, we mean a way of reducing a set of 1151 independent values (the outputs of all of the models) into a smaller dimensional space that preserves as much of the behaviour of the 1151 values.
+
+These techniques are also known as ``information bottleneck'' methods or auto-encoders, tend to use some kind of a factorisation (explicit or implicit) to approximate a dataset with a large number of free parameters with a much smaller number of free parameters.
+They work by learning an (encoder, decoder) pair.  The encoder reduces the 1151 dimensional input vector into a smaller internal representation.  The decoder takes the encoded vector and reproduces the 1151 values as much as possible.  A good encoder/decoder pair will do this without introducing much of an error.  In fact, frequently the effect of the (encode, decode) sequence will be to remove noise from the input whilst keeping its essential characteristics.
 
 
-\section{Decompositions}
+\subsubsection{Singular Value Decomposition}
 
-One of the interesting aspects of this competition is the complete lack of any
-side-channel source of information\footnote{For example, in the original NetFlix
-competition the identities of the films were known, which allowed the
-possibility to obtain further information about the film from the internet.}.  Indeed, even movies that could normally be used to determine the accuracy of the underlying models (such as the amount of information about the movie and the user in the training data) was not available.
+The simplest decomposition used was the SVD.  It uses linear algebra to generate an optimal low-dimensional representation of a series of models.
 
-In order to determine the accuracy of a prediction of a particular model, it is
-therefore necessary to use information about predictions from the other models.
+Applying the SVD to a matrix $M$ breaks it down as follows:
 
-\subsection{Singular Value Decomposition}
+\begin{equation}
+M = U \Sigma V^T
+\end{equation}
 
-The most basic
+where $M$ (for the large contest) is the $50,000 \times 1151$ matrix of the model outputs, $U$ is a $50,000 \times 1151$ matrix of left-singular orthonormal vectors, $\Sigma$ is a $1151 \times 1151$ diagonal matrix with diagonal entries $[ \sigma_1 \sigma_2 \ldots \sigma_{1151}]$ and $V$ is a $1151 \times 1151$ matrix of right-singular orthonormal vectors.
 
-Analyzing the singular vectors generated, the 
+The interesting thing to note is that the $\sigma$ values in $\Sigma$ are all positive and are in decreasing order of magnitude.  In order to reconstruct the best possible approximation of $M$ of rank $n$, it is sufficient to set
+
+\begin{equation}
+\hat{M} = U_n \Sigma_N V_N^T
+\end{equation}
+
+where $\hat{M}$ is a $50,000 \times 1151$ rank-$n$ approximation to $M$, $U_n$ is a $50,000 \times n$ matrix containing the first $n$ columns of $U$, $\Sigma_n$ is a $n \times n$ diagonal matrix containing the first $n$ rows and columns of $\Sigma$, and $V_n$ is a $1151 \times n$ matrix containing the first $n$ columns of $V$.  The error of any element in $M$ is bounded by the magnitude of the excluded singular values $\sum_{i=n+1}^{1151} \sigma_i$.
+
+This matrix can be used to reduce an 1151 element model vector $\mathbf{x}$ into a $n$-dimensional representation $\mathbf{z}$ which contains as much of the information in $\mathbf{x}$ as possible.  Simply take
+
+\begin{equation}
+\label{eqn:svd-encode}
+\mathbf{z} = \Sigma_n^{-1} V_n^T \mathbf{x} .
+\end{equation}
+
+The features in $\mathbf{z}$ contain as much as possible of the information in $\mathbf{x}$, but in much fewer dimensions (typical values of $n$ used in the competition were 50, 100 and 200), and as a result have much of the noise removed.  Even if the number of dimensions is not reduced, the $\mathbf{z}$ values tend to make better features for classification as they are orthogonal from each other.
+
+We can also produce $\hat{\mathbf{x}}$, which is a reconstituted version of $\mathbf{x}$ produced from $\mathbf{z}$:
+
+\begin{equation}
+\hat{\mathbf{x}} = V_n \Sigma_n \mathbf{z}
+\end{equation}
+
+and measure its error:
+
+\begin{equation}
+\label{eqn:decomp-error}
+E = || \mathbf{x - \hat{x}} ||
+\end{equation}
+
+If $E$ is small, the information in $\mathbf{z}$ was sufficient to capture all of the information in $\mathbf{x}$.  If $E$ is large, it means that one or more of the dimensions excldued from the decomposition were important.
 
 
-An analysis of the utility of these features showed that only the first couple
-(which corresponded to the mean and bias of the data) had any significant
-correlation with the 
+\subsubsection{Denoising Auto-Encoder Decomposition}
 
-\subsection{Denoising Auto-Encoder Decomposition}
+One problem with the singular value decomposition is that the the decomposition is entirely linear.  A denoising auto-encoder can be used to generate a non-linear decomposition.
 
-One of my goals for this competition was to explore the use of deep neural network architectures.  The architecture that I choose was that of denoising autoencoders.
-
-The goal of a standard auto encoder is to learn the identity function: two functions $f(\cdot)$ and $g(\cdot)$ such that $f(g(\mathbf{x})) = \mathbf{x}$.  Generally, in order to be interesting an auto-encoder will include some kind of restriction: for example, the number of dimensions in the range of $f$ is smaller than the number of dimentions in its domain.
+The goal of an auto encoder is to learn the identity function: two functions $f(\cdot)$ and $g(\cdot)$ such that $f(g(\mathbf{x})) = \mathbf{x}$.  Generally, in order to be interesting an auto-encoder will include some kind of restriction: for example, the number of dimensions in the range of $f$ is smaller than the number of dimensions in its domain.
 
 In neural networks, the most commonly used formulation shares an activation matrix $\mathbf{W}$ between the forward and reverse directions:
 
-$$
-f(\mathbf{x}) = t(\mathbf{Wx} + \mathbf{b})
-$$
-$$
-g(\mathbf{x}) = t(\mathbf{W}^T\mathbf{x} + \mathbf{c})
-$$
+\begin{equation}
+\label{eqn:autoencoder-encode}
+\mathbf{z} = f(\mathbf{x}) = t(W\mathbf{x} + \mathbf{b})
+\end{equation}
 
-The output of $f(x)$ is the \emph{encoded} form of the input $\mathbf{x}$, and the function $f$ is the \emph{encoder function}.  Similarly, $g$ is the \emph{decoder} function.  When we train the auto encoder over a 
-
-In some circumstances, it may encode nearly the same information as in $\mathbf{x}$.  For example, if $t$ is the identity function and $\mathbf{W}$ is the left-singular matrix of a set of 
-
-When $t$ is the identity function, this formulation reduces (essentially, see below) to the singular value decomposition.
+\begin{equation}
+\label{eqn:autoencoder-decode}
+\hat{\mathbf{x}} = g(\mathbf{z}) = t(W^T\mathbf{z} + \mathbf{c})
+\end{equation}
 
 When $t(\cdot)$ is a non-linear squashing function such as (in my case) $t(\mathbf{x}) = \tanh(\mathbf{x})$, we can use this neural network to learn a nonlinear decomposition.
 
 Note that these auto-encoders can be stacked one on top of the other, so that we apply all of the forward functions one after the other and then all of the reverse directions in the opposite order.
 
-In order to make the auto encoder generalize (and learn higher level features), we need to do one of two things:
-
-\begin{itemize}
-\item Add noise to the input, but train the network to reconstruct the non-noisy input (remove the noise).  This is where it becomes a ``denoising'' auto-encoder;
-\item Create an information bottleneck, whereby the number of features from which the input is reconstructed is lower than the number of features in the input.
-\end{itemize}
-
-\subsubsection{Addition of noise}
-
-\subsubsection{Information bottleneck}
-
-In addition to adding noise as described above, I also created an information bottleneck.
+In order to make the auto encoder generalise (and learn higher level features), we need to either a) add noise to the input (and train the auto encoder to remove the noise) and/or b) create an ``information bottleneck'', by reducing the number of neural network units lower down in the stack.  This leads to the architecture used in the competition, which is shown in figure \ref{fig:autoencoder-decomposition}:
 
 \begin{figure}[ht]
 \vskip 0.2in
 \begin{center}
 \centerline{\includegraphics{auto-encoder}}
-\caption{Denoising Auto Encoder used in solution}
-\label{figure:autoencoder}
+\caption{Denoising auto-encoder decomposition used in the competition.}
+\label{fig:autoencoder-decomposition}
 \end{center}
 \vskip -0.2in
 \end{figure} 
 
-\section{Derived Features}
+In order to train the auto-encoders, a standard backpropagation algorithm can be used to perform gradient descent on the parameter space.  Normally, a stack of autoencoders will be trained a layer at a time on the output of the previous layer (in a greedy manner), although it is possible to train the entire stack at once.  Both methods were used in the competition.
+
+\subsubsection{Improvements}
+
+Several improvements were made to the auto-encoder model described previously.
+
+Firstly, it is known that a linear neural network under the right conditions will approximate the singular value decomposition.  It would make sense for the autoencoder described in the previous section to be able to do so.  However, if we set $t$ to the identity function and $W = \Sigma_n^{-1} V_n^T$ in \ref{eqn:autoencoder-encode} as in equation \ref{eqn:svd-encode} (ignoring the bias terms), we get
+
+\begin{equation}
+\mathbf{z} = \Sigma_n^{-1} V_n^T \mathbf{x}
+\end{equation}
+
+and so
+
+\begin{equation}
+\hat{\mathbf{x}} = V_n \left( \Sigma_n^{-1} \right)^T \Sigma_n^{-1} V_n^T \mathbf{x} = \Sigma_n^{-2} \mathbf{x}
+\end{equation}
+
+where we rely on the fact that $V^T V = I$ due to $V$ being orthonormal.
+
+Thus, this auto-encoder can only reproduce its input, no matter the dimensionality, if all of the singular values of our data matrix are unitary (not very often the case).  The alternative of not including $\Sigma_n$ in the encoder function is not satisfactory as this will cause the neurons corresponding to the high-valued singular values to dominate the training.
+
+To rectify this problem, we added two extra terms to the decoding function \ref{eqn:autoencoder-decode}:
+
+\begin{equation}
+\label{eqn:autoencoder-decode}
+\hat{\mathbf{x}} = t(D \mathbf{W}^T E \mathbf{z} + \mathbf{c})
+\end{equation}
+
+where $D$ and $E$ are diagonal matrices that control the input and output gain of the activation matrix $W^T$.  Then, by setting $W = \Sigma_n^{-1} V_n^T$, $E = I$ and $D = \Sigma_n^{-2}$ we can achieve our goal of emulating the SVD.
+
+A second improvement was made to the treatment of noisy inputs.  In (TODO), noisy inputs are simply set to zero.  This causes problems with the autoencoder, as the same weight in $W$ is simultaneously trying to reject noise, contribute to the hidden state and reproduce the output from the hidden state.  Instead, as plenty of data was available, we used a separate activation matrix $W_N$ for the noisy inputs.  Those inputs which were chosen to be noisy were assumed to have an input value of 1 and connected via $W_N$ instead of $W$ to the hidden layer.  This change significantly increased the accuracy of the reconstruction in the no-noise case.
+
+The third improvement was made in the addition of noise.  It was observed that the auto-encoders actually were better at reproducing the (noiseless) input when that input had noise added than when it was presented in a pristine state.  This was because the auto-encoders were assuming a certain noise level: if 20\% noise is added and an internal state represents the mean of the inputs, then that state is going to be 125\% the mean when no noise is present.  In order to prevent the auto-encoders from expecting the noise to be present, every second example was presented with no noise added.  Again, this change significantly increased the auto-encoder's performance in the noiseless case.
+
+\subsection{Derived Features}
 
 In order to make it easier for the classifiers to work, several features were derived from the outputs of the models:
 
@@ -212,14 +296,31 @@ In order to make it easier for the classifiers to work, several features were de
     \item The difference between the spread of values over these 10 models and the spread of values over all of the models;
     \item For each of the 10 models, the output of the model;
     \item For each of the 10 models, the number of standard deviations from the mean;
-    \item The difference between the output of this model and the closest integer (for example, 4.513 which corresponds to 4513 in the data files would return 0.487);
-    \item If a decomposition was done, the error of the reconstruction of this model by the decomposition;
+    \item The difference between the output of this model and the closest integer (for example, a prediction of 4.513 stars would return 0.487, which is the distance from 5 stars);
+    \item If a decomposition was used, the error of the reconstruction of this model by the decomposition;
   \end{itemize}
 \item The output of the decomposition (SVD or Denoising Auto-Encoder), if there was any;
-\item The overall RMS error of the decomposition on this example.
+\item The RMS error of the decomposition, as in equation \ref{eqn:decomp-error}.
 
 \end{itemize}
 
+\subsection{Multiple Models}
+
+Highly non-linear algorithms such as decision trees, regression trees and especially meta-algorithms like Adaboost tend to have big problems dealing with noise.  To deal with this problem, 
+
+\subsection{Ridge Regression}
+
+Ridge regression was used in place of linear regression in all circumstances, including within the Iteratively Reweighted Least Squares routines used to calculate the logistic regression coefficients.
+
+Ridge regression is a regularised form of linear regression, that penalizes high weights in the model coefficients $\mathbf{x}$.  The algorithm calculates the value of the vector $\mathbf{x}$ that minimises the following error:
+
+\begin{equation}
+  E = ||W\mathbf{x} - \mathbf{b}|| + \lambda ||\mathbf{b}|| \leftarrow \mbox{Regularization term}
+\end{equation}
+
+The coefficient $\lambda$ describes the trade-off between fitting the data and reducing the size of the parameters in $\mathbf{x}$.  The optimal value of $\lambda$ can be efficiently calculated using leave-one-out cross validation.
+
+Ridge regression also has the advantage of working well on rank-deficient problems, unlike standard linear regression.
 
 \section{Models}
 
@@ -251,9 +352,9 @@ The goal of the gated classifier model was to learn which models were more likel
 
 \subsection{Deep Neural Network Model}
 
-The denoising auto-encoders are trained with no knowledge of the target feature.  By adding an extra output layer or two and training the entire resulting network with backpropagation, the features that it has learned in its internal representation can be fine-tuned to help produce a target output (here, the label for the AUC or RMSE model).  This kind of model has already been used successfully for 
+The denoising auto-encoders are trained with no knowledge of the target feature.  By adding an extra output layer or two and training the entire resulting network with back-propagation, the features that it has learnt in its internal representation can be fine-tuned to help produce a target output (here, the label for the AUC or RMSE model).  This kind of model has already been used successfully for 
 
-This model started with the denoising autoencoders
+This model started with the denoising auto-encoders
 
 \begin{figure}[ht]
 \vskip 0.2in
@@ -282,7 +383,7 @@ There were four main classes of models that were used to contribute to the final
 
 \subsubsection{Multiple Regression}
 
-The multiple regression models turned out to be the most powerful models, particularly in the RMSE task.  This is largely due to their ability to reject noise due to their inherent smoothness, the regularization provided by ridge regression and the smoothing provided by the random selection of features and examples.
+The multiple regression models turned out to be the most powerful models, particularly in the RMSE task.  This is largely due to their ability to reject noise due to their inherent smoothness, the regularisation provided by ridge regression and the smoothing provided by the random selection of features and examples.
 
 Table \ref{table:multiple-regression-models} describes the parameters for the different models.  In all cases, 500 separate regression models were combined (linear regression for the RMSE task; logistic regression for the AUC task) on 6,000 randomly selected examples.  On the small task, the number of features sampled and the decomposition order were set to 100; for the medium task 150 and for the large task 200.
 
@@ -322,7 +423,7 @@ mr9   & DNAE3  & $\surd$ \\
 
 The very first results obtained from the deep neural network were extremely good, and placed quite high on the leaderboard.  However, all attempts to reproduce these results failed\footnote{The code that generated these results had a bug in it which caused the execution to be non-deterministic}: the training error of the deep net stopped improving far before the point observed on the first run.  The results from the deep net are included as they tend to be more diverse than the other models, but they did not contribute greatly to the final score.
 
-Table \ref{table:deep-net-models} describes the deep network models used.  Each of these had an architecture with 250, 150, 100, 50 and 50 hidden units.  The 50 outputs of the autoencoder phase were added to the extra features which were fed into the last hidden layer.
+Table \ref{table:deep-net-models} describes the deep network models used.  Each of these had an architecture with 250, 150, 100, 50 and 50 hidden units.  The 50 outputs of the auto-encoder phase were added to the extra features which were fed into the last hidden layer.
 
 \begin{table}
 \caption{Deep Network Models Used}
@@ -356,7 +457,7 @@ dn4   & DNAE3  & $\surd$  \\
 
 Several models of the gated merger were tried.  This model tended to perform reasonably well for the AUC task, but poorly for the RMSE task.  Presumably, this is because the two-stage nature of the model caused the noise to be amplified between the stages.
 
-The models differed in which decomposition they used (no decomposition, the SVD or the denoising autoencoders), whether or not they used extra features, and the technique used for the final score once the confidence-modified values had been produced.
+The models differed in which decomposition they used (no decomposition, the SVD or the denoising auto-encoders), whether or not they used extra features, and the technique used for the final score once the confidence-modified values had been produced.
 
 
 \begin{table}
@@ -405,16 +506,16 @@ This is probably due to there not being enough diversity in the models blended: 
 
 \subsection{Implementation}
 
-In practice, this competition turned out (for me, anyway) to be as much about software engineering as about data mining.
+In practise, this competition turned out (for me, anyway) to be as much about software engineering as about data mining.
 
-The biggest reason for this was the amount of noise in the data compared to the size of the data itself.  The variation over even very sparesly parameterized models such as linear regression was extremely large, and for non-linear models (especially those using algorithms such as boosting) was even worse.  As a result, it was necessary to run each model as many times as possible over different random subsets of the data and average the results (for example, 5000 decision trees were trained for the random forest classifier in the gated model).
+The biggest reason for this was the amount of noise in the data compared to the size of the data itself.  The variation over even very sparsely parametrised models such as linear regression was extremely large, and for non-linear models (especially those using algorithms such as boosting) was even worse.  As a result, it was necessary to run each model as many times as possible over different random subsets of the data and average the results (for example, 5000 decision trees were trained for the random forest classifier in the gated model).
 
-Due to the limited hardware resources available\footnote{One quad core ``hyperthreaded'' (8 virtual cores) desktop machine with 6GB of RAM, one dual core laptop with 2GB of RAM} and the large number of tasks, it was necessary that the software be both memory and CPU efficient.
-The entire code was vectorized to take advantage of the vector unit, multi-threaded\footnote{On the desktop machine, 8 threads were run to fully exploit the hyper-threaded processor} and the bottlenecks were profiled and carefully optimized.  Single precision arithmetic was used wherever possible\footnote{It is frequently not possible.  For example, whenever accumulating a series of numbers it is necessary to accumulate in double precision even if the numbers being accumulated are only in single precision.} due to its advantage in execution speed.
+Due to the limited hardware resources available\footnote{One quad core ``hyper-threaded'' (8 virtual cores) desktop machine with 6GB of RAM, one dual core laptop with 2GB of RAM} and the large number of tasks, it was necessary that the software be both memory and CPU efficient.
+The entire code was vectorised to take advantage of the vector unit, multi-threaded\footnote{On the desktop machine, 8 threads were run to fully exploit the hyper-threaded processor} and the bottlenecks were profiled and carefully optimised.  Single precision arithmetic was used wherever possible\footnote{It is frequently not possible.  For example, whenever accumulating a series of numbers it is necessary to accumulate in double precision even if the numbers being accumulated are only in single precision.} due to its advantage in execution speed.
 
 In addition, parameters were saved using as small a precision as possible and care was taken not to duplicate memory when splitting datasets into training and validation sets.
 
-The fact that there were six different tasks (AUC and RMSE for the small, medium and large datasets) also increased the amount of CPU time and engineering work required, as anything that was model or dataset-specific needed to be parameterized out and a method found to calculate the parameter for the task at hand.
+The fact that there were six different tasks (AUC and RMSE for the small, medium and large datasets) also increased the amount of CPU time and engineering work required, as anything that was model or dataset-specific needed to be parametrised out and a method found to calculate the parameter for the task at hand.
 
 In the end, about 5,000 lines of C++ code were written to handle the competition directly, and about 15,000 lines added to the underlying machine learning library (primarily the code to perform Ridge Regression and the denoising auto-encoder routines).  The entire set of results could be reproduced in about 24 hours on the desktop machine.
 
@@ -424,7 +525,7 @@ The software was developed on Linux.  The only significant external libraries us
 
 \subsection{Open Source}
 
-The source code for this submission is available.  The machine learning library used to perform the heavy lifting is available at http://bitbucket.org/jeremy\_barnes/jml/.  The source code of the actual ausdm submission is abailable at http://github.com/jeremybarnes/ausdm.  Both are available under the Affero GNU Public License version 3.
+The source code for this submission is available.  The machine learning library used to perform the heavy lifting is available at http://bitbucket.org/jeremy\_barnes/jml/.  The source code of the actual AUSDM submission is available at http://github.com/jeremybarnes/ausdm.  Both are available under the Affero GNU Public License version 3.
 
 Some of the data files used in the building of the results are available (the full set of files could not be provided as they are too large for the version control hosting service that is used).  These could be used to verify the results and to perform further experiments.  Please note that these files are only available to the AUSDM or NetFlix challenge participants, as they contain ranking values from the original NetFlix dataset that are not freely redistributable.
 
@@ -546,13 +647,13 @@ combined   & 0.4381 &   1.7 &  & 0.4277 &   3.0 &  & 0.4385 &   3.4 &   \\
 \vskip -0.1in
 \end{table*}
 
-\section{Discussion}
+\section{Analysis}
 
 \subsection{RMSE Task}
 
 The overall lift achieved for the RMSE task was very poor, and far below the level where a person using the system would notice a difference in the quality of the recommendations.  Even the highest placed teams on the leaderboard achieved a lift of 10\% or so more than was achieved here.
 
-This phenomena is probably explained by the use of a RMSE metric, and the amount of noise in the data.  The RMSE metric penalizes very heavily incorrect predictions at the extreme ends of the scale: a prediction of 1 has 4 times the potential error.
+This phenomena is probably explained by the use of a RMSE metric, and the amount of noise in the data.  The RMSE metric penalises very heavily incorrect predictions at the extreme ends of the scale: a prediction of 1 has 4 times the potential error.
 
 \subsection{Difficulty Values of Rows}
 
@@ -591,6 +692,16 @@ Total         & 1.000 & 0.195 & 0.1953 \\
 \subsection{Black Box Model}
 
 
+
+One of the interesting aspects of this competition is the complete lack of any
+side-channel source of information\footnote{For example, in the original NetFlix
+competition the identities of the films were known, which allowed the
+possibility to obtain further information about the film from the Internet.}.  Indeed, even movies that could normally be used to determine the accuracy of the underlying models (such as the amount of information about the movie and the user in the training data) was not available.
+
+In order to determine the accuracy of a prediction of a particular model, it is
+therefore necessary to use information about predictions from the other models.
+
+
 \subsection{}
 
 
@@ -609,10 +720,9 @@ The RMSE measure used has the effect of clustering the predictions around the da
 
 An improved model of ensembling was proposed, whereby each model in the ensemble provides not only a prediction of the target function, but a list of features that can be used to determine when the model is likely to be inaccurate.  This model requires further work on the part of the ensemble builders to provide this information, but would allow the ensembling method to have significantly more leverage.
 
-% Acknowledgements should only appear in the accepted version. 
-\section*{Acknowledgments} 
+\section*{Acknowledgements} 
 
-Thanks to Phil Brierley for organizing and running the competition.
+Thanks to Phil Brierley for organising and running the competition.
 
 The \LaTeX style file for this report is based upon that for ICML 2009, by P Langley, Terran Lane, Jennifer Dy, Kristian Kersting and Ricardo Silva.
 
