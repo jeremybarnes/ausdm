@@ -29,7 +29,7 @@
 
 We describe how we combined 1151 ``black box'' models into a more powerful ensemble predictor.  Several models that achieved significant success on the AUC task were produced: a deep neural network model, a gated classifier and a multiple logistic regression model.  Further improvement was achieved by adding features derived from the model input, and by adding unsupervised features from decomposing the model inputs (using a SVD or denoising auto-encoders).
 
-On the large AUC task, the baseline performance\footnote{The average of the most accurate 20 models over a held-out set of 20\% of the training set.  These scores are not the official scores, which are calculated on data for which the labels were not available.} of 0.1635 was reduced to 0.1461.  On the more difficult medium task, the baseline performance of 0.3384 was reduced to 0.3144.  On the simpler small task, the baseline of 0.0597 was reduced to 0.0571.
+On the large AUC task, the baseline AOC\footnote{AOC = 1 - AUC} performance\footnote{The average of the most accurate 20 models over a held-out set of 20\% of the training set.  These scores are not the official scores, which are calculated on data for which the labels were not available.} of 0.1635 was improved to 0.1461.  On the more difficult medium task, the baseline performance of 0.3384 was improved to 0.3144.  On the simpler small task, the baseline of 0.0597 was improved to 0.0571.
 
 Less attention was given to the RMSE task.  On the small task, the baseline of 0.4398\footnote{These RMSE scores are calculated on a ratings scale of [-1,1] not [1000,5000] as in the competition, and so are not directly comparable.} to the was reduced to 0.4381.  On the medium task, the baseline of 0.4307 was reduced to 0.4277.  On the large task, the baseline of 0.4419 was improved to 0.4385.  It was observed that very little improvement was possible on this task.
 
@@ -39,15 +39,15 @@ The ``black box'' nature of the competition and the underlying noise in the labe
 
 \section{Introduction}
 
-The AUSDM ensembling challenge is based upon the NetFlix Prize \cite{NetFlixPrize} which recently finished.
+The AUSDM ensembling challenge was a competition that ran for approximately six weeks in October and November, 2009.  The goal of the challenge was to combine existing personalised movie rating models in order to achieve a better result than the original model.  The dataset was derived from the NetFlix Prize \cite{NetFlixPrize}.
 
 \subsection{NetFlix Prize}
 
- The goal of this competition was to predict the rating (from 1 to 5) that a person would give to a film on a particular date, given a training dataset that contained examples of predictions that had already been made.  The score was evaluated with the Root Mean Squared Error (RMSE):
+The goal of this competition was to predict the rating (from 1 to 5) that a person would give to a film on a particular date, given a training dataset that contained examples of predictions that had already been made.  The score was evaluated with the Root Mean Squared Error (RMSE):
 
-$$
+\begin{equation}
 E = \sqrt{\frac{1}{n} \sum_{i=1}^{n} (x_i - \hat{x}_i)^2} \label{RMSE}.
-$$
+\end{equation}
 
 A ``probe'' dataset was also made available, which included 1.4 million (user, date, rating) triplets that were not included in the training set.  Finally, a third dataset was provided; this dataset included (user, date) pairs, and the goal of the competition was to predict the rating for each of these pairs.
 
@@ -55,7 +55,7 @@ The leading entries in this competition were from coalitions of collaborating te
 
 \subsection{AUSDM Competition}
 
-The organisers of the AUSDM competition first approached the two leading coelitions and obtained from them the results of all of their models (some 1151 in total) on the probe set.  From this large combined set of data, random sampling was used to produce twelve datasets, with three data sizes (Small, Medium and Large as decribed in table \ref{problems}), two problem types (AUC and RMSE) and two datasets for each (a training set including target values, and a testing set with the target values removed).
+The organisers of the AUSDM competition first approached the two leading coalitions and obtained from them the results of all of their models (some 1151 in total) on the probe set.  From this large combined set of data, random sampling was used to produce twelve datasets, with three data sizes (Small, Medium and Large as decribed in table \ref{problems}), two problem types (AUC and RMSE) and two datasets for each (a training set including target values, and a testing set with the target values removed).
 
 \begin{table}[t]
 \caption{Problem sizes and row counts.}
@@ -129,16 +129,12 @@ As a one-person team with limited time and labour, I choose to concentrate mostl
 Clearly, the NetFlix competition 
 
 
-\subsection{Competition}
-
-About the competition
-
 \section{Decompositions}
 
 One of the interesting aspects of this competition is the complete lack of any
 side-channel source of information\footnote{For example, in the original NetFlix
 competition the identities of the films were known, which allowed the
-possibility to obtain further information about the film from the internet.}.
+possibility to obtain further information about the film from the internet.}.  Indeed, even movies that could normally be used to determine the accuracy of the underlying models (such as the amount of information about the movie and the user in the training data) was not available.
 
 In order to determine the accuracy of a prediction of a particular model, it is
 therefore necessary to use information about predictions from the other models.
@@ -308,6 +304,370 @@ The software was developed on Linux.  The only significant external libraries us
 The source code for this submission is available.  The machine learning library used to perform the heavy lifting is available at http://bitbucket.org/jeremy\_barnes/jml/.  The source code of the actual ausdm submission is abailable at http://github.com/jeremybarnes/ausdm.  Both are available under the Affero GNU Public License version 3.
 
 Some of the data files used in the building of the results are available (the full set of files could not be provided as they are too large for the version control hosting service that is used).  These could be used to verify the results and to perform further experiments.  Please note that these files are only available to the AUSDM or NetFlix challenge participants, as they contain ranking values from the original NetFlix dataset that are not freely redistributable.
+
+\section{Results}
+
+% cat ../loadbuild/merged/L_rmse_official.txt.log | awk -v baseline=0.4419 'NF == 2 && $1 == "dn1" { go=1; ++iter; } !go { next; } $1 == "bias" || $1 == "combined" { go = 0; } iter < 11 { total[$1] += $2;  scores[$1,iter] = $2; } iter == 11 { score[$1] = $2; } END { for (model in total) { mean = total[model] / 10; var = 0;  for (j = 1;  j <= 10;  ++j) var += (scores[model,j] - mean) * (scores[model,j] - mean); printf("%-10s & %6.4f(%7.4f) & %7.4f$\\pm$%6.4f \\\\\n", model, score[model], baseline-score[model], mean, sqrt(var)); } printf("merged     & %6.4f(%7.4f) &         &        \\\\\n", score["combined"], baseline-score["combined"]); }'  | sort
+
+We present the results in several tables, which show the performance of the component models and the blended result.  The table contains two columns of numerical information.  The first describes the error score of the model, with the lift (reduction in error) as compared with the baseline model.  The second shows the average blending weight of the model (over 10 folds) as well as the standard deviation in this value.
+
+\subsection{AUC}
+
+Looking first at the AUC scores.
+
+%(cat ../loadbuild/merged/S_auc_official.txt.log; echo "next"; cat ../loadbuild/merged/M_auc_official.txt.log; echo "next"; cat ../loadbuild/merged/L_auc_official.txt.log; echo "next") | awk -v baseline1=0.0597 -v baseline2=0.3384 -v baseline3=0.1635 -f tabulate_results.awk | sort
+
+\begin{table*}
+\caption{AUC Blending Results}
+\label{table:auc-results}
+\vskip 0.15in
+\begin{center}
+\begin{small}
+\begin{sc}
+\begin{tabular}{l|rr r|rr r|rr r}
+\hline
+\abovespace\belowspace
+Task & \multicolumn{3}{|c}{Small} & \multicolumn{3}{|c}{Medium} & \multicolumn{3}{|c}{Large} \\
+Model
+& AOC & Lift & Weight 
+& AOC & Lift & Weight 
+& AOC & Lift & Weight \\
+\hline
+\abovespace
+dn1        & 0.0585 &   1.2 & -0.36$\pm$0.32& 0.3299 &   8.5 &  0.04$\pm$0.23& 0.1581 &   5.4 & -0.41$\pm$0.20 \\ 
+dn2        & 0.0611 &  -1.4 &  0.20$\pm$0.19& 0.3431 &  -4.7 & -0.51$\pm$0.22& 0.1634 &   0.1 & -0.05$\pm$0.21 \\ 
+dn3        & 0.0611 &  -1.4 &  0.19$\pm$0.17& 0.3432 &  -4.8 & -0.49$\pm$0.19& 0.1634 &   0.1 & -0.60$\pm$0.23 \\ 
+dn4        & 0.0585 &   1.2 & -0.34$\pm$0.30& 0.3300 &   8.4 &  0.05$\pm$0.24& 0.1581 &   5.4 & -0.83$\pm$0.31 \\ 
+\abovespace
+gated      & 0.0565 &   3.2 &  0.80$\pm$0.23& 0.3239 &  14.5 &  0.60$\pm$0.25& 0.1497 &  13.8 &  1.09$\pm$0.27 \\ 
+gated2     & 0.0584 &   1.3 &  0.26$\pm$0.24& 0.3318 &   6.6 & -0.08$\pm$0.27& 0.1528 &  10.7 &  0.32$\pm$0.24 \\ 
+gated3     & 0.0592 &   0.5 & -0.55$\pm$0.35& 0.3282 &  10.2 &  0.09$\pm$0.29& 0.1524 &  11.1 &  0.19$\pm$0.32 \\ 
+gated4     & 0.0586 &   1.1 & -0.02$\pm$0.29& 0.3303 &   8.1 & -0.26$\pm$0.44& 0.1528 &  10.7 & -0.64$\pm$0.33 \\ 
+gated5     & 0.0580 &   1.7 &  0.37$\pm$0.14& 0.3264 &  12.0 &  0.11$\pm$0.31& 0.1519 &  11.6 &  0.32$\pm$0.13 \\ 
+\abovespace
+mr1        & 0.0639 &  -4.2 &  0.23$\pm$0.33& 0.3208 &  17.6 &  0.47$\pm$0.47& 0.1581 &   5.4 & -0.08$\pm$0.39 \\ 
+mr2        & 0.0633 &  -3.6 &  0.18$\pm$0.33& 0.3203 &  18.1 &  0.46$\pm$0.49& 0.1584 &   5.1 & -0.88$\pm$0.30 \\ 
+mr3        & 0.0575 &   2.2 &  0.57$\pm$0.51& 0.3174 &  21.0 &  0.03$\pm$0.51& 0.1499 &  13.6 &  1.84$\pm$0.69 \\ 
+mr4        & 0.0573 &   2.4 &  0.39$\pm$0.27& 0.3196 &  18.8 &  0.82$\pm$0.34& 0.1508 &  12.7 & -0.75$\pm$0.38 \\ 
+mr5        & 0.0574 &   2.3 & -0.29$\pm$0.29& 0.3128 &  25.6 &  0.80$\pm$0.44& 0.1485 &  15.0 &  1.58$\pm$0.47 \\ 
+mr6        & 0.0573 &   2.4 &  0.51$\pm$0.30& 0.3201 &  18.3 &  0.61$\pm$0.22& 0.1505 &  13.0 &  0.13$\pm$0.29 \\ 
+mr7        & 0.0573 &   2.4 & -0.21$\pm$0.25& 0.3135 &  24.9 &  0.65$\pm$0.42& 0.1485 &  15.0 &  0.74$\pm$0.43 \\ 
+mr8        & 0.0572 &   2.5 &  0.90$\pm$0.60& 0.3186 &  19.8 & -0.06$\pm$0.30& 0.1500 &  13.5 &  2.04$\pm$0.57 \\ 
+mr9        & 0.0574 &   2.3 & -0.04$\pm$0.16& 0.3146 &  23.8 &  0.24$\pm$0.24& 0.1484 &  15.1 &  0.58$\pm$0.66 \\ 
+\abovespace
+bias       &        &       & -1.09$\pm$0.46&        &       & -2.10$\pm$0.34&        &       & -2.57$\pm$0.32 \\ 
+\abovespace\belowspace
+combined   & 0.0571 &   2.6 &  & 0.3144 &  24.0 &  & 0.1461 &  17.4 &   \\ 
+\hline
+\end{tabular}
+\end{sc}
+\end{small}
+\end{center}
+\vskip -0.1in
+\end{table*}
+
+
+%cat ../loadbuild/merged/S_rmse_official.txt.log; echo "next"; cat ../loadbuild/merged/M_rmse_official.txt.log; echo "next"; cat ../loadbuild/merged/L_rmse_official.txt.log; echo "next") | awk -v baseline1=0.4398 -v baseline2=0.4307 -v baseline3=0.4419 -f tabulate_results.awk | sort
+
+\begin{table*}
+\caption{RMSE Blending Results}
+\label{table:rmse-results}
+\vskip 0.15in
+\begin{center}
+\begin{small}
+\begin{sc}
+\begin{tabular}{l|rr r|rr r|rr r}
+\hline
+\abovespace\belowspace
+Task & \multicolumn{3}{|c}{Small} & \multicolumn{3}{|c}{Medium} & \multicolumn{3}{|c}{Large} \\
+Model
+& RMSE & Lift & Weight 
+& RMSE & Lift & Weight 
+& RMSE & Lift & Weight \\
+\hline
+\abovespace
+dn1        & 0.4422 &  -2.4 &  0.02$\pm$0.01& 0.4332 &  -2.5 &  0.04$\pm$0.02& 0.4442 &  -2.3 & -0.06$\pm$0.03 \\ 
+dn2        & 0.4485 &  -8.7 &  0.02$\pm$0.03& 0.4407 & -10.0 &  0.03$\pm$0.02& 0.4495 &  -7.6 & -0.02$\pm$0.04 \\ 
+dn3        & 0.4486 &  -8.8 &  0.02$\pm$0.04& 0.4409 & -10.2 &  0.03$\pm$0.03& 0.4497 &  -7.8 &  0.02$\pm$0.07 \\ 
+dn4        & 0.4421 &  -2.3 &  0.02$\pm$0.01& 0.4332 &  -2.5 &  0.03$\pm$0.02& 0.4442 &  -2.3 & -0.06$\pm$0.04 \\ 
+\abovespace
+gated      & 0.4500 & -10.2 &  0.07$\pm$0.04& 0.4462 & -15.5 &  0.02$\pm$0.04& 0.4418 &   0.1 &  0.09$\pm$0.04 \\ 
+gated2     & 0.4409 &  -1.1 &  0.08$\pm$0.04& 0.4315 &  -0.8 &  0.07$\pm$0.04& 0.4414 &   0.5 &  0.09$\pm$0.04 \\ 
+gated3     & 0.4554 & -15.6 & -0.04$\pm$0.03& 0.4420 & -11.3 &  0.02$\pm$0.04& 0.4428 &  -0.9 &  0.05$\pm$0.04 \\ 
+gated4     & 0.4490 &  -9.2 &  0.03$\pm$0.03& 0.4393 &  -8.6 &  0.00$\pm$0.03& 0.4419 &   0.0 &  0.04$\pm$0.05 \\ 
+gated5     & 0.4620 & -22.2 &  0.03$\pm$0.03& 0.4487 & -18.0 & -0.04$\pm$0.04& 0.4460 &  -4.1 &  0.01$\pm$0.02 \\ 
+gated6     & 0.4421 &  -2.3 &  0.03$\pm$0.04& 0.4317 &  -1.0 &  0.03$\pm$0.04& 0.4421 &  -0.2 &  0.02$\pm$0.05 \\ 
+gated7     & 0.4394 &   0.4 &  0.04$\pm$0.02& 0.4295 &   1.2 &  0.04$\pm$0.03& 0.4405 &   1.4 & -0.05$\pm$0.10 \\ 
+\abovespace
+mr1        & 0.4379 &   1.9 &  0.07$\pm$0.02& 0.4277 &   3.0 &  0.10$\pm$0.02& 0.4386 &   3.3 &  0.13$\pm$0.04 \\ 
+mr2        & 0.4377 &   2.1 &  0.08$\pm$0.01& 0.4275 &   3.2 &  0.10$\pm$0.04& 0.4387 &   3.2 &  0.10$\pm$0.02 \\ 
+mr3        & 0.4377 &   2.1 &  0.07$\pm$0.02& 0.4276 &   3.1 &  0.09$\pm$0.03& 0.4386 &   3.3 &  0.11$\pm$0.03 \\ 
+mr4        & 0.4382 &   1.6 &  0.06$\pm$0.03& 0.4278 &   2.9 &  0.08$\pm$0.03& 0.4386 &   3.3 &  0.10$\pm$0.06 \\ 
+mr5        & 0.4379 &   1.9 &  0.06$\pm$0.02& 0.4277 &   3.0 &  0.08$\pm$0.04& 0.4386 &   3.3 &  0.10$\pm$0.06 \\ 
+mr6        & 0.4379 &   1.9 &  0.07$\pm$0.02& 0.4277 &   3.0 &  0.09$\pm$0.03& 0.4386 &   3.3 &  0.11$\pm$0.02 \\ 
+mr7        & 0.4377 &   2.1 &  0.07$\pm$0.02& 0.4278 &   2.9 &  0.06$\pm$0.04& 0.4385 &   3.4 &  0.15$\pm$0.09 \\ 
+mr8        & 0.4377 &   2.1 &  0.07$\pm$0.02& 0.4275 &   3.2 &  0.10$\pm$0.04& 0.4389 &   3.0 &  0.07$\pm$0.02 \\ 
+mr9        & 0.4379 &   1.9 &  0.06$\pm$0.01& 0.4278 &   2.9 &  0.05$\pm$0.05& 0.4389 &   3.0 &  0.05$\pm$0.03 \\ 
+rtrees     & 0.4411 &  -1.3 &  0.05$\pm$0.05& 0.4321 &  -1.4 &  0.02$\pm$0.04& 0.4427 &  -0.8 & -0.05$\pm$0.05 \\ 
+\abovespace
+mclass     & 0.4398 &   0.0 &  0.06$\pm$0.05& 0.4319 &  -1.2 &  0.02$\pm$0.03& 0.4417 &   0.2 & -0.00$\pm$0.04 \\ 
+rtrees     & 0.4411 &  -1.3 &  0.05$\pm$0.05& 0.4321 &  -1.4 &  0.02$\pm$0.04& 0.4427 &  -0.8 & -0.05$\pm$0.05 \\ 
+\abovespace
+bias       &        &       &  0.00$\pm$0.02&        &       & -0.02$\pm$0.01&        &       & -0.00$\pm$0.01 \\ 
+\abovespace\belowspace
+combined   & 0.4381 &   1.7 &  & 0.4277 &   3.0 &  & 0.4385 &   3.4 &   \\ 
+\hline
+\end{tabular}
+\end{sc}
+\end{small}
+\end{center}
+\vskip -0.1in
+\end{table*}
+
+
+
+\begin{table}[t]
+\caption{Large AUC blending results}
+\label{problems}
+\vskip 0.15in
+\begin{center}
+\begin{small}
+\begin{sc}
+\begin{tabular}{lrrr}
+\hline
+\abovespace\belowspace
+Model & AOC (lift) & Weight$\pm$Std \\
+\hline
+\abovespace
+dn1        & 0.1581( 0.0054) & -0.4145$\pm$0.1967 \\
+dn2        & 0.1634( 0.0001) & -0.0544$\pm$0.2138 \\
+dn3        & 0.1634( 0.0001) & -0.6044$\pm$0.2300 \\
+dn4        & 0.1581( 0.0054) & -0.8349$\pm$0.3135 \\
+\abovespace
+gated      & 0.1497( 0.0138) &  1.0936$\pm$0.2731 \\
+gated2     & 0.1528( 0.0107) &  0.3231$\pm$0.2441 \\
+gated3     & 0.1524( 0.0111) &  0.1850$\pm$0.3196 \\
+gated4     & 0.1528( 0.0107) & -0.6375$\pm$0.3273 \\
+gated5     & 0.1519( 0.0116) &  0.3164$\pm$0.1278 \\
+\abovespace
+mr1        & 0.1581( 0.0054) & -0.0790$\pm$0.3933 \\
+mr2        & 0.1584( 0.0051) & -0.8821$\pm$0.2953 \\
+mr3        & 0.1499( 0.0136) &  1.8421$\pm$0.6877 \\
+mr4        & 0.1508( 0.0127) & -0.7505$\pm$0.3829 \\
+mr5        & 0.1485( 0.0150) &  1.5781$\pm$0.4709 \\
+mr6        & 0.1505( 0.0130) &  0.1290$\pm$0.2908 \\
+mr7        & 0.1485( 0.0150) &  0.7378$\pm$0.4254 \\
+mr8        & 0.1500( 0.0135) &  2.0444$\pm$0.5735 \\
+mr9        & 0.1484( 0.0151) &  0.5794$\pm$0.6626 \\
+\abovespace
+bias       &                 & -2.5664$\pm$0.3154 \\
+\abovespace\belowspace
+merged     & 0.1461( 0.0174) &                    \\
+\hline
+\end{tabular}
+\end{sc}
+\end{small}
+\end{center}
+\vskip -0.1in
+\end{table}
+
+
+\begin{table}[t]
+\caption{Medium AUC blending results}
+\label{problems}
+\vskip 0.15in
+\begin{center}
+\begin{small}
+\begin{sc}
+\begin{tabular}{lrrr}
+\hline
+\abovespace\belowspace
+Model & AOC (lift) & Weight$\pm$Std \\
+\hline
+\abovespace
+dn1        & 0.3299( 0.0085) &  0.0436$\pm$0.2257 \\
+dn2        & 0.3431(-0.0047) & -0.5098$\pm$0.2247 \\
+dn3        & 0.3432(-0.0048) & -0.4862$\pm$0.1872 \\
+dn4        & 0.3300( 0.0084) &  0.0501$\pm$0.2440 \\
+\abovespace
+gated      & 0.3239( 0.0145) &  0.6045$\pm$0.2547 \\
+gated2     & 0.3318( 0.0066) & -0.0787$\pm$0.2708 \\
+gated3     & 0.3282( 0.0102) &  0.0882$\pm$0.2929 \\
+gated4     & 0.3303( 0.0081) & -0.2602$\pm$0.4433 \\
+gated5     & 0.3264( 0.0120) &  0.1066$\pm$0.3105 \\
+\abovespace
+mr1        & 0.3208( 0.0176) &  0.4715$\pm$0.4715 \\
+mr2        & 0.3203( 0.0181) &  0.4565$\pm$0.4902 \\
+mr3        & 0.3174( 0.0210) &  0.0335$\pm$0.5070 \\
+mr4        & 0.3196( 0.0188) &  0.8224$\pm$0.3427 \\
+mr5        & 0.3128( 0.0256) &  0.8031$\pm$0.4444 \\
+mr6        & 0.3201( 0.0183) &  0.6071$\pm$0.2200 \\
+mr7        & 0.3135( 0.0249) &  0.6473$\pm$0.4200 \\
+mr8        & 0.3186( 0.0198) & -0.0595$\pm$0.3033 \\
+mr9        & 0.3146( 0.0238) &  0.2392$\pm$0.2422 \\
+\abovespace
+bias       &                 & -2.0994$\pm$0.3393 \\
+\abovespace\belowspace
+merged     & 0.3144( 0.0240) &                    \\
+\hline
+\end{tabular}
+\end{sc}
+\end{small}
+\end{center}
+\vskip -0.1in
+\end{table}
+
+\begin{table}[t]
+\caption{Small AUC blending results}
+\label{problems}
+\vskip 0.15in
+\begin{center}
+\begin{small}
+\begin{sc}
+\begin{tabular}{lrrr}
+\hline
+\abovespace\belowspace
+Model & AOC (lift) & Weight$\pm$Std \\
+\hline
+\abovespace
+dn1        & 0.0585( 0.0012) & -0.3635$\pm$0.3233 \\
+dn2        & 0.0611(-0.0014) &  0.1990$\pm$0.1926 \\
+dn3        & 0.0611(-0.0014) &  0.1860$\pm$0.1678 \\
+dn4        & 0.0585( 0.0012) & -0.3431$\pm$0.3013 \\
+\abovespace
+gated      & 0.0565( 0.0032) &  0.8025$\pm$0.2296 \\
+gated2     & 0.0584( 0.0013) &  0.2572$\pm$0.2424 \\
+gated3     & 0.0592( 0.0005) & -0.5532$\pm$0.3477 \\
+gated4     & 0.0586( 0.0011) & -0.0201$\pm$0.2874 \\
+gated5     & 0.0580( 0.0017) &  0.3666$\pm$0.1365 \\
+\abovespace
+mr1        & 0.0639(-0.0042) &  0.2347$\pm$0.3261 \\
+mr2        & 0.0633(-0.0036) &  0.1754$\pm$0.3324 \\
+mr3        & 0.0575( 0.0022) &  0.5730$\pm$0.5081 \\
+mr4        & 0.0573( 0.0024) &  0.3864$\pm$0.2689 \\
+mr5        & 0.0574( 0.0023) & -0.2887$\pm$0.2947 \\
+mr6        & 0.0573( 0.0024) &  0.5057$\pm$0.3039 \\
+mr7        & 0.0573( 0.0024) & -0.2075$\pm$0.2457 \\
+mr8        & 0.0572( 0.0025) &  0.9016$\pm$0.6035 \\
+mr9        & 0.0574( 0.0023) & -0.0358$\pm$0.1632 \\
+\abovespace
+bias       &                 & -1.0878$\pm$0.4551 \\
+\abovespace\belowspace
+merged     & 0.0571( 0.0026) &                    \\
+\hline
+\end{tabular}
+\end{sc}
+\end{small}
+\end{center}
+\vskip -0.1in
+\end{table}
+
+
+
+
+
+\begin{table}[t]
+\caption{Large RMSE blending results}
+\label{problems}
+\vskip 0.15in
+\begin{center}
+\begin{small}
+\begin{sc}
+\begin{tabular}{lrrr}
+\hline
+\abovespace\belowspace
+Model & RMSE (lift) & Weight$\pm$Std \\
+\hline
+\abovespace
+dn1        & 0.4442(-0.0023) & -0.0581$\pm$0.0306 \\
+dn2        & 0.4495(-0.0076) & -0.0176$\pm$0.0355 \\
+dn3        & 0.4497(-0.0078) &  0.0227$\pm$0.0658 \\
+dn4        & 0.4442(-0.0023) & -0.0582$\pm$0.0360 \\
+\abovespace
+gated      & 0.4418( 0.0001) &  0.0878$\pm$0.0394 \\
+gated2     & 0.4414( 0.0005) &  0.0892$\pm$0.0421 \\
+gated3     & 0.4428(-0.0009) &  0.0474$\pm$0.0406 \\
+gated4     & 0.4419( 0.0000) &  0.0420$\pm$0.0458 \\
+gated5     & 0.4460(-0.0041) &  0.0072$\pm$0.0240 \\
+gated6     & 0.4421(-0.0002) &  0.0204$\pm$0.0464 \\
+gated7     & 0.4405( 0.0014) & -0.0500$\pm$0.1015 \\
+\abovespace
+mr1        & 0.4386( 0.0033) &  0.1260$\pm$0.0403 \\
+mr2        & 0.4387( 0.0032) &  0.0957$\pm$0.0228 \\
+mr3        & 0.4386( 0.0033) &  0.1075$\pm$0.0266 \\
+mr4        & 0.4386( 0.0033) &  0.1047$\pm$0.0606 \\
+mr5        & 0.4386( 0.0033) &  0.1029$\pm$0.0589 \\
+mr6        & 0.4386( 0.0033) &  0.1104$\pm$0.0211 \\
+mr7        & 0.4385( 0.0034) &  0.1467$\pm$0.0945 \\
+mr8        & 0.4389( 0.0030) &  0.0691$\pm$0.0213 \\
+mr9        & 0.4389( 0.0030) &  0.0531$\pm$0.0268 \\
+\abovespace
+mclass     & 0.4417( 0.0002) & -0.0047$\pm$0.0412 \\
+rtrees     & 0.4427(-0.0008) & -0.0510$\pm$0.0513 \\
+\abovespace
+bias       &                 & -0.0042$\pm$0.0063 \\
+\abovespace\belowspace
+merged     & 0.4385( 0.0034) &                    \\
+\hline
+\end{tabular}
+\end{sc}
+\end{small}
+\end{center}
+\vskip -0.1in
+\end{table}
+
+
+\begin{table}[t]
+\caption{Medium RMSE blending results}
+\label{problems}
+\vskip 0.15in
+\begin{center}
+\begin{small}
+\begin{sc}
+\begin{tabular}{lrrr}
+\hline
+\abovespace\belowspace
+Model & RMSE (lift) & Weight$\pm$Std \\
+\hline
+\abovespace
+dn1        & 0.4332(-0.0025) &  0.0376$\pm$0.0178 \\
+dn2        & 0.4407(-0.0100) &  0.0317$\pm$0.0193 \\
+dn3        & 0.4409(-0.0102) &  0.0270$\pm$0.0300 \\
+dn4        & 0.4332(-0.0025) &  0.0346$\pm$0.0177 \\
+\abovespace
+gated      & 0.4462(-0.0155) &  0.0182$\pm$0.0386 \\
+gated2     & 0.4315(-0.0008) &  0.0722$\pm$0.0414 \\
+gated3     & 0.4420(-0.0113) &  0.0178$\pm$0.0371 \\
+gated4     & 0.4393(-0.0086) &  0.0012$\pm$0.0326 \\
+gated5     & 0.4487(-0.0180) & -0.0369$\pm$0.0446 \\
+gated6     & 0.4317(-0.0010) &  0.0277$\pm$0.0392 \\
+gated7     & 0.4295( 0.0012) &  0.0427$\pm$0.0266 \\
+\abovespace
+mr1        & 0.4277( 0.0030) &  0.1041$\pm$0.0238 \\
+mr2        & 0.4275( 0.0032) &  0.1029$\pm$0.0398 \\
+mr3        & 0.4276( 0.0031) &  0.0852$\pm$0.0253 \\
+mr4        & 0.4278( 0.0029) &  0.0805$\pm$0.0330 \\
+mr5        & 0.4277( 0.0030) &  0.0832$\pm$0.0405 \\
+mr6        & 0.4277( 0.0030) &  0.0886$\pm$0.0259 \\
+mr7        & 0.4278( 0.0029) &  0.0553$\pm$0.0366 \\
+mr8        & 0.4275( 0.0032) &  0.0986$\pm$0.0387 \\
+mr9        & 0.4278( 0.0029) &  0.0520$\pm$0.0550 \\
+\abovespace
+rtrees     & 0.4321(-0.0014) &  0.0152$\pm$0.0411 \\
+mclass     & 0.4319(-0.0012) &  0.0212$\pm$0.0315 \\
+\abovespace
+bias       &                 & -0.0160$\pm$0.0095 \\
+\abovespace\belowspace
+merged     & 0.4277( 0.0030) &                    \\
+\hline
+\end{tabular}
+\end{sc}
+\end{small}
+\end{center}
+\vskip -0.1in
+\end{table}
+
+
 
 \section{Discussion}
 
