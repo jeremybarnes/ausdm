@@ -92,7 +92,7 @@ The RMSE problem in the AUSDM Challenge was identical to that in the NetFlix Pri
 
 \subsubsection{AUC Task}
 
-The AUC task was a binary ranking problem.  Two ratings were selected (for example, 1 star and 5 stars), and only rows with one of these ratings were samples.  These two rows were then assigned the labels $+1$ and $-1$.  The goal was to minimise the AUC score, which is the average false rate (the sum of the average false positive rate over negative examples and the average false negative rate over positive examples).
+The AUC task was a binary ranking problem.  Two ratings were selected (for example, 1 star and 5 stars), and only rows with one of these ratings were samples.  These two rows were then assigned the labels $+1$ and $-1$.  The goal was to minimise the AUC score, which is the area under the cumulative (false positive, true positive) curve.
 
 Intuitively, the goal of this task is to separate the two classes as much as possible.  For this task, only the order of the scores mattered, not their magnitudes.  As a result, it is possible to use the RMSE score as a surrogate to calculate the AUC.
 
@@ -152,9 +152,9 @@ When adapting the work to the large and particularly the medium task at the end 
 
 It is unlikely that ensembling algorithm would ever be sufficiently well informed to extrapolate outside the range spanned by its component models, especially in a black-box setting.
 One way to look at the task, then, is to select those component models that are likely to be more accurate than the others in a particular situation, and to have these influence the final result more heavily.
-For example, it may be that model A is nearly always worse than model C, except when model B is in agreement with model A.  In this case, an optimal strategy would be to choose the result of model C, unless models A and B agreed with each other.
+For example, a pure statistical model would probably be more accurate on those users and movies for which it had lots of data than on those for which it had little or no data.  An algorithm that looked at the words in the title of the movie would probably be less accurate on foreign titled films, and so on.
 
-One way to do this is to use a confidence function, which models explicitly the accuracy of each model on each data point.
+One way to choose the most accurate models is to use a confidence function, which models explicitly the accuracy of each model on each data point.
 For the RMSE task, we could try to learn the probability that the output of a given model was within one ranking of the correct ranking.  
 For the AUC task, we could try to learn the probability that the given model is closer to the $+1$ value than the $-1$ value.
 
@@ -169,6 +169,8 @@ By decomposition, we mean a way of reducing a set of 1151 independent values (th
 These techniques are also known as ``information bottleneck'' methods or auto-encoders, tend to use some kind of a factorisation (explicit or implicit) to approximate a dataset with a large number of free parameters with a much smaller number of free parameters.
 They work by learning an (encoder, decoder) pair.  The encoder reduces the 1151 dimensional input vector into a smaller internal representation.  The decoder takes the encoded vector and reproduces the 1151 values as much as possible.  A good encoder/decoder pair will do this without introducing much of an error.  In fact, frequently the effect of the (encode, decode) sequence will be to remove noise from the input whilst keeping its essential characteristics.
 
+None of these techniques use the target values: they model the joint distribution of the inputs.  
+They were trained on the testing set to avoid biasing the training set.
 
 \subsubsection{Singular Value Decomposition}
 
@@ -233,7 +235,7 @@ In neural networks, the most commonly used formulation shares an activation matr
 \hat{\mathbf{x}} = g(\mathbf{z}) = t(W^T\mathbf{z} + \mathbf{c})
 \end{equation}
 
-When $t(\cdot)$ is a non-linear squashing function such as (in my case) $t(\mathbf{x}) = \tanh(\mathbf{x})$, we can use this neural network to learn a nonlinear decomposition.
+When $t(\cdot)$ is a non-linear squashing function such as $t(\mathbf{x}) = \tanh(\mathbf{x})$, we can use this neural network to learn a nonlinear decomposition.
 
 Note that these auto-encoders can be stacked one on top of the other, so that we apply all of the forward functions one after the other and then all of the reverse directions in the opposite order.
 
@@ -251,7 +253,7 @@ In order to make the auto encoder generalise (and learn higher level features), 
 
 In order to train the auto-encoders, a standard backpropagation algorithm can be used to perform gradient descent on the parameter space.  Normally, a stack of autoencoders will be trained a layer at a time on the output of the previous layer (in a greedy manner), although it is possible to train the entire stack at once.  Both methods were used in the competition.
 
-\subsubsection{Improvements}
+\paragraph{Improvements}
 
 Several improvements were made to the auto-encoder model described previously.
 
@@ -306,7 +308,13 @@ In order to make it easier for the classifiers to work, several features were de
 
 \subsection{Multiple Models}
 
-Highly non-linear algorithms such as decision trees, regression trees and especially meta-algorithms like Adaboost tend to have big problems dealing with noise.  To deal with this problem, 
+Highly non-linear algorithms such as decision trees, regression trees and especially meta-algorithms like Adaboost tend to have big problems dealing with noise.
+One way of mitigating this effect is by averaging models trained over random subsets of the data.  The following techniques were used:
+
+\begin{itemize}
+\item Random decision trees and regression trees were used to train the final classifier in the gated models.  The most successful model used 500 bags (with random selection of examples) of 10 iterations of boosted random decision trees (with a random subset of the features).
+\item Wherever regression (linear or logistic) was used, the regression was performed multiple (20-500) times and the average of the models taken.  A random subset of examples and of features was chosen.
+\end{itemize}
 
 \subsection{Ridge Regression}
 
@@ -320,41 +328,13 @@ Ridge regression is a regularised form of linear regression, that penalizes high
 
 The coefficient $\lambda$ describes the trade-off between fitting the data and reducing the size of the parameters in $\mathbf{x}$.  The optimal value of $\lambda$ can be efficiently calculated using leave-one-out cross validation.
 
-Ridge regression also has the advantage of working well on rank-deficient problems, unlike standard linear regression.
-
-\section{Models}
-
-There were three main models used in the entry:
-
-\begin{itemize}
-\item A multiple regression model;
-\item A gated classifier model;
-\item A deep neural network model.
-\end{itemize}
-
-In addition, several other models were tried:
-
-\begin{itemize}
-\item A boosting model
-\item A standard classifier model
-\end{itemize}
-
-Each will be described briefly in the following sections.
-
-\subsection{Multiple Regression Models}
-
-\subsection{Gated Classifier Models}
-
-It is likely that different models have differing circumstances under which they are accurate.  For example, a pure statistical model would probably be more accurate on those users and movies for which it had lots of data than on those for which it had little or no data.  An algorithm that looked at the words in the title of the movie would probably be less accurate on foreign titled films, and so on.
-
-The goal of the gated classifier model was to learn which models were more likely to be accurate, and weight these disproportionately in the output.
-
+Ridge regression also has the advantage of working well on rank-deficient or poorly conditioned problems, unlike standard linear regression.  
+This is important in the context of this work: there are a lot of small, but not insignificant singular values in the data, and so 
 
 \subsection{Deep Neural Network Model}
 
-The denoising auto-encoders are trained with no knowledge of the target feature.  By adding an extra output layer or two and training the entire resulting network with back-propagation, the features that it has learnt in its internal representation can be fine-tuned to help produce a target output (here, the label for the AUC or RMSE model).  This kind of model has already been used successfully for 
-
-This model started with the denoising auto-encoders
+The denoising auto-encoders are trained with no knowledge of the target feature.
+By adding an extra output layer or two and training the entire resulting network with back-propagation, the features that it has learnt in its internal representation can be fine-tuned to help produce a target output (here, the label for the AUC or RMSE model).
 
 \begin{figure}[ht]
 \vskip 0.2in
@@ -366,7 +346,7 @@ This model started with the denoising auto-encoders
 \vskip -0.2in
 \end{figure} 
 
-\section{Results Generation}
+\section{Method}
 
 In order to generate results, a large number of predictors were trained individually based upon the models above.  Each of these predictors was trained on 80\% of the training data, with the other 20\% (always the same part) held out in order to train the final blending model.  Once each model was run, it created:
 
@@ -377,11 +357,38 @@ In order to generate results, a large number of predictors were trained individu
 
 Once all of the files were available, they were combined a final blender, and this result became the submitted output.
 
-\subsection{Models Used}
+\subsection{Decompositions}
+\label{sec:decompositions}
 
-There were four main classes of models that were used to contribute to the final score.
+A total of four decompositions were generated: one SVD decomposition and three denoising auto-encoder decompositions.  Table \ref{table:dnae-decompositions} shows the parameters used.  In each case, the layer sizes are as indicated in \ref{fig:autoencoder-decomposition}.  Learning rates were set via manual tuning.  On the small dataset, 80\% of the examples were randomly selected on each iteration; 50\% on the medium and 10\% on the large.  The presentation order of examples was random.
 
-\subsubsection{Multiple Regression}
+\begin{table}
+\caption{Denoising Auto-Encoder Decompositions.  Layer Iter is the number of backpropagation iterations that each layer was trained by itself, Stack Iter is the number of backpropagation iterations that the entire stack was trained after each layer was added.  Bug indicates the presence of a bug described in section \ref{sec:decompositions}.}
+\label{table:dnae-decompositions}
+\vskip 0.15in
+\begin{center}
+\begin{small}
+\begin{sc}
+\begin{tabular}{lrrr}
+\hline
+\abovespace\belowspace
+Model & Layer Iter & Stack Iter & Bug \\
+\hline
+\abovespace
+dnae1 & 500    & 500 & $\surd$ \\
+dnae2 & 800    &   0 &         \\
+\belowspace
+dnae3 & 400    & 200 &         \\
+\hline
+\end{tabular}
+\end{sc}
+\end{small}
+\end{center}
+\vskip -0.1in
+\end{table}
+
+
+\subsection{Multiple Regression}
 
 The multiple regression models turned out to be the most powerful models, particularly in the RMSE task.  This is largely due to their ability to reject noise due to their inherent smoothness, the regularisation provided by ridge regression and the smoothing provided by the random selection of features and examples.
 
@@ -419,7 +426,7 @@ mr9   & DNAE3  & $\surd$ \\
 \end{table}
 
 
-\subsubsection{Deep Neural Networks}
+\subsection{Deep Neural Networks}
 
 The very first results obtained from the deep neural network were extremely good, and placed quite high on the leaderboard.  However, all attempts to reproduce these results failed\footnote{The code that generated these results had a bug in it which caused the execution to be non-deterministic}: the training error of the deep net stopped improving far before the point observed on the first run.  The results from the deep net are included as they tend to be more diverse than the other models, but they did not contribute greatly to the final score.
 
@@ -452,8 +459,7 @@ dn4   & DNAE3  & $\surd$  \\
 \end{table}
 
 
-
-\subsubsection{Gated Merger}
+\subsection{Gated Merger}
 
 Several models of the gated merger were tried.  This model tended to perform reasonably well for the AUC task, but poorly for the RMSE task.  Presumably, this is because the two-stage nature of the model caused the noise to be amplified between the stages.
 
@@ -489,10 +495,9 @@ gated7  & DNAE3     & Multi LR & N/A   \\
 \vskip -0.1in
 \end{table}
 
-\subsubsection{Classifier Models}
+\subsection{Classifier Models}
 
-For the RMSE data, two classifier models were used.  One, \texttt{rtrees} used a random forest of 200 regression trees.  The other, \texttt{mclass}, learnt a binary classifier for each discrete movie rating (1, 2, 3, 4 or 5 stars) using a random forest of 500 decision trees, and combined these predictions using linear regression.  Neither model performed particularly well.
-
+For the RMSE data, two classifier models were used.  One, \texttt{rtrees} used a random forest of 200 regression trees.  The other, \texttt{mclass}, learnt a binary classifier for several discrete movie ratings (1, 2, 3, 4 or 5 stars; 2-5 stars; 3-5 stars; 4-5 stars) using a random forest of 5000 decision trees, and combined these predictions using linear regression.  Neither model performed particularly well.
 
 \subsection{Final Blending}
 
@@ -500,28 +505,28 @@ Final blending was performed using a cross-validation training on the 20\% held 
 
 This strategy was adapted in order to reduce the impact that a ``rogue'' model (with a high error rate) would have on the final blend.  It is unlikely that performing (yet another) round of blending of already blended models would significantly improve the results.  Straight linear blending worked just as well, especially for the RMSE task.
 
-The final blending provided a substantial improvement in the AUC task.  On the RMSE task, final blending was ineffectual: the score of the blended result was slightly worse than the best individual result\footnote{The submitted results were still the blended ones, however, as they should be more resistant to the selection bias in the validation set}.
-
-This is probably due to there not being enough diversity in the models blended: there were only a few really distinct models, and these frequently used the same features (from the DNAE, the SVD and the derived features).
+The final blending provided a substantial improvement in the AUC tasks.  On the RMSE task, final blending was ineffectual: the score of the blended result was slightly worse than the best individual result\footnote{The submitted results were still the blended ones, however, as they should be more resistant to the selection bias in the validation set}.  This is probably due to there not being enough diversity in the models blended: there were only a few really distinct models, and these frequently used the same features (from the DNAE, the SVD and the derived features).
 
 \subsection{Implementation}
 
-In practise, this competition turned out (for me, anyway) to be as much about software engineering as about data mining.
+In practise, this competition turned out to be as much about software engineering as about data mining.
 
-The biggest reason for this was the amount of noise in the data compared to the size of the data itself.  The variation over even very sparsely parametrised models such as linear regression was extremely large, and for non-linear models (especially those using algorithms such as boosting) was even worse.  As a result, it was necessary to run each model as many times as possible over different random subsets of the data and average the results (for example, 5000 decision trees were trained for the random forest classifier in the gated model).
+The biggest reason for this was the amount of noise in the data.  This necessitated that models be run many times (up to 500) and the results averaged, with a corresponding increase in compute time.
 
 Due to the limited hardware resources available\footnote{One quad core ``hyper-threaded'' (8 virtual cores) desktop machine with 6GB of RAM, one dual core laptop with 2GB of RAM} and the large number of tasks, it was necessary that the software be both memory and CPU efficient.
 The entire code was vectorised to take advantage of the vector unit, multi-threaded\footnote{On the desktop machine, 8 threads were run to fully exploit the hyper-threaded processor} and the bottlenecks were profiled and carefully optimised.  Single precision arithmetic was used wherever possible\footnote{It is frequently not possible.  For example, whenever accumulating a series of numbers it is necessary to accumulate in double precision even if the numbers being accumulated are only in single precision.} due to its advantage in execution speed.
 
-In addition, parameters were saved using as small a precision as possible and care was taken not to duplicate memory when splitting datasets into training and validation sets.
+In addition, parameters were stored using as small a precision as possible and care was taken not to duplicate memory when splitting datasets into training and validation sets.
 
 The fact that there were six different tasks (AUC and RMSE for the small, medium and large datasets) also increased the amount of CPU time and engineering work required, as anything that was model or dataset-specific needed to be parametrised out and a method found to calculate the parameter for the task at hand.
 
 In the end, about 5,000 lines of C++ code were written to handle the competition directly, and about 15,000 lines added to the underlying machine learning library (primarily the code to perform Ridge Regression and the denoising auto-encoder routines).  The entire set of results could be reproduced in about 24 hours on the desktop machine.
 
-\subsection{Platform}
-
 The software was developed on Linux.  The only significant external libraries used were LAPACK and BLAS for the linear algebra routines.
+
+\subsubsection{Backpropagation Tuning}
+
+A large amount of effort was expended to improve the speed of backpropagation, which was were most of the time was spent in the longest parts of the training process (the denoising auto-encoders and deep network models).  The second-order methods indicated in \cite{lecun-98b} were implemented; however they tended to be over-enthusiastic about the learning rate, leading to divergence or oscillation.  This was especially the case on the auto-encoder training.
 
 \subsection{Open Source}
 
@@ -674,9 +679,8 @@ Category & Freq & Avg MSE & Total MSE \\
 \abovespace
 Automatic     & 0.329 & 0.019 & 0.0063 \\
 Possible      & 0.614 & 0.198 & 0.1216 \\
-\belowspace
 Impossible    & 0.057 & 1.189 & 0.0678 \\
-\hline
+\abovespace\belowspace
 Total         & 1.000 & 0.195 & 0.1953 \\
 \hline
 \end{tabular}
