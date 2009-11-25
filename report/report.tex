@@ -84,7 +84,7 @@ Large    & 50,000 & 50,000 & 1151 & 15MB \\
 
 Note that all information about the movies, users, dates and models was removed from the dataset.  This was presumably due to the probe set being publicly available for the duration of the NetFlix Prize; it would be very easy to use the probe scores to improve performance (either accidentally or on purpose).  The result was to make the contest a complete ``black box'', and preclude the use of any side-channel information.  This point will be discussed below.
 
-It is unknown if any of the probe sets collected were in fact blended versions of other models.  If they were, then the baseline results would be artificially inflated\footnote{The results of the SVD decomposition in section \ref{svd-decomposition} show that the models are mostly linearly independent, so it is likely that little blending had occurred}.
+It is unknown if any of the probe sets collected were in fact blended versions of other models.  If they were, then the baseline results would be artificially inflated\footnote{The results of the SVD decomposition in section \ref{sec:svd-decomposition-results} show that the models are mostly linearly independent, so it is likely that little blending had occurred}.
 
 \subsubsection{RMSE Task}
 
@@ -125,6 +125,8 @@ Large    & 2 & 4 & 0.1635 \\
 \end{table}
 
 As a one-person team with limited time and labour, most effort was expended on this task.  It is arguable that it represents better the real-world application of recommendation engines\footnote{For example, NetFlix presumably wants to optimise the probability that someone who sees a recommendation rents the film (or rents the film and doesn't hate it): their revenue is increased by people renting more films (more active members have more profitable subscription levels and are less likely to let their subscription lapse).}.
+
+There should also be more improvement possible on the AUC task, as the cost of making an error is essentially linear in the magnitude of the error, rather than quadratic as in the RMSE task.  The models optimized for RMSE are therefore likely to cluster results about the mean more than would be necessary for the AUC task, and some improvement should be possible simply by spreading them apart.
 
 \section{Solution Strategy}
 
@@ -276,7 +278,7 @@ Thus, this auto-encoder can only reproduce its input, no matter the dimensionali
 To rectify this problem, we added two extra terms to the decoding function \ref{eqn:autoencoder-decode}:
 
 \begin{equation}
-\label{eqn:autoencoder-decode}
+\label{eqn:autoencoder-decode-improved}
 \hat{\mathbf{x}} = t(D \mathbf{W}^T E \mathbf{z} + \mathbf{c})
 \end{equation}
 
@@ -537,6 +539,7 @@ Some of the data files used in the building of the results are available (the fu
 \section{Results}
 
 \subsection{SVD Decompositions}
+\label{sec:svd-decomposition-results}
 
 Table \ref{table:sv-distributions} shows the distribution of singular values over the six tasks.  The highest singular value in all cases corresponds to the mean of the model.  It can be seen that the large dataset is quite ill-conditioned, which means that there were probably some models that were linear combinations of others in the dataset (although only a few of them).  Most of the singular values are large enough to be somewhat relevant to the task.
 
@@ -579,7 +582,7 @@ n          & 200 & 200 & 250 &  250 & 1151   & 1151 \\
 
 \begin{table}[t]
 \caption{Decomposition accuracies.  These are the total RMSE over all inputs for different decompositions as the order (dimensionality) of the decomposition varies.}
-\label{table:sv-distributions}
+\label{table:dnae-decomposition-accuracy}
 \vskip 0.15in
 \begin{center}
 \begin{small}
@@ -628,7 +631,7 @@ We present the results in several tables, which show the performance of the comp
 %(cat ../loadbuild/merged/S_auc_official.txt.log; echo "next"; cat ../loadbuild/merged/M_auc_official.txt.log; echo "next"; cat ../loadbuild/merged/L_auc_official.txt.log; echo "next") | awk -v baseline1=0.0597 -v baseline2=0.3384 -v baseline3=0.1635 -f tabulate_results.awk | sort
 
 \begin{table*}[t]
-\caption{AUC Blending Results.  The lift is 1000 times the improvement over the baseline score.  The weight values are reported as mean $\pm$ standard deviation.}
+\caption{AUC Blending Results.  The lift is 1000 times the improvement over the baseline score.  The weight values, which describe the blending weight in the final model, are reported as mean $\pm$ standard deviation.}
 \label{table:auc-results}
 \vskip 0.15in
 \begin{center}
@@ -680,7 +683,7 @@ combined   & 0.0571 &   2.6 &  & 0.3144 &  24.0 &  & 0.1461 &  17.4 &   \\
 %cat ../loadbuild/merged/S_rmse_official.txt.log; echo "next"; cat ../loadbuild/merged/M_rmse_official.txt.log; echo "next"; cat ../loadbuild/merged/L_rmse_official.txt.log; echo "next") | awk -v baseline1=0.4398 -v baseline2=0.4307 -v baseline3=0.4419 -f tabulate_results.awk | sort
 
 \begin{table*}[b]
-\caption{RMSE Blending Results}
+\caption{RMSE Blending Results.  The lift is 1000 times the improvement over the baseline score.  The weight values, which describe the blending weight in the final model, are reported as mean $\pm$ standard deviation.}
 \label{table:rmse-results}
 \vskip 0.15in
 \begin{center}
