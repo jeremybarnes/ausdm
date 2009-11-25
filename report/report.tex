@@ -9,7 +9,9 @@
 % For citations
 \usepackage{mlapa}
 
-\icmltitlerunning{AUSDM Challenge 2009: Team ``Barneso''}
+\pagenumbering{arabic}
+
+\icmltitlerunning{AUSDM Challenge 2009 Report: Team ``Barneso''}
 
 \begin{document} 
 
@@ -17,10 +19,6 @@
 \icmltitle{Team ``Barneso'' Report for the AUSDM Ensembling Challenge 2009}
 
 \icmlauthor{Jeremy Barnes}{jeremy@barneso.com}
-
-\vskip 0.3in
-
-(Shameless plug: I am looking for consulting work: Recommendation Engines, Data Mining, Machine Learning or Computational Linguistics).
 
 \vskip 0.3in
 ]
@@ -320,7 +318,7 @@ One way of mitigating this effect is by averaging models trained over random sub
 
 \subsection{Ridge Regression}
 
-Ridge regression was used in place of linear regression in all circumstances, including within the Iteratively Reweighted Least Squares routines used to calculate the logistic regression coefficients.
+Ridge regression was used in place of linear regression in all circumstances, including within the Iteratively Reweighted Least Squares routines used to calculate the logistic regression coefficients \cite{komarek2005}.
 
 Ridge regression is a regularised form of linear regression, that penalizes high weights in the model coefficients $\mathbf{x}$.  The algorithm calculates the value of the vector $\mathbf{x}$ that minimises the following error:
 
@@ -331,7 +329,7 @@ Ridge regression is a regularised form of linear regression, that penalizes high
 The coefficient $\lambda$ describes the trade-off between fitting the data and reducing the size of the parameters in $\mathbf{x}$.  The optimal value of $\lambda$ can be efficiently calculated using leave-one-out cross validation.
 
 Ridge regression also has the advantage of working well on rank-deficient or poorly conditioned problems, unlike standard linear regression.  
-This is important in the context of this work: there are a lot of small, but not insignificant singular values in the data, and so 
+This is important in the context of this work: there are a lot of small, but not insignificant singular values in the data. 
 
 \subsection{Deep Neural Network Model}
 
@@ -522,7 +520,7 @@ In addition, parameters were stored using as small a precision as possible and c
 
 The fact that there were six different tasks (AUC and RMSE for the small, medium and large datasets) also increased the amount of CPU time and engineering work required, as anything that was model or dataset-specific needed to be parametrised out and a method found to calculate the parameter for the task at hand.
 
-In the end, about 5,000 lines of C++ code were written to handle the competition directly, and about 15,000 lines added to the underlying machine learning library (primarily the code to perform Ridge Regression and the denoising auto-encoder routines).  The entire set of results could be reproduced in about 24 hours on the desktop machine.
+In the end, about 5,000 lines of C++ code were written to handle the competition directly, and about 10,000 lines added to the underlying machine learning library (primarily the code to perform Ridge Regression and the denoising auto-encoder routines).  The entire set of results could be reproduced in about 24 hours on the desktop machine.
 
 The software was developed on Linux.  The only significant external libraries used were LAPACK and BLAS for the linear algebra routines.
 
@@ -538,15 +536,15 @@ Some of the data files used in the building of the results are available (the fu
 
 \section{Results}
 
-\subsection{SVD Decompositions}
+\subsection{Independence of Model Predictions}
 \label{sec:svd-decomposition-results}
 
-Table \ref{table:sv-distributions} shows the distribution of singular values over the six tasks.  The highest singular value in all cases corresponds to the mean of the model.  It can be seen that the large dataset is quite ill-conditioned, which means that there were probably some models that were linear combinations of others in the dataset (although only a few of them).  Most of the singular values are large enough to be somewhat relevant to the task.
+Table \ref{table:sv-distributions} shows the distribution of singular values over the six tasks.  The top part lists values of the singular values; the bottom part lists counts of various categories.  The highest singular value in all cases corresponds to the mean of the model.  It can be seen that the large dataset is quite ill-conditioned, which means that there were probably some models that were linear combinations of others in the dataset (although only a few of them).  Most of the singular values are large enough to be somewhat relevant to the task.
 
 % cat ../loadbuild/gated/L_rmse_official.txt.log | grep singular_values | sed 's/singular_values = { //g;s/}//g' | tr ' ' '\n' | awk 'BEGIN { min=10000.5; lessone = 0;  less01 = 0;  } { if ($1 > max) max = $1;  if ($1 < min) min = $1; if ($1 > 100) ++hundred;  if ($1 > 10) ++ten;  if ($1 > 1) ++one;  if ($1 > 0.1) ++pointone; } END { print max, hundred, ten, one, pointone; }'
 
 \begin{table}[t]
-\caption{Singular Value Distributions.  For each task, the top 2 and lowest singular values are shown, as well as a histogram over orders of magnitude.}
+\caption{Independence and Conditioning of Models.  The singular values of each data matrix were taken.  The top half lists values (highest, second highest and lowest); the bottom half shows a histogram over orders of magnitude.}
 \label{table:sv-distributions}
 \vskip 0.15in
 \begin{center}
@@ -567,9 +565,9 @@ $> 100$    &   1 &   1 &   1 &    1 &    9   &    9 \\
 $> 10$     &  72 &  59 &  88 &   87 &  433   &  428 \\
 $> 1$      & 199 & 197 & 247 &  249 & 1071   & 1074 \\
 $> 0.1$    & 200 & 200 & 250 &  250 & 1143   & 1143 \\
-$\leq 0.1$ &   0 &   0 &   0 &    0 &    8   &    8 \\
 \belowspace
-n          & 200 & 200 & 250 &  250 & 1151   & 1151 \\
+$\leq 0.1$ &   0 &   0 &   0 &    0 &    8   &    8 \\
+%n          & 200 & 200 & 250 &  250 & 1151   & 1151 \\
 \hline
 \end{tabular}
 \end{sc}
@@ -578,7 +576,9 @@ n          & 200 & 200 & 250 &  250 & 1151   & 1151 \\
 \vskip -0.1in
 \end{table}
 
-\subsection{DNAE Decomposition}
+\subsection{Decompositions}
+
+Table \ref{table:dnae-decomposition-accuracy} shows the accuracy of the decompositions of different orders over the training sets.  We can see that the accuracy increases as we move from DNAE1 to DNAE2 to DNAE3, but that they aren't as efficient at reproducing the data as the SVD.  DNAE3 is particularly interesting, as it shows the effect of training the stack as a whole rather than each layer individually.  The effect of this whole stack training is clearly to reduce the efficiency of the invidual layers as separate auto-encoders, but to improve the entire stack.  Its final accuracy (on a 50 element decomposition) is only 10-20\% worse than the SVD.
 
 \begin{table}[t]
 \caption{Decomposition accuracies.  These are the total RMSE over all inputs for different decompositions as the order (dimensionality) of the decomposition varies.}
@@ -621,14 +621,17 @@ RMSE & 100 & 1.51 & 4.56 & 4.08 & 2.84 \\
 \vskip -0.1in
 \end{table}
 
+Looking at the results of the \texttt{gated} (SVD decomposition), \texttt{gated3} (DNAE1 decomposition), \texttt{gated4} (DNAE2 decomposition) and \texttt{gated4} (DNAE3 decomposition) algorithms (which differ only in the decomposition used), it appears that the SVD decomposition is the most useful, followed by the DNAE3, DNAE2 and DNAE1 decompositions.  These results are disappointing.  It is possible that allowing interactions between the features (as in \cite{larochelle2009}) would improve matters, but as they stand these results would have to be considered a failure.
 
 \subsection{Model and Blending Results}
 
 % cat ../loadbuild/merged/L_rmse_official.txt.log | awk -v baseline=0.4419 'NF == 2 && $1 == "dn1" { go=1; ++iter; } !go { next; } $1 == "bias" || $1 == "combined" { go = 0; } iter < 11 { total[$1] += $2;  scores[$1,iter] = $2; } iter == 11 { score[$1] = $2; } END { for (model in total) { mean = total[model] / 10; var = 0;  for (j = 1;  j <= 10;  ++j) var += (scores[model,j] - mean) * (scores[model,j] - mean); printf("%-10s & %6.4f(%7.4f) & %7.4f$\\pm$%6.4f \\\\\n", model, score[model], baseline-score[model], mean, sqrt(var)); } printf("merged     & %6.4f(%7.4f) &         &        \\\\\n", score["combined"], baseline-score["combined"]); }'  | sort
 
-We present the results in several tables, which show the performance of the component models and the blended result.  The table contains two columns of numerical information.  The first describes the error score of the model, with the lift (reduction in error) as compared with the baseline model.  The second shows the average blending weight of the model (over 10 folds) as well as the standard deviation in this value.
+We present the results in several tables, which show the performance of the component models and the blended result.  The table for each task contains two columns of numerical information.  The first describes the error score of the model, with the lift (reduction in error) as compared with the baseline model.  The second shows the average blending weight of the model (over 10 folds) as well as the standard deviation in this value.
 
 %(cat ../loadbuild/merged/S_auc_official.txt.log; echo "next"; cat ../loadbuild/merged/M_auc_official.txt.log; echo "next"; cat ../loadbuild/merged/L_auc_official.txt.log; echo "next") | awk -v baseline1=0.0597 -v baseline2=0.3384 -v baseline3=0.1635 -f tabulate_results.awk | sort
+
+\subsubsection{AUC}
 
 \begin{table*}[t]
 \caption{AUC Blending Results.  The lift is 1000 times the improvement over the baseline score.  The weight values, which describe the blending weight in the final model, are reported as mean $\pm$ standard deviation.}
@@ -679,10 +682,23 @@ combined   & 0.0571 &   2.6 &  & 0.3144 &  24.0 &  & 0.1461 &  17.4 &   \\
 \vskip -0.1in
 \end{table*}
 
+Looking at the AUC results in table \ref{table:auc-results}, we see that the multiple regression models appear to be the most consistently accurate, followed by the gated models.  The deep network models appeared to be used mostly to attenuate noise, as their blending weights were more negative than positive.  The greatest lift was obtained on the medium task (which was also the hardest, and consequently had the most scope for improvement).  A significant improvement was also obtained on the medium task.  The lift on the small task was small, but (as will be discussed below) there was not much scope for improvement due to the noise ceiling.
+
+It is instructive to compare the multiple regression models to determine the effect of the various strategies.  Recall from table \ref{table:multiple-regression-models} that \texttt{mr1} contained only the component models, \texttt{mr2} augmented this with an SVD and \texttt{mr3} with the extra features.  Any improvement in \texttt{mr1} is therefore attribuable to the calibration of the component scores from the RMSE (quadratic error) task to the AUC (linear error) task.
+
+It seems that most of the improvement is due to the extra features, as \texttt{mr1} and \texttt{mr2} are not significantly different, but \texttt{mr3} is always significantly better than the others.  On the other hand, it appears from the rest of the \texttt{mr} results that, especially on the large task, the dnae models provide a useful substitute for the extra features, whereas the SVD does not.  Or in other words, the DNAE decompositions manage to implicitly capture most of the information in the extra features whereas the SVD does not.
+
+The deep network models (\texttt{dn1} to \texttt{dn4}) did not perform well, but were improved by adding the extra features.
+
+In all cases, the \texttt{gated} model worked better than \texttt{gated2} through \texttt{gated4}.  As these models always had extra features available, this shows that the SVD decomposition is more useful than the DNAE decompositions.
+
+Overall, the AUC results successully provided a modest lift.  It was particularly encouraging to see that the merged model on the large dataset was significantly more accurate than any of its component predictors.
+
+\subsubsection{RMSE}
 
 %cat ../loadbuild/merged/S_rmse_official.txt.log; echo "next"; cat ../loadbuild/merged/M_rmse_official.txt.log; echo "next"; cat ../loadbuild/merged/L_rmse_official.txt.log; echo "next") | awk -v baseline1=0.4398 -v baseline2=0.4307 -v baseline3=0.4419 -f tabulate_results.awk | sort
 
-\begin{table*}[b]
+\begin{table*}[t]
 \caption{RMSE Blending Results.  The lift is 1000 times the improvement over the baseline score.  The weight values, which describe the blending weight in the final model, are reported as mean $\pm$ standard deviation.}
 \label{table:rmse-results}
 \vskip 0.15in
@@ -736,21 +752,32 @@ combined   & 0.4381 &   1.7 &  & 0.4277 &   3.0 &  & 0.4385 &   3.4 &   \\
 \vskip -0.1in
 \end{table*}
 
-\section{Analysis}
+The RMSE task results presented in table \ref{table:rmse-results} are not encouraging.  The deep network results were all very poor and the gated results only rarely beat the baseline.  The multiple regression results were nearly uniform which means that the effect of the extra features and the decompositions was minimal.  The final lift obtained is far too small to be detectable by a user of such a system.  The inescapable conculsion is that we failed to achieve a significant improvement in the RMSE task.  It is probable, based upon the state of the leaderboard of the competition for the small task, that no team managed to achieve a significant improvement on the baseline.
 
-\subsection{RMSE Task}
-
-The overall lift achieved for the RMSE task was very poor, and far below the level where a person using the system would notice a difference in the quality of the recommendations.  Even the highest placed teams on the leaderboard achieved a lift of 10\% or so more than was achieved here.
+TODO
 
 This phenomena is probably explained by the use of a RMSE metric, and the amount of noise in the data.  The RMSE metric penalises very heavily incorrect predictions at the extreme ends of the scale: a prediction of 1 has 4 times the potential error.
 
+\subsection{Deep Network Results}
+
+The final submission for the small AUC task that is presented in table \ref{table:auc-results} is not in fact the best results that were obtained for this task.  During development of the denoising auto-encoders, an initial autoencoder was produced that, when trained into a deep network using supervised backprop, produced results significantly better than these.  However, due to numerical issues and thread-order nondeterminism, these results could not be duplicated nor closely matched.  There are two possible explanations.  The first is that, in speeding up the code to run at an acceptable speed for the large task, an error was introduced.  The second is that these methods are inherently based upon good luck, and that luck ran out\footnote{Of course, one can make one's own luck.  This is why proponents of deep networks suggest to make them both wide and deep: somewhere within the wide network, there is likely to be a neuron that starts at a point where it will learn something useful.  Unfortunately, the computational resources were not available to train significantly larger networks than the ones described here.}.
+
+
+
 \subsection{Difficulty Values of Rows}
 
-It is instructive to break the dataset into different types of rows, based upon the ease with which a prediction can be made.  For RMSE, we could define a row to be \emph{impossible} if the predictions of all of the models are closer to the target value than the
+It is instructive to break the dataset into different types of rows, based upon the ease with which a prediction can be made:
+\begin{itemize}
+\item \emph{easy}: all models are within one star of the correct answer;
+\item \emph{possible}: at least one model is within one star of the correct answer;
+\item \emph{impossible}: no model is within one star of the correct answer\footnote{It is could happen that the impossible values be clustered on both sides of the correct answer and that their mean be a good predictor, but this was not observed in the data.}.
+\end{itemize}
+
+Table \ref{table:row-types-rmse} shows the result of this breakdown on the large RMSE dataset, and the contribution of the different row types to the total MSE for the baseline model.  Considering that it is very unlikely that any improvement could be made on these positions, it is still very important to pick a good middle value for them, as they account for $1/3$ of the error. 
 
 \begin{table}[t]
 \caption{RMSE large set broken down by row difficulty.  In the last column, we see that 1/3 of the MSE comes from the impossible positions, which account for just 5.7\% of the data.}
-\label{rowtypesrmse}
+\label{table:row-types-rmse}
 \vskip 0.15in
 \begin{center}
 \begin{small}
@@ -761,7 +788,7 @@ It is instructive to break the dataset into different types of rows, based upon 
 Category & Freq & Avg MSE & Total MSE \\
 \hline
 \abovespace
-Automatic     & 0.329 & 0.019 & 0.0063 \\
+Easy          & 0.329 & 0.019 & 0.0063 \\
 Possible      & 0.614 & 0.198 & 0.1216 \\
 Impossible    & 0.057 & 1.189 & 0.0678 \\
 \abovespace\belowspace
@@ -774,37 +801,50 @@ Total         & 1.000 & 0.195 & 0.1953 \\
 \vskip -0.1in
 \end{table}
 
+\tableofcontents
 
 
+\subsection{Noise}
 
-\subsection{Black Box Model}
+It was observed that progress was difficult in the small AUC competition, and that the data had many characteristics of noisy data.  
 
 
+\subsection{Possible Improvements}
+
+\subsubsection{RMSE Considered Harmful}
+
+The RMSE measure used has the effect of clustering the predictions around the dataset mean.  This is especially true for the lower rankings of 1, which are already exceedingly rare.
+
+
+\subsubsection{Cracking Open the Black Box}
 
 One of the interesting aspects of this competition is the complete lack of any
 side-channel source of information\footnote{For example, in the original NetFlix
 competition the identities of the films were known, which allowed the
-possibility to obtain further information about the film from the Internet.}.  Indeed, even movies that could normally be used to determine the accuracy of the underlying models (such as the amount of information about the movie and the user in the training data) was not available.
+possibility to obtain further information about the film from the Internet.}.  Indeed, even movies that could normally be used to determine the accuracy of the underlying models (such as the amount of information about the movie and the user in the training data) was not available.  It was also interesting that every model made a prediction for every data point, irregardless of whether or not that prediction was likely to be useful.  In other words, the models were designed to maximize recall.
+
+Previous work on ensembling in computational linguistics\footnote{Idilia Inc: http://www.idilia.com/} has tended to indicate the opposite: that the it is important to use highly precise models, even at the expense of recall.
+
+One way to allow this tradeoff to be explicitly made is to provide a way to control the precision/recall tradeoff.  The most obvious way to do so is to provide a confidence function with the prediction, which gives the probability that the prediction is incorrect (for example, the probability that the output of the model is more than one star away from the correct rating).
+
+In order to generate a confidence function, it suffices to train a classifier on some held-out data.  The features for this confidence function need to be provided by the designer of the algorithm, and they need to provide information about the failure modes of the algorithm.  For example, a statistical model might perform poorly when there is little data available about the user; in this case, the amount of data available about the user might be provided as a confidence variable.  It then becomes easier to create an algorithm.  The algorithm is allowed to make really bad predictions, so long as its confidence is low in these cases; this frees it to move its predictions away from the dataset mean.
+
+An ensembling algorithm can then use these confidence values to consider only the high-precision (high-confidence) part of any given algorithm's output.  If the selection of algorithms is significantly diverse, it is possible to 
+
 
 In order to determine the accuracy of a prediction of a particular model, it is
 therefore necessary to use information about predictions from the other models.
 
 
-\subsection{}
-
-
-\subsection{Directions for Further Investigation}
-
-\begin{itemize}
-\item Non-linear but noise resistant regression models
-\end{itemize}
-
-
 \section{Conclusion}
 
-The limitations of the black-box model of ensembling, especially using the RMSE loss function to measure performance, are clear from this competition.  Judging from the leaderboard on the small task, it is unlikely that any team managed to achieve a significant improvement over the baseline.
+The AUC task proved to be rich and enjoyable, and a significant improvement was obtained on this task, especially on the medium and large datasets.  Models based upon gating of the input models and multiple regressions were successfully used.  Further improvement was achieved by hand-coding features.
 
-The RMSE measure used has the effect of clustering the predictions around the dataset mean.  This is especially true for the lower rankings of 1, which are already exceedingly rare.
+The use of unsupervised decompositions to model the joint distribution of the input variables led to some success.  Both a linear SVD decomposition and non-linear denoising auto-encoder decompositions were tried.  The denoising auto-encoder decompositions however did not end up providing good pre-initialization for deep neural networks, except for on one model which could not be reproduced.  These models appear to be difficult to use well and more experience would have been necessary to use them effectively.
+
+No significant improvements were made on the RMSE task.
+
+The limitations of the black-box model of ensembling, especially using the RMSE loss function to measure performance, are clear from this competition.  Judging from the leaderboard on the small task, it is unlikely that any team managed to achieve a significant improvement over the baseline.
 
 An improved model of ensembling was proposed, whereby each model in the ensemble provides not only a prediction of the target function, but a list of features that can be used to determine when the model is likely to be inaccurate.  This model requires further work on the part of the ensemble builders to provide this information, but would allow the ensembling method to have significantly more leverage.
 

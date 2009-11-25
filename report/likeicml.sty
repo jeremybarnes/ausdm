@@ -117,6 +117,47 @@
 
 %\addtolength{\topmargin}{-2em}
 
+%% The following is adapted from code in the acmconf.sty conference
+%% style file.  The constants in it are somewhat magical, and appear
+%% to work well with the two-column format on US letter paper that
+%% ICML uses, but will break if you change that layout, or if you use
+%% a longer block of text for the copyright notice string.  Fiddle with
+%% them if necessary to get the block to fit/look right.
+%%
+%% -- Terran Lane, 2003
+%%
+%% The following comments are included verbatim from acmconf.sty:
+%%
+%%% This section (written by KBT) handles the 1" box in the lower left
+%%% corner of the left column of the first page by creating a picture,
+%%% and inserting the predefined string at the bottom (with a negative
+%%% displacement to offset the space allocated for a non-existent
+%%% caption).
+%%%
+\def\ftype@copyrightbox{8}
+\def\@copyrightspace{
+% Create a float object positioned at the bottom of the column.  Note
+% that because of the mystical nature of floats, this has to be called
+% before the first column is populated with text (e.g., from the title
+% or abstract blocks).  Otherwise, the text will force the float to
+% the next column.  -- TDRL.
+\@float{copyrightbox}[b]
+\begin{center}
+\setlength{\unitlength}{1pc}
+\begin{picture}(20,1.5)
+% Create a line separating the main text from the note block.
+% 4.818pc==0.8in.
+\put(0,2.5){\line(1,0){4.818}}
+% Insert the text string itself.  Note that the string has to be
+% enclosed in a parbox -- the \put call needs a box object to
+% position.  Without the parbox, the text gets splattered across the
+% bottom of the page semi-randomly.  The 19.75pc distance seems to be
+% the width of the column, though I can't find an appropriate distance
+% variable to substitute here.  -- TDRL.
+\put(0,0){\parbox[b]{19.75pc}{\small Shameless plug: I'm currently looking for consulting work: Recommendation Engines, Machine Learning, Data Mining, Data Analysis, Computational Linguistics}}
+\end{picture}
+\end{center}
+\end@float}
 
 % Note: A few Latex versions need the next line instead of the former.
 % \addtolength{\topmargin}{0.3in}
@@ -145,11 +186,13 @@
 
 % general page style
 \pagestyle{fancy}
-\fancyhf{}
+%\fancyhf{}
 \fancyhead{}
-\fancyfoot{}
+%\fancyfoot{}
 % set the width of the head rule to 1 point
 \renewcommand{\headrulewidth}{1pt}
+
+\setlength{\footskip}{0.45in}
 
 % definition to set the head as running head in the preamble
 \def\icmltitlerunning#1{\gdef\@icmltitlerunning{#1}}
@@ -217,6 +260,7 @@
 \renewenvironment{abstract}
    {%
 % Insert the ``appearing in'' copyright notice.
+\@copyrightspace
 \centerline{\large\bf Abstract}
     \vspace{-0.12in}\begin{quote}}
    {\par\end{quote}\vskip 0.12in}

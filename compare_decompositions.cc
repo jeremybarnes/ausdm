@@ -58,6 +58,11 @@ struct Do_Test_Job {
 
     int order_svd, order_dnae;
 
+    vector<distribution<float> > & decomp_svd;
+    vector<distribution<float> > & decomp_dnae1;
+    vector<distribution<float> > & decomp_dnae2;
+    vector<distribution<float> > & decomp_dnae3;
+
     Do_Test_Job(int x0, int x1,
                 const SVD_Decomposition & svd,
                 const DNAE_Decomposition & dnae1,
@@ -69,14 +74,22 @@ struct Do_Test_Job {
                 double & total_error_dnae2,
                 double & total_error_dnae3,
                 const Data & data,
-                int order_svd, int order_dnae)
+                int order_svd, int order_dnae,
+                vector<distribution<float> > & decomp_svd,
+                vector<distribution<float> > & decomp_dnae1,
+                vector<distribution<float> > & decomp_dnae2,
+                vector<distribution<float> > & decomp_dnae3)
         : x0(x0), x1(x1), svd(svd), dnae1(dnae1), dnae2(dnae2), dnae3(dnae3),
           lock(lock),
           total_error_svd(total_error_svd),
           total_error_dnae1(total_error_dnae1),
           total_error_dnae2(total_error_dnae2),
           total_error_dnae3(total_error_dnae3),
-          data(data), order_svd(order_svd), order_dnae(order_dnae)
+          data(data), order_svd(order_svd), order_dnae(order_dnae),
+          decomp_svd(decomp_svd),
+          decomp_dnae1(decomp_dnae1),
+          decomp_dnae2(decomp_dnae2),
+          decomp_dnae3(decomp_dnae3)
     {
     }
 
@@ -95,6 +108,12 @@ struct Do_Test_Job {
             distribution<float> out_dnae1 = dnae1.decompose(input);
             distribution<float> out_dnae2 = dnae2.decompose(input);
             distribution<float> out_dnae3 = dnae3.decompose(input);
+
+            decomp_svd[x] = out_svd;
+            decomp_dnae1[x] = out_dnae1;
+            decomp_dnae2[x] = out_dnae2;
+            decomp_dnae3[x] = out_dnae3;
+            decomp_dnae4[x] = out_dnae4;
 
             distribution<float> recomp_svd = svd.recompose(input, out_svd, order_svd);
             distribution<float> recomp_dnae1 = dnae1.recompose(input, out_dnae1, order_dnae);
@@ -195,6 +214,8 @@ int main(int argc, char ** argv)
         = boost::dynamic_pointer_cast<DNAE_Decomposition>
         (Decomposition::load(decomp4));
 
+    int nx = data_train.nx();
+
     for (unsigned i = 0;  i < dnae1->stack.size();  ++i) {
 
         int order = dnae1->stack[i].outputs();
@@ -211,6 +232,11 @@ int main(int argc, char ** argv)
         static Worker_Task & worker = Worker_Task::instance(num_threads() - 1);
         
         Lock lock;
+
+        vector<distribution<float> > decomp_svd(nx);
+        vector<distribution<float> > decomp_dnae1(nx);
+        vector<distribution<float> > decomp_dnae2(nx);
+        vector<distribution<float> > decomp_dnae3(nx);
         
         // Now, submit it as jobs to the worker task to be done multithreaded
         int group;
@@ -225,15 +251,17 @@ int main(int argc, char ** argv)
                                          boost::ref(worker),
                                          group));
             
-            for (unsigned x = 0;  x < data_train.nx();  x += 100, ++job_num) {
-                int last = std::min<int>(data_train.nx(), x + 100);
+            for (unsigned x = 0;  x < nx;  x += 100, ++job_num) {
+                int last = std::min<int>(nx, x + 100);
                 
                 // Create the job
                 Do_Test_Job job(x, last,
                                 *svd, *dnae1, *dnae2, *dnae3,
                                 lock, total_error_svd, total_error_dnae1,
                                 total_error_dnae2, total_error_dnae3,
-                                data_train, order, i);
+                                data_train, order, i,
+                                decomp_svd, decomp_dnae1, decomp_dnae2,
+                                decomp_dnae3);
                 // Send it to a thread to be processed
                 worker.add(job, "blend job", group);
             }
@@ -242,10 +270,10 @@ int main(int argc, char ** argv)
         // Add this thread to the thread pool until we're ready
         worker.run_until_finished(group);
 
-        double err_svd = sqrt(total_error_svd / data_train.nx());
-        double err_dnae1 = sqrt(total_error_dnae1 / data_train.nx());
-        double err_dnae2 = sqrt(total_error_dnae2 / data_train.nx());
-        double err_dnae3 = sqrt(total_error_dnae3 / data_train.nx());
+        double err_svd = sqrt(total_error_svd / nx);
+        double err_dnae1 = sqrt(total_error_dnae1 / nx);
+        double err_dnae2 = sqrt(total_error_dnae2 / nx);
+        double err_dnae3 = sqrt(total_error_dnae3 / nx);
         
         cerr << "RMSE: svd " << err_svd << " dnae1 " << err_dnae1
              << " dnae2 " << err_dnae2 << " dnae3 " << err_dnae3 << endl;
