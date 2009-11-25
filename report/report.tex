@@ -174,7 +174,7 @@ They were trained on the testing set to avoid biasing the training set.
 
 \subsubsection{Singular Value Decomposition}
 
-The simplest decomposition used was the SVD.  It uses linear algebra to generate an optimal low-dimensional representation of a series of models.
+The simplest decomposition used was the SVD \cite{deerwester90}.  It uses linear algebra to generate an optimal low-dimensional representation of a series of models.
 
 Applying the SVD to a matrix $M$ breaks it down as follows:
 
@@ -219,7 +219,7 @@ If $E$ is small, the information in $\mathbf{z}$ was sufficient to capture all o
 
 \subsubsection{Denoising Auto-Encoder Decomposition}
 
-One problem with the singular value decomposition is that the the decomposition is entirely linear.  A denoising auto-encoder can be used to generate a non-linear decomposition.
+One problem with the singular value decomposition is that the the decomposition is entirely linear.  A denoising auto-encoder \cite{Vincent-TR1316} can be used to generate a non-linear decomposition.
 
 The goal of an auto encoder is to learn the identity function: two functions $f(\cdot)$ and $g(\cdot)$ such that $f(g(\mathbf{x})) = \mathbf{x}$.  Generally, in order to be interesting an auto-encoder will include some kind of restriction: for example, the number of dimensions in the range of $f$ is smaller than the number of dimensions in its domain.
 
@@ -271,7 +271,7 @@ and so
 
 where we rely on the fact that $V^T V = I$ due to $V$ being orthonormal.
 
-Thus, this auto-encoder can only reproduce its input, no matter the dimensionality, if all of the singular values of our data matrix are unitary (not very often the case).  The alternative of not including $\Sigma_n$ in the encoder function is not satisfactory as this will cause the neurons corresponding to the high-valued singular values to dominate the training.
+Thus, this auto-encoder can only reproduce its input, no matter the dimensionality, if all of the singular values of our data matrix are unitary, which is rarely true.  The alternative of not including $\Sigma_n$ in the encoder function is not satisfactory as this will cause the neurons corresponding to the high-valued singular values to dominate the training.
 
 To rectify this problem, we added two extra terms to the decoding function \ref{eqn:autoencoder-decode}:
 
@@ -323,7 +323,7 @@ Ridge regression was used in place of linear regression in all circumstances, in
 Ridge regression is a regularised form of linear regression, that penalizes high weights in the model coefficients $\mathbf{x}$.  The algorithm calculates the value of the vector $\mathbf{x}$ that minimises the following error:
 
 \begin{equation}
-  E = ||W\mathbf{x} - \mathbf{b}|| + \lambda ||\mathbf{b}|| \leftarrow \mbox{Regularization term}
+  E = ||W\mathbf{x} - \mathbf{b}|| + \lambda ||\mathbf{b}||^2 \leftarrow \mbox{Regularisation term}
 \end{equation}
 
 The coefficient $\lambda$ describes the trade-off between fitting the data and reducing the size of the parameters in $\mathbf{x}$.  The optimal value of $\lambda$ can be efficiently calculated using leave-one-out cross validation.
@@ -536,13 +536,94 @@ Some of the data files used in the building of the results are available (the fu
 
 \section{Results}
 
+\subsection{SVD Decompositions}
+
+Table \ref{table:sv-distributions} shows the distribution of singular values over the six tasks.  The highest singular value in all cases corresponds to the mean of the model.  It can be seen that the large dataset is quite ill-conditioned, which means that there were probably some models that were linear combinations of others in the dataset (although only a few of them).  Most of the singular values are large enough to be somewhat relevant to the task.
+
+% cat ../loadbuild/gated/L_rmse_official.txt.log | grep singular_values | sed 's/singular_values = { //g;s/}//g' | tr ' ' '\n' | awk 'BEGIN { min=10000.5; lessone = 0;  less01 = 0;  } { if ($1 > max) max = $1;  if ($1 < min) min = $1; if ($1 > 100) ++hundred;  if ($1 > 10) ++ten;  if ($1 > 1) ++one;  if ($1 > 0.1) ++pointone; } END { print max, hundred, ten, one, pointone; }'
+
+\begin{table}[t]
+\caption{Singular Value Distributions.  For each task, the top 2 and lowest singular values are shown, as well as a histogram over orders of magnitude.}
+\label{table:sv-distributions}
+\vskip 0.15in
+\begin{center}
+\begin{small}
+\begin{sc}
+\begin{tabular}{lrrrrrr}
+\hline
+\abovespace\belowspace
+& \multicolumn{2}{c}{Small} & \multicolumn{2}{c}{Medium} & \multicolumn{2}{c}{Large} \\
+Type & AUC & RMS & AUC & RMS & AUC & RMS \\
+\hline
+\abovespace
+Top        & 936 & 806 & 674 & 1040 & 2830   & 3538 \\
+2nd        &  69 &  55 &  83 &   77 &  257   &  253 \\
+min        & 0.9 & 0.9 & 0.4 &  0.8 & $10^{-5}$& $10^{-5}$ \\
+\abovespace
+$> 100$    &   1 &   1 &   1 &    1 &    9   &    9 \\
+$> 10$     &  72 &  59 &  88 &   87 &  433   &  428 \\
+$> 1$      & 199 & 197 & 247 &  249 & 1071   & 1074 \\
+$> 0.1$    & 200 & 200 & 250 &  250 & 1143   & 1143 \\
+$\leq 0.1$ &   0 &   0 &   0 &    0 &    8   &    8 \\
+\belowspace
+n          & 200 & 200 & 250 &  250 & 1151   & 1151 \\
+\hline
+\end{tabular}
+\end{sc}
+\end{small}
+\end{center}
+\vskip -0.1in
+\end{table}
+
+\subsection{DNAE Decomposition}
+
+\begin{table}[t]
+\caption{Decomposition accuracies.  These are the total RMSE over all inputs for different decompositions as the order (dimensionality) of the decomposition varies.}
+\label{table:sv-distributions}
+\vskip 0.15in
+\begin{center}
+\begin{small}
+\begin{sc}
+\begin{tabular}{crrrrr}
+\hline
+\abovespace\belowspace
+Set & Order & SVD & DAE1 & DAE2 & DAE3 \\
+\hline
+\abovespace
+     & 250 & 0.00 & 0.86 & 0.81 & 6.51 \\
+S    & 150 & 0.20 & 1.48 & 1.15 & 3.51 \\
+AUC  & 100 & 0.44 & 1.99 & 1.30 & 1.92 \\
+     &  50 & 0.72 & 2.22 & 1.40 & 0.92 \\
+\abovespace
+     & 250 & 0.00 & 0.62 & 0.62 & 3.58 \\
+M    & 150 & 0.30 & 1.09 & 1.02 & 3.44 \\
+AUC  & 100 & 0.48 & 1.52 & 1.42 & 2.87 \\
+     &  50 & 0.74 & 1.97 & 1.80 & 0.90 \\
+\abovespace
+     & 250 & 1.00 & 2.08 & 2.18 & 17 \\
+L    & 150 & 1.31 & 3.24 & 3.05 & 4.88 \\
+AUC  & 100 & 1.52 & 4.18 & 3.74 & 2.98 \\
+     &  50 & 1.84 & 5.01 & 4.34 & 2.08 \\
+\abovespace
+     & 250 & 0.99 & 2.31 & 2.51 & 23 \\
+L    & 150 & 1.30 & 3.58 & 3.42 & 5.52 \\
+RMSE & 100 & 1.51 & 4.56 & 4.08 & 2.84 \\
+\belowspace
+     &  50 & 1.82 & 5.38 & 4.49 & 2.08 \\
+\hline
+\end{tabular}
+\end{sc}
+\end{small}
+\end{center}
+\vskip -0.1in
+\end{table}
+
+
+\subsection{Model and Blending Results}
+
 % cat ../loadbuild/merged/L_rmse_official.txt.log | awk -v baseline=0.4419 'NF == 2 && $1 == "dn1" { go=1; ++iter; } !go { next; } $1 == "bias" || $1 == "combined" { go = 0; } iter < 11 { total[$1] += $2;  scores[$1,iter] = $2; } iter == 11 { score[$1] = $2; } END { for (model in total) { mean = total[model] / 10; var = 0;  for (j = 1;  j <= 10;  ++j) var += (scores[model,j] - mean) * (scores[model,j] - mean); printf("%-10s & %6.4f(%7.4f) & %7.4f$\\pm$%6.4f \\\\\n", model, score[model], baseline-score[model], mean, sqrt(var)); } printf("merged     & %6.4f(%7.4f) &         &        \\\\\n", score["combined"], baseline-score["combined"]); }'  | sort
 
 We present the results in several tables, which show the performance of the component models and the blended result.  The table contains two columns of numerical information.  The first describes the error score of the model, with the lift (reduction in error) as compared with the baseline model.  The second shows the average blending weight of the model (over 10 folds) as well as the standard deviation in this value.
-
-\subsection{AUC}
-
-Looking first at the AUC scores.
 
 %(cat ../loadbuild/merged/S_auc_official.txt.log; echo "next"; cat ../loadbuild/merged/M_auc_official.txt.log; echo "next"; cat ../loadbuild/merged/L_auc_official.txt.log; echo "next") | awk -v baseline1=0.0597 -v baseline2=0.3384 -v baseline3=0.1635 -f tabulate_results.awk | sort
 
@@ -728,7 +809,7 @@ An improved model of ensembling was proposed, whereby each model in the ensemble
 
 Thanks to Phil Brierley for organising and running the competition.
 
-The \LaTeX style file for this report is based upon that for ICML 2009, by P Langley, Terran Lane, Jennifer Dy, Kristian Kersting and Ricardo Silva.
+The \LaTeX\ style file for this report is based upon that for ICML 2009, by P Langley, Terran Lane, Jennifer Dy, Kristian Kersting and Ricardo Silva.
 
 
 \bibliography{report}

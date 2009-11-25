@@ -54,4 +54,6 @@ $(eval $(call program,dnae_decomposition_test,ausdm utils ACE boost_program_opti
 
 $(eval $(call test,dnae_unit_tests,ausdm,boost))
 
+$(eval $(call program,compare_decompositions,ausdm utils ACE boost_program_options-mt db arch boosting neural,compare_decompositions.cc exception_hook.cc,tools))
+
 include loadbuild.mk
