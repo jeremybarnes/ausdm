@@ -1,0 +1,336 @@
+loading data...training 500 models
+
+0%   10   20   30   40   50   60   70   80   90   100%
+|----|----|----|----|----|----|----|----|----|----|
+***************************************************
+processing 10000 predictions...
+
+0%   10   20   30   40   50   60   70   80   90   100%
+|----|----|----|----|----|----|----|----|----|----|
+***************************************************
+ done.
+elapsed: [3618.50s cpu, 1988551.8531 mticks, 744.02s wall]
+score: 0.1581  baseline: 0.1635  diff: -0.00538
+category UNKNOWN: count 0 avg error 0 baseline avg error 0 avg improvement 0
+category AUTO: count 3347 avg error 0.0618263 baseline avg error 0.0652753 avg improvement 0.003449
+category POSS: count 5942 avg error 0.169722 baseline avg error 0.171225 avg improvement 0.00150266
+category IMP: count 711 avg error 0.514044 baseline avg error 0.56085 avg improvement 0.0468051
+overall: count 10000 avg error 0.158091 baseline avg error 0.163466 avg improvement 0.0053751
+worst entries: 
+0: 7689  label: 1 pred: 0.265373 bl: 0.33235 POSS error_pred: 0.637595 error_bl: 0.148049 improvement: -0.489546
+    min: -0.4415  max: 0.8675 avg: 0.256449
+explanation: 
+
+
+1: 1612  label: 1 pred: 0.247147 bl: 0.25805 POSS error_pred: 0.666069 error_bl: 0.20689 improvement: -0.45918
+    min: -0.2395  max: 0.827 avg: 0.335646
+explanation: 
+
+
+2: 6151  label: -1 pred: 0.851349 bl: 0.27855 POSS error_pred: 0.732222 error_bl: 0.301527 improvement: -0.430695
+    min: -0.4915  max: 0.812 avg: 0.0553011
+explanation: 
+
+
+3: 592  label: -1 pred: 0.840973 bl: 0.2749 POSS error_pred: 0.702893 error_bl: 0.298011 improvement: -0.404881
+    min: -0.2335  max: 0.562 avg: 0.228981
+explanation: 
+
+
+4: 278  label: -1 pred: 0.865395 bl: 0.3661 POSS error_pred: 0.773805 error_bl: 0.435717 improvement: -0.338088
+    min: -0.3615  max: 0.7895 avg: 0.460267
+explanation: 
+
+
+5: 1761  label: 1 pred: 0.20867 bl: 0.09385 POSS error_pred: 0.728793 error_bl: 0.391478 improvement: -0.337316
+    min: -0.812  max: 0.6365 avg: -0.0227042
+explanation: 
+
+
+6: 5381  label: -1 pred: 0.840696 bl: 0.32645 IMP error_pred: 0.702089 error_bl: 0.37284 improvement: -0.329249
+    min: 0.1755  max: 0.5815 avg: 0.376663
+explanation: 
+
+
+7: 8222  label: 1 pred: 0.28882 bl: 0.1957 POSS error_pred: 0.599562 error_bl: 0.271207 improvement: -0.328355
+    min: -0.314  max: 0.6965 avg: 0.252207
+explanation: 
+
+
+8: 2106  label: -1 pred: 0.863381 bl: 0.3713 POSS error_pred: 0.76818 error_bl: 0.442748 improvement: -0.325432
+    min: -0.084  max: 0.9765 avg: 0.474503
+explanation: 
+
+
+9: 2849  label: -1 pred: 0.796136 bl: 0.25625 POSS error_pred: 0.592206 error_bl: 0.271093 improvement: -0.321113
+    min: -0.7565  max: 0.6965 avg: -0.124247
+explanation: 
+
+
+10: 1151  label: -1 pred: 0.758496 bl: 0.1949 POSS error_pred: 0.507634 error_bl: 0.201085 improvement: -0.306549
+    min: -0.4675  max: 0.594 avg: 0.040437
+explanation: 
+
+
+11: 648  label: 1 pred: 0.164849 bl: 0.0059 POSS error_pred: 0.808244 error_bl: 0.506372 improvement: -0.301872
+    min: -0.355  max: 0.933 avg: 0.142074
+explanation: 
+
+
+12: 3090  label: 1 pred: 0.462538 bl: 0.45915 POSS error_pred: 0.374353 error_bl: 0.0730785 improvement: -0.301274
+    min: -0.5395  max: 0.746 avg: 0.21589
+explanation: 
+
+
+13: 8445  label: 1 pred: 0.31262 bl: 0.1989 POSS error_pred: 0.563919 error_bl: 0.268618 improvement: -0.295301
+    min: -0.2305  max: 0.6935 avg: 0.132744
+explanation: 
+
+
+14: 2653  label: -1 pred: 0.907853 bl: 0.46365 POSS error_pred: 0.889514 error_bl: 0.595621 improvement: -0.293893
+    min: -0.31  max: 0.911 avg: 0.344281
+explanation: 
+
+
+15: 1333  label: -1 pred: 0.91155 bl: 0.4703 POSS error_pred: 0.899759 error_bl: 0.60687 improvement: -0.292889
+    min: -0.4365  max: 0.917 avg: 0.385174
+explanation: 
+
+
+16: 2205  label: -1 pred: 0.864974 bl: 0.3951 POSS error_pred: 0.7728 error_bl: 0.482121 improvement: -0.290679
+    min: -0.2025  max: 0.7195 avg: 0.313801
+explanation: 
+
+
+17: 8067  label: -1 pred: 0.662308 bl: -0.0456 POSS error_pred: 0.336481 error_bl: 0.0462033 improvement: -0.290277
+    min: -0.3875  max: 0.8085 avg: 0.190385
+explanation: 
+
+
+18: 9922  label: -1 pred: 0.785667 bl: 0.26045 POSS error_pred: 0.566493 error_bl: 0.276617 improvement: -0.289875
+    min: -0.169  max: 0.7565 avg: 0.240774
+explanation: 
+
+
+19: 4377  label: 1 pred: 0.0893814 bl: -0.10075 POSS error_pred: 0.926722 error_bl: 0.644763 improvement: -0.281959
+    min: -0.9275  max: 0.9535 avg: -0.121816
+explanation: 
+
+
+20: 4691  label: 1 pred: 0.187449 bl: 0.0226 POSS error_pred: 0.766627 error_bl: 0.484966 improvement: -0.281661
+    min: -0.137  max: 0.6965 avg: 0.183882
+explanation: 
+
+
+21: 4174  label: -1 pred: 0.731555 bl: 0.17015 POSS error_pred: 0.451587 error_bl: 0.172861 improvement: -0.278726
+    min: -0.1245  max: 0.4595 avg: 0.129214
+explanation: 
+
+
+22: 669  label: 1 pred: 0.21694 bl: 0.0598 POSS error_pred: 0.713859 error_bl: 0.435583 improvement: -0.278276
+    min: -0.575  max: 0.5735 avg: -0.051083
+explanation: 
+
+
+23: 9942  label: 1 pred: 0.167634 bl: -0.00905 POSS error_pred: 0.801274 error_bl: 0.525189 improvement: -0.276085
+    min: -0.2095  max: 0.602 avg: 0.131931
+explanation: 
+
+
+24: 3809  label: -1 pred: 0.659491 bl: -0.013 POSS error_pred: 0.331258 error_bl: 0.0566493 improvement: -0.274608
+    min: -0.3675  max: 0.3945 avg: 0.00205734
+explanation: 
+
+
+25: 7504  label: -1 pred: 0.702159 bl: 0.11435 POSS error_pred: 0.396746 error_bl: 0.123945 improvement: -0.2728
+    min: -0.2035  max: 0.397 avg: 0.123896
+explanation: 
+
+
+26: 9997  label: -1 pred: 0.748063 bl: 0.2058 POSS error_pred: 0.485737 error_bl: 0.21374 improvement: -0.271997
+    min: -0.132  max: 0.471 avg: 0.189357
+explanation: 
+
+
+27: 3888  label: -1 pred: 0.772144 bl: 0.2542 POSS error_pred: 0.536963 error_bl: 0.26808 improvement: -0.268883
+    min: -0.028  max: 0.8635 avg: 0.423755
+explanation: 
+
+
+28: 4148  label: -1 pred: 0.717214 bl: 0.15425 POSS error_pred: 0.426075 error_bl: 0.158698 improvement: -0.267376
+    min: -0.1425  max: 0.7645 avg: 0.30508
+explanation: 
+
+
+29: 9746  label: 1 pred: 0.333305 bl: 0.20135 POSS error_pred: 0.533055 error_bl: 0.266229 improvement: -0.266826
+    min: -0.0675  max: 0.61 avg: 0.228024
+explanation: 
+
+
+30: 7715  label: 1 pred: 0.280369 bl: 0.1279 POSS error_pred: 0.612107 error_bl: 0.349263 improvement: -0.262843
+    min: -0.192  max: 0.4045 avg: 0.137758
+explanation: 
+
+
+31: 7638  label: -1 pred: 0.68818 bl: 0.10275 POSS error_pred: 0.375653 error_bl: 0.114504 improvement: -0.261149
+    min: -0.362  max: 0.5675 avg: 0.108006
+explanation: 
+
+
+32: 4029  label: -1 pred: 0.853334 bl: 0.39255 IMP error_pred: 0.736641 error_bl: 0.4773 improvement: -0.259341
+    min: 0.0305  max: 0.799 avg: 0.470565
+explanation: 
+
+
+33: 2077  label: 1 pred: 0.317889 bl: 0.16965 POSS error_pred: 0.558542 error_bl: 0.300478 improvement: -0.258064
+    min: -0.174  max: 0.659 avg: 0.227475
+explanation: 
+
+
+34: 8805  label: 1 pred: 0.342043 bl: 0.20095 POSS error_pred: 0.5227 error_bl: 0.266428 improvement: -0.256272
+    min: -0.06  max: 0.6105 avg: 0.189759
+explanation: 
+
+
+35: 9978  label: 1 pred: 0.470209 bl: 0.397 POSS error_pred: 0.362804 error_bl: 0.107328 improvement: -0.255476
+    min: -0.4115  max: 0.976 avg: 0.501333
+explanation: 
+
+
+36: 7620  label: -1 pred: 0.718101 bl: 0.1694 POSS error_pred: 0.427481 error_bl: 0.172358 improvement: -0.255123
+    min: -0.0715  max: 0.5375 avg: 0.201652
+explanation: 
+
+
+37: 8166  label: 1 pred: 0.2904 bl: 0.13465 POSS error_pred: 0.597571 error_bl: 0.342692 improvement: -0.254879
+    min: -0.383  max: 0.667 avg: 0.187428
+explanation: 
+
+
+38: 2579  label: 1 pred: 0.205809 bl: 0.02725 POSS error_pred: 0.732776 error_bl: 0.478893 improvement: -0.253883
+    min: -0.5045  max: 0.4375 avg: -0.0495517
+explanation: 
+
+
+39: 5227  label: 1 pred: 0.401796 bl: 0.27145 POSS error_pred: 0.448029 error_bl: 0.194146 improvement: -0.253883
+    min: -0.126  max: 0.664 avg: 0.158253
+explanation: 
+
+
+40: 9689  label: 1 pred: 0.469499 bl: 0.39035 POSS error_pred: 0.3636 error_bl: 0.110414 improvement: -0.253186
+    min: -0.0515  max: 0.882 avg: 0.389835
+explanation: 
+
+
+41: 4961  label: 1 pred: 0.41905 bl: 0.2979 AUTO error_pred: 0.427121 error_bl: 0.174831 improvement: -0.25229
+    min: 0.007  max: 0.636 avg: 0.316909
+explanation: 
+
+
+42: 5334  label: -1 pred: 0.764756 bl: 0.25615 POSS error_pred: 0.520289 error_bl: 0.270992 improvement: -0.249297
+    min: -0.307  max: 0.667 avg: 0.240597
+explanation: 
+
+
+43: 1329  label: 1 pred: 0.303536 bl: 0.1464 POSS error_pred: 0.578455 error_bl: 0.329351 improvement: -0.249104
+    min: -0.3325  max: 0.459 avg: 0.0850638
+explanation: 
+
+
+44: 1714  label: -1 pred: 0.812773 bl: 0.33315 IMP error_pred: 0.632383 error_bl: 0.384994 improvement: -0.247389
+    min: 0.013  max: 0.6775 avg: 0.301946
+explanation: 
+
+
+45: 6990  label: -1 pred: 0.76812 bl: 0.2644 POSS error_pred: 0.528124 error_bl: 0.283045 improvement: -0.245078
+    min: -0.24  max: 0.648 avg: 0.294
+explanation: 
+
+
+46: 2488  label: -1 pred: 0.681721 bl: 0.11045 POSS error_pred: 0.3636 error_bl: 0.119325 improvement: -0.244275
+    min: -0.4545  max: 0.3785 avg: 0.041507
+explanation: 
+
+
+47: 885  label: 1 pred: 0.340309 bl: 0.18745 POSS error_pred: 0.524094 error_bl: 0.280167 improvement: -0.243927
+    min: -0.037  max: 0.731 avg: 0.255062
+explanation: 
+
+
+48: 743  label: -1 pred: 0.672868 bl: 0.0989 POSS error_pred: 0.353355 error_bl: 0.111892 improvement: -0.241462
+    min: -0.2055  max: 1 avg: 0.401949
+explanation: 
+
+
+49: 1798  label: -1 pred: 0.854554 bl: 0.4056 IMP error_pred: 0.739654 error_bl: 0.498293 improvement: -0.241362
+    min: 0.0785  max: 0.9765 avg: 0.495473
+explanation: 
+
+
+best entries: 
+0: 8121  label: -1 pred: 0.576417 bl: 0.6206 IMP error_pred: 0.221374 error_bl: 0.820209 improvement: 0.598835
+1: 2947  label: -1 pred: 0.681612 bl: 0.68375 IMP error_pred: 0.3636 error_bl: 0.88188 improvement: 0.51828
+2: 4453  label: -1 pred: 0.723049 bl: 0.7789 IMP error_pred: 0.436722 error_bl: 0.948172 improvement: 0.51145
+3: 6838  label: -1 pred: 0.470074 bl: 0.48985 POSS error_pred: 0.129168 error_bl: 0.63861 improvement: 0.509442
+4: 2277  label: -1 pred: 0.588942 bl: 0.53195 IMP error_pred: 0.236641 error_bl: 0.703295 improvement: 0.466653
+5: 8852  label: -1 pred: 0.659374 bl: 0.6012 POSS error_pred: 0.330856 error_bl: 0.793692 improvement: 0.462836
+6: 4928  label: 1 pred: 0.753339 bl: -0.00395 POSS error_pred: 0.0904022 error_bl: 0.518519 improvement: 0.428116
+7: 1646  label: -1 pred: 0.720829 bl: 0.65775 IMP error_pred: 0.432704 error_bl: 0.860587 improvement: 0.427883
+8: 6652  label: -1 pred: 0.667867 bl: 0.57045 IMP error_pred: 0.345119 error_bl: 0.756027 improvement: 0.410908
+9: 9825  label: -1 pred: 0.662636 bl: 0.56265 IMP error_pred: 0.336882 error_bl: 0.747087 improvement: 0.410205
+10: 9754  label: -1 pred: 0.501505 bl: 0.44215 POSS error_pred: 0.15448 error_bl: 0.560064 improvement: 0.405585
+11: 3096  label: -1 pred: 0.705061 bl: 0.5983 IMP error_pred: 0.402772 error_bl: 0.789273 improvement: 0.386501
+12: 6541  label: -1 pred: 0.741961 bl: 0.65155 POSS error_pred: 0.471274 error_bl: 0.85456 improvement: 0.383286
+13: 3107  label: -1 pred: 0.654566 bl: 0.52815 POSS error_pred: 0.322017 error_bl: 0.697971 improvement: 0.375954
+14: 508  label: -1 pred: 0.54371 bl: 0.4462 IMP error_pred: 0.192045 error_bl: 0.56599 improvement: 0.373945
+15: 8252  label: -1 pred: 0.422141 bl: 0.38665 POSS error_pred: 0.0974287 error_bl: 0.467658 improvement: 0.370229
+16: 472  label: 1 pred: 0.369333 bl: -0.30225 POSS error_pred: 0.489646 error_bl: 0.856332 improvement: 0.366687
+17: 2510  label: -1 pred: 0.578418 bl: 0.45885 POSS error_pred: 0.222378 error_bl: 0.587987 improvement: 0.365609
+18: 5531  label: -1 pred: 0.570133 bl: 0.45235 IMP error_pred: 0.214946 error_bl: 0.57734 improvement: 0.362395
+19: 363  label: -1 pred: 0.596478 bl: 0.47065 POSS error_pred: 0.245279 error_bl: 0.607372 improvement: 0.362093
+20: 2613  label: 1 pred: 0.473886 bl: -0.16225 POSS error_pred: 0.35902 error_bl: 0.720629 improvement: 0.361609
+21: 4558  label: -1 pred: 0.738572 bl: 0.62475 IMP error_pred: 0.464243 error_bl: 0.825432 improvement: 0.361189
+22: 505  label: 1 pred: 0.499089 bl: -0.1334 POSS error_pred: 0.327957 error_bl: 0.68638 improvement: 0.358423
+23: 2070  label: -1 pred: 0.697458 bl: 0.56225 IMP error_pred: 0.388911 error_bl: 0.746786 improvement: 0.357875
+24: 4351  label: -1 pred: 0.688566 bl: 0.55115 IMP error_pred: 0.376055 error_bl: 0.731619 improvement: 0.355564
+25: 3808  label: 1 pred: 0.277465 bl: -0.55605 POSS error_pred: 0.616687 error_bl: 0.971127 improvement: 0.35444
+26: 3490  label: -1 pred: 0.638649 bl: 0.4959 IMP error_pred: 0.296906 error_bl: 0.648051 improvement: 0.351145
+27: 2934  label: -1 pred: 0.480474 bl: 0.3964 POSS error_pred: 0.137204 error_bl: 0.483728 improvement: 0.346525
+28: 7193  label: -1 pred: 0.643898 bl: 0.49475 POSS error_pred: 0.30675 error_bl: 0.646043 improvement: 0.339293
+29: 4626  label: 1 pred: 0.300204 bl: -0.40305 POSS error_pred: 0.583234 error_bl: 0.919355 improvement: 0.336121
+30: 6785  label: -1 pred: 0.699676 bl: 0.5458 POSS error_pred: 0.393331 error_bl: 0.725191 improvement: 0.33186
+31: 1656  label: -1 pred: 0.60665 bl: 0.4612 POSS error_pred: 0.259944 error_bl: 0.591603 improvement: 0.331659
+32: 8455  label: -1 pred: 0.705207 bl: 0.55155 IMP error_pred: 0.402772 error_bl: 0.732222 improvement: 0.32945
+33: 7631  label: 1 pred: 0.453556 bl: -0.1559 POSS error_pred: 0.384309 error_bl: 0.712664 improvement: 0.328355
+34: 6343  label: -1 pred: 0.58071 bl: 0.43785 POSS error_pred: 0.225392 error_bl: 0.553033 improvement: 0.327642
+35: 8114  label: -1 pred: 0.713648 bl: 0.5587 IMP error_pred: 0.417035 error_bl: 0.741262 improvement: 0.324227
+36: 7231  label: -1 pred: 0.420069 bl: 0.35665 POSS error_pred: 0.0958216 error_bl: 0.419847 improvement: 0.324026
+37: 2246  label: -1 pred: 0.606069 bl: 0.4533 IMP error_pred: 0.259542 error_bl: 0.580153 improvement: 0.320611
+38: 768  label: -1 pred: 0.728075 bl: 0.57735 IMP error_pred: 0.445159 error_bl: 0.764564 improvement: 0.319405
+39: 286  label: -1 pred: 0.642469 bl: 0.4789 IMP error_pred: 0.303536 error_bl: 0.620932 improvement: 0.317397
+40: 750  label: 1 pred: 0.456789 bl: -0.1436 POSS error_pred: 0.381322 error_bl: 0.697232 improvement: 0.31591
+41: 1302  label: -1 pred: 0.696935 bl: 0.5324 IMP error_pred: 0.388509 error_bl: 0.703495 improvement: 0.314986
+42: 4133  label: -1 pred: 0.534266 bl: 0.4007 POSS error_pred: 0.183005 error_bl: 0.490257 improvement: 0.307252
+43: 11  label: -1 pred: 0.655294 bl: 0.48445 IMP error_pred: 0.323222 error_bl: 0.630173 improvement: 0.306951
+44: 9062  label: -1 pred: 0.570906 bl: 0.4199 POSS error_pred: 0.21595 error_bl: 0.522499 improvement: 0.306549
+45: 7246  label: -1 pred: 0.783228 bl: 0.6617 IMP error_pred: 0.558658 error_bl: 0.864303 improvement: 0.305645
+46: 7838  label: -1 pred: 0.761535 bl: 0.619 IMP error_pred: 0.514464 error_bl: 0.818401 improvement: 0.303937
+47: 8507  label: 1 pred: 0.323012 bl: -0.29785 POSS error_pred: 0.549383 error_bl: 0.852648 improvement: 0.303266
+48: 6610  label: 1 pred: 0.631705 bl: 0.01255 POSS error_pred: 0.196734 error_bl: 0.496714 improvement: 0.29998
+49: 3188  label: -1 pred: 0.815683 bl: 0.7601 IMP error_pred: 0.640418 error_bl: 0.939534 improvement: 0.299116
+
+total is 0
+score for UNKNOWN: 1.0000 baseline: 1.0000 diff: 0.0000
+total is 3347
+score for AUTO: 0.0000 baseline: 0.0000 diff: 0.0000
+total is 5942
+score for POSS: 0.2374 baseline: 0.2389 diff: -0.0015
+total is 711
+score for IMP: 1.0000 baseline: 1.0000 diff: 0.0000
+writing 50000 official test outputs
+
+0%   10   20   30   40   50   60   70   80   90   100%
+|----|----|----|----|----|----|----|----|----|----|
+***************************************************
+scores: [ 0.158091 ]
+0.1581 +/-    nan

@@ -1,0 +1,1694 @@
+loading data...model 261: before 0.441147/0 after 0.450675/0 test: before 0.439386/0.448169 after 0/0
+model 307: before 0.441483/0 after 0.450285/0 test: before 0.440526/0.44857 after 0/0
+model 86: before 0.44229/0 after 0.451569/0 test: before 0.440112/0.449275 after 0/0
+model 0: before 0.44086/0 after 0.450194/0 test: before 0.440826/0.449086 after 0/0
+model 878: before 0.441363/0 after 0.450284/0 test: before 0.44005/0.448133 after 0/0
+model 1034: before 0.440964/0 after 0.449909/0 test: before 0.439388/0.447604 after 0/0
+model 135: before 0.441077/0 after 0.450097/0 test: before 0.439598/0.447838 after 0/0
+model 741: before 0.440871/0 after 0.450453/0 test: before 0.440215/0.448586 after 0/0
+model 1150: before 0.441905/0 after 0.450769/0 test: before 0.44031/0.448852 after 0/0
+model 1106: before 0.440944/0 after 0.450773/0 test: before 0.439827/0.448711 after 0/0
+generating blend data
+bag 0 of 10bag 1 of 10
+
+bag bag 6 of 10
+bag 3 of 10
+4 of 10
+bag 5 of 10
+bag 7 of 10
+bag 2 of 10
+
+Learned GLZ function: 
+feature                                     label0   
+bias                                         0.000000
+min_model                                    0.000000
+max_model                                    0.000000
+avg_model_chosen                             0.000000
+min_weighted                                 0.168246
+max_weighted                                -0.005722
+avg_weighted                                 0.000000
+weighted_avg                                -0.107403
+L_rmse_1_output                             -0.194553
+L_rmse_1_conf                                0.000000
+L_rmse_1_weighted                           -0.115489
+L_rmse_1_dev_from_mean                       0.121663
+L_rmse_1_diff_from_int                      -0.120086
+L_rmse_87_output                             0.005916
+L_rmse_87_conf                              -0.161711
+L_rmse_87_weighted                           0.065871
+L_rmse_87_dev_from_mean                      0.016195
+L_rmse_87_diff_from_int                      0.038971
+L_rmse_136_output                           -0.237518
+L_rmse_136_conf                              0.317360
+L_rmse_136_weighted                          0.069441
+L_rmse_136_dev_from_mean                    -0.156751
+L_rmse_136_diff_from_int                    -0.233531
+L_rmse_262_output                            0.432348
+L_rmse_262_conf                             -0.026668
+L_rmse_262_weighted                          0.479902
+L_rmse_262_dev_from_mean                    -0.220342
+L_rmse_262_diff_from_int                    -0.148682
+L_rmse_308_output                           -0.059562
+L_rmse_308_conf                             -0.279284
+L_rmse_308_weighted                         -0.049899
+L_rmse_308_dev_from_mean                     0.147015
+L_rmse_308_diff_from_int                     0.295444
+L_rmse_742_output                            0.013492
+L_rmse_742_conf                             -0.221219
+L_rmse_742_weighted                         -0.286198
+L_rmse_742_dev_from_mean                     0.215705
+L_rmse_742_diff_from_int                    -0.080953
+L_rmse_879_output                           -0.082883
+L_rmse_879_conf                              0.255246
+L_rmse_879_weighted                          0.057020
+L_rmse_879_dev_from_mean                    -0.091443
+L_rmse_879_diff_from_int                     0.354040
+L_rmse_1035_output                           0.505988
+L_rmse_1035_conf                             0.092774
+L_rmse_1035_weighted                         0.081024
+L_rmse_1035_dev_from_mean                    0.065285
+L_rmse_1035_diff_from_int                   -0.415624
+L_rmse_1107_output                           0.425195
+L_rmse_1107_conf                            -0.057847
+L_rmse_1107_weighted                         0.085928
+L_rmse_1107_dev_from_mean                    0.172226
+L_rmse_1107_diff_from_int                    0.007886
+L_rmse_1151_output                           0.098729
+L_rmse_1151_conf                             0.090697
+L_rmse_1151_weighted                         0.030992
+L_rmse_1151_dev_from_mean                   -0.037698
+L_rmse_1151_diff_from_int                    0.283952
+chosen_conf_min                             -0.332740
+chosen_conf_max                             -0.142450
+chosen_conf_avg                             -0.010977
+highest_chosen_output                        0.158496
+highest_chosen_weighted                      0.152524
+model_avg                                    0.000000
+chosen_model_avg                             0.000000
+models_mean                                 -0.130310
+models_std                                   0.005648
+models_min                                   0.000000
+models_max                                   0.173177
+models_range                                 0.107704
+models_range_dev_high                        0.004167
+models_range_dev_low                         0.036933
+diff_mean_10_all                            -0.221025
+abs_diff_mean_10_all                        -0.613695
+BIAS                                        -0.073201
+
+bag 8 of 10
+
+Learned GLZ function: 
+feature                                     label0   
+bias                                         0.000000
+min_model                                    0.000000
+max_model                                    0.000000
+avg_model_chosen                             0.000000
+min_weighted                                 0.705337
+max_weighted                                -0.649676
+avg_weighted                                 0.000000
+weighted_avg                                 0.220224
+L_rmse_1_output                              0.056052
+L_rmse_1_conf                                0.000000
+L_rmse_1_weighted                           -0.446529
+L_rmse_1_dev_from_mean                      -0.338973
+L_rmse_1_diff_from_int                      -0.286740
+L_rmse_87_output                             0.068214
+L_rmse_87_conf                              -0.182329
+L_rmse_87_weighted                          -0.051251
+L_rmse_87_dev_from_mean                     -0.001896
+L_rmse_87_diff_from_int                      0.090476
+L_rmse_136_output                            0.043328
+L_rmse_136_conf                             -0.038493
+L_rmse_136_weighted                         -0.336047
+L_rmse_136_dev_from_mean                    -0.309753
+L_rmse_136_diff_from_int                     0.025241
+L_rmse_262_output                            0.294076
+L_rmse_262_conf                             -0.022720
+L_rmse_262_weighted                          0.087984
+L_rmse_262_dev_from_mean                    -0.409283
+L_rmse_262_diff_from_int                    -0.224636
+L_rmse_308_output                           -0.168106
+L_rmse_308_conf                              0.027912
+L_rmse_308_weighted                         -0.105326
+L_rmse_308_dev_from_mean                    -0.694610
+L_rmse_308_diff_from_int                     0.064875
+L_rmse_742_output                            0.445454
+L_rmse_742_conf                             -0.184008
+L_rmse_742_weighted                          0.166979
+L_rmse_742_dev_from_mean                    -0.581580
+L_rmse_742_diff_from_int                     0.123168
+L_rmse_879_output                           -0.072892
+L_rmse_879_conf                              0.023935
+L_rmse_879_weighted                         -0.395349
+L_rmse_879_dev_from_mean                    -0.341840
+L_rmse_879_diff_from_int                    -0.100535
+L_rmse_1035_output                           0.406525
+L_rmse_1035_conf                            -0.124791
+L_rmse_1035_weighted                        -0.341008
+L_rmse_1035_dev_from_mean                   -0.169402
+L_rmse_1035_diff_from_int                    0.104891
+L_rmse_1107_output                          -0.077194
+L_rmse_1107_conf                            -0.053142
+L_rmse_1107_weighted                        -0.454534
+L_rmse_1107_dev_from_mean                    0.243429
+L_rmse_1107_diff_from_int                    0.113327
+L_rmse_1151_output                           0.167390
+L_rmse_1151_conf                             0.129920
+L_rmse_1151_weighted                        -0.608479
+L_rmse_1151_dev_from_mean                   -0.327588
+L_rmse_1151_diff_from_int                    0.174715
+chosen_conf_min                              0.112874
+chosen_conf_max                             -0.086237
+chosen_conf_avg                             -0.045839
+highest_chosen_output                        0.266382
+highest_chosen_weighted                     -0.010228
+model_avg                                    0.000000
+chosen_model_avg                             0.000000
+models_mean                                 -0.267192
+models_std                                   0.002324
+models_min                                   0.000000
+models_max                                  -0.035691
+models_range                                 0.167202
+models_range_dev_high                        0.044653
+models_range_dev_low                        -0.504504
+diff_mean_10_all                            -0.383477
+abs_diff_mean_10_all                        -0.271637
+BIAS                                         0.020922
+
+bag 9 of 10
+
+Learned GLZ function: 
+feature                                     label0   
+bias                                         0.000000
+min_model                                    0.000000
+max_model                                    0.000000
+avg_model_chosen                             0.000000
+min_weighted                                 0.489858
+max_weighted                                -0.111716
+avg_weighted                                 0.000000
+weighted_avg                                -0.031689
+L_rmse_1_output                              0.091077
+L_rmse_1_conf                                0.000000
+L_rmse_1_weighted                           -0.229215
+L_rmse_1_dev_from_mean                      -0.047368
+L_rmse_1_diff_from_int                       0.041815
+L_rmse_87_output                             0.141696
+L_rmse_87_conf                              -0.282301
+L_rmse_87_weighted                           0.516056
+L_rmse_87_dev_from_mean                     -0.084769
+L_rmse_87_diff_from_int                     -0.054969
+L_rmse_136_output                           -0.456989
+L_rmse_136_conf                              0.005727
+L_rmse_136_weighted                         -0.104761
+L_rmse_136_dev_from_mean                    -0.150422
+L_rmse_136_diff_from_int                     0.167822
+L_rmse_262_output                            0.196899
+L_rmse_262_conf                             -0.303837
+L_rmse_262_weighted                          0.378108
+L_rmse_262_dev_from_mean                    -0.112177
+L_rmse_262_diff_from_int                    -0.156460
+L_rmse_308_output                           -0.100929
+L_rmse_308_conf                             -0.095217
+L_rmse_308_weighted                          0.023649
+L_rmse_308_dev_from_mean                    -0.308420
+L_rmse_308_diff_from_int                     0.047460
+L_rmse_742_output                            0.413698
+L_rmse_742_conf                             -0.156068
+L_rmse_742_weighted                          0.471833
+L_rmse_742_dev_from_mean                    -0.492543
+L_rmse_742_diff_from_int                    -0.066749
+L_rmse_879_output                            0.087803
+L_rmse_879_conf                             -0.143010
+L_rmse_879_weighted                         -0.123100
+L_rmse_879_dev_from_mean                     0.049184
+L_rmse_879_diff_from_int                     0.387039
+L_rmse_1035_output                           0.461008
+L_rmse_1035_conf                            -0.269474
+L_rmse_1035_weighted                        -0.087854
+L_rmse_1035_dev_from_mean                    0.133328
+L_rmse_1035_diff_from_int                   -0.341116
+L_rmse_1107_output                          -0.041304
+L_rmse_1107_conf                            -0.167429
+L_rmse_1107_weighted                        -0.304276
+L_rmse_1107_dev_from_mean                    0.330975
+L_rmse_1107_diff_from_int                   -0.028513
+L_rmse_1151_output                          -0.061423
+L_rmse_1151_conf                            -0.019983
+L_rmse_1151_weighted                        -0.099829
+L_rmse_1151_dev_from_mean                   -0.212269
+L_rmse_1151_diff_from_int                    0.083788
+chosen_conf_min                             -0.398516
+chosen_conf_max                             -0.394810
+chosen_conf_avg                             -0.164560
+highest_chosen_output                        0.057328
+highest_chosen_weighted                      0.282481
+model_avg                                    0.000000
+chosen_model_avg                             0.000000
+models_mean                                 -0.120871
+models_std                                   0.042435
+models_min                                   0.000000
+models_max                                   0.432763
+models_range                                -0.102587
+models_range_dev_high                       -0.410403
+models_range_dev_low                         0.142008
+diff_mean_10_all                            -0.194024
+abs_diff_mean_10_all                        -0.438093
+BIAS                                         0.034932
+
+
+Learned GLZ function: 
+feature                                     label0   
+bias                                         0.000000
+min_model                                    0.000000
+max_model                                    0.000000
+avg_model_chosen                             0.000000
+min_weighted                                 0.217010
+max_weighted                                -0.173110
+avg_weighted                                 0.000000
+weighted_avg                                -0.027747
+L_rmse_1_output                             -0.030948
+L_rmse_1_conf                                0.000000
+L_rmse_1_weighted                           -0.175918
+L_rmse_1_dev_from_mean                       0.019326
+L_rmse_1_diff_from_int                      -0.371607
+L_rmse_87_output                             0.024966
+L_rmse_87_conf                              -0.340557
+L_rmse_87_weighted                           0.415188
+L_rmse_87_dev_from_mean                      0.130873
+L_rmse_87_diff_from_int                     -0.271020
+L_rmse_136_output                           -0.123329
+L_rmse_136_conf                              0.091087
+L_rmse_136_weighted                         -0.421596
+L_rmse_136_dev_from_mean                    -0.280747
+L_rmse_136_diff_from_int                     0.109762
+L_rmse_262_output                            0.497927
+L_rmse_262_conf                              0.001381
+L_rmse_262_weighted                          0.725117
+L_rmse_262_dev_from_mean                    -0.590743
+L_rmse_262_diff_from_int                    -0.064082
+L_rmse_308_output                           -0.311972
+L_rmse_308_conf                             -0.545928
+L_rmse_308_weighted                         -0.282109
+L_rmse_308_dev_from_mean                    -0.127726
+L_rmse_308_diff_from_int                     0.500103
+L_rmse_742_output                            0.337672
+L_rmse_742_conf                             -0.439008
+L_rmse_742_weighted                         -0.149562
+L_rmse_742_dev_from_mean                    -0.339757
+L_rmse_742_diff_from_int                     0.078029
+L_rmse_879_output                           -0.027492
+L_rmse_879_conf                              0.114839
+L_rmse_879_weighted                         -0.486211
+L_rmse_879_dev_from_mean                    -0.296900
+L_rmse_879_diff_from_int                     0.318689
+L_rmse_1035_output                           0.548289
+L_rmse_1035_conf                            -0.091653
+L_rmse_1035_weighted                        -0.361201
+L_rmse_1035_dev_from_mean                   -0.069497
+L_rmse_1035_diff_from_int                   -0.545187
+L_rmse_1107_output                           0.165267
+L_rmse_1107_conf                            -0.099610
+L_rmse_1107_weighted                         0.112774
+L_rmse_1107_dev_from_mean                    0.117552
+L_rmse_1107_diff_from_int                    0.198100
+L_rmse_1151_output                           0.250014
+L_rmse_1151_conf                            -0.047336
+L_rmse_1151_weighted                        -0.116596
+L_rmse_1151_dev_from_mean                   -0.302498
+L_rmse_1151_diff_from_int                    0.097555
+chosen_conf_min                              0.171978
+chosen_conf_max                             -0.334729
+chosen_conf_avg                             -0.172744
+highest_chosen_output                       -0.302725
+highest_chosen_weighted                      0.040252
+model_avg                                    0.000000
+chosen_model_avg                             0.000000
+models_mean                                 -0.189051
+models_std                                  -0.023899
+models_min                                   0.000000
+models_max                                   0.437710
+models_range                                 0.159535
+models_range_dev_high                       -0.240015
+models_range_dev_low                         0.101248
+diff_mean_10_all                            -0.322091
+abs_diff_mean_10_all                        -0.375965
+BIAS                                        -0.042766
+
+
+Learned GLZ function: 
+feature                                     label0   
+bias                                         0.000000
+min_model                                    0.000000
+max_model                                    0.000000
+avg_model_chosen                             0.000000
+min_weighted                                 0.122721
+max_weighted                                -0.143444
+avg_weighted                                 0.000000
+weighted_avg                                 0.083665
+L_rmse_1_output                              0.219174
+L_rmse_1_conf                                0.000000
+L_rmse_1_weighted                           -0.035069
+L_rmse_1_dev_from_mean                      -0.087335
+L_rmse_1_diff_from_int                       0.035685
+L_rmse_87_output                             0.226984
+L_rmse_87_conf                              -0.174063
+L_rmse_87_weighted                          -0.011981
+L_rmse_87_dev_from_mean                      0.106483
+L_rmse_87_diff_from_int                      0.083545
+L_rmse_136_output                            0.020069
+L_rmse_136_conf                             -0.015891
+L_rmse_136_weighted                         -0.030233
+L_rmse_136_dev_from_mean                    -0.206686
+L_rmse_136_diff_from_int                    -0.037490
+L_rmse_262_output                            0.205766
+L_rmse_262_conf                             -0.124984
+L_rmse_262_weighted                         -0.013416
+L_rmse_262_dev_from_mean                    -0.006192
+L_rmse_262_diff_from_int                    -0.416361
+L_rmse_308_output                           -0.066151
+L_rmse_308_conf                             -0.067029
+L_rmse_308_weighted                          0.014433
+L_rmse_308_dev_from_mean                    -0.221489
+L_rmse_308_diff_from_int                     0.115449
+L_rmse_742_output                            0.098581
+L_rmse_742_conf                             -0.115022
+L_rmse_742_weighted                          0.004130
+L_rmse_742_dev_from_mean                    -0.110990
+L_rmse_742_diff_from_int                     0.133602
+L_rmse_879_output                            0.123764
+L_rmse_879_conf                             -0.054327
+L_rmse_879_weighted                         -0.063029
+L_rmse_879_dev_from_mean                    -0.163070
+L_rmse_879_diff_from_int                     0.106203
+L_rmse_1035_output                           0.066686
+L_rmse_1035_conf                            -0.030684
+L_rmse_1035_weighted                        -0.024196
+L_rmse_1035_dev_from_mean                   -0.188918
+L_rmse_1035_diff_from_int                   -0.141875
+L_rmse_1107_output                           0.236776
+L_rmse_1107_conf                            -0.117906
+L_rmse_1107_weighted                        -0.077665
+L_rmse_1107_dev_from_mean                    0.063429
+L_rmse_1107_diff_from_int                    0.053873
+L_rmse_1151_output                          -0.172669
+L_rmse_1151_conf                             0.005149
+L_rmse_1151_weighted                        -0.141778
+L_rmse_1151_dev_from_mean                   -0.100260
+L_rmse_1151_diff_from_int                    0.024533
+chosen_conf_min                             -0.055667
+chosen_conf_max                             -0.156623
+chosen_conf_avg                             -0.085001
+highest_chosen_output                        0.120947
+highest_chosen_weighted                     -0.018126
+model_avg                                    0.000000
+chosen_model_avg                             0.000000
+models_mean                                 -0.242391
+models_std                                   0.009788
+models_min                                   0.000000
+models_max                                   0.202937
+models_range                                -0.011603
+models_range_dev_high                        0.058992
+models_range_dev_low                        -0.095700
+diff_mean_10_all                            -0.338289
+abs_diff_mean_10_all                        -0.284620
+BIAS                                         0.029981
+
+
+Learned GLZ function: 
+feature                                     label0   
+bias                                         0.000000
+min_model                                    0.000000
+max_model                                    0.000000
+avg_model_chosen                             0.000000
+min_weighted                                 0.078887
+max_weighted                                -0.173383
+avg_weighted                                 0.000000
+weighted_avg                                 0.041445
+L_rmse_1_output                              0.145874
+L_rmse_1_conf                                0.000000
+L_rmse_1_weighted                           -0.073801
+L_rmse_1_dev_from_mean                      -0.058007
+L_rmse_1_diff_from_int                      -0.030943
+L_rmse_87_output                             0.132694
+L_rmse_87_conf                              -0.124492
+L_rmse_87_weighted                           0.182675
+L_rmse_87_dev_from_mean                     -0.053091
+L_rmse_87_diff_from_int                     -0.010334
+L_rmse_136_output                           -0.140592
+L_rmse_136_conf                              0.074458
+L_rmse_136_weighted                         -0.374976
+L_rmse_136_dev_from_mean                    -0.120589
+L_rmse_136_diff_from_int                    -0.060946
+L_rmse_262_output                            0.257968
+L_rmse_262_conf                             -0.074739
+L_rmse_262_weighted                          0.112455
+L_rmse_262_dev_from_mean                    -0.092840
+L_rmse_262_diff_from_int                    -0.150170
+L_rmse_308_output                           -0.027305
+L_rmse_308_conf                             -0.085321
+L_rmse_308_weighted                         -0.035304
+L_rmse_308_dev_from_mean                    -0.164981
+L_rmse_308_diff_from_int                    -0.082908
+L_rmse_742_output                            0.341115
+L_rmse_742_conf                             -0.157261
+L_rmse_742_weighted                          0.044572
+L_rmse_742_dev_from_mean                    -0.056392
+L_rmse_742_diff_from_int                     0.197188
+L_rmse_879_output                            0.193573
+L_rmse_879_conf                             -0.017471
+L_rmse_879_weighted                         -0.375465
+L_rmse_879_dev_from_mean                    -0.011071
+L_rmse_879_diff_from_int                     0.563593
+L_rmse_1035_output                           0.132431
+L_rmse_1035_conf                             0.001659
+L_rmse_1035_weighted                        -0.349640
+L_rmse_1035_dev_from_mean                   -0.040463
+L_rmse_1035_diff_from_int                   -0.276382
+L_rmse_1107_output                           0.412988
+L_rmse_1107_conf                            -0.118916
+L_rmse_1107_weighted                        -0.164599
+L_rmse_1107_dev_from_mean                    0.134851
+L_rmse_1107_diff_from_int                   -0.035826
+L_rmse_1151_output                          -0.034579
+L_rmse_1151_conf                             0.005073
+L_rmse_1151_weighted                        -0.014287
+L_rmse_1151_dev_from_mean                   -0.111129
+L_rmse_1151_diff_from_int                   -0.023905
+chosen_conf_min                             -0.035802
+chosen_conf_max                             -0.038777
+chosen_conf_avg                             -0.061534
+highest_chosen_output                       -0.122192
+highest_chosen_weighted                     -0.099452
+model_avg                                    0.000000
+chosen_model_avg                             0.000000
+models_mean                                 -0.203206
+models_std                                  -0.009107
+models_min                                   0.000000
+models_max                                   0.007102
+models_range                                 0.156368
+models_range_dev_high                       -0.003080
+models_range_dev_low                        -0.185074
+diff_mean_10_all                            -0.344623
+abs_diff_mean_10_all                        -0.360294
+BIAS                                        -0.003362
+
+
+Learned GLZ function: 
+feature                                     label0   
+bias                                         0.000000
+min_model                                    0.000000
+max_model                                    0.000000
+avg_model_chosen                             0.000000
+min_weighted                                 0.071598
+max_weighted                                -0.030380
+avg_weighted                                 0.000000
+weighted_avg                                 0.093883
+L_rmse_1_output                             -0.051876
+L_rmse_1_conf                                0.000000
+L_rmse_1_weighted                            0.064665
+L_rmse_1_dev_from_mean                      -0.168611
+L_rmse_1_diff_from_int                      -0.230453
+L_rmse_87_output                            -0.038996
+L_rmse_87_conf                              -0.013229
+L_rmse_87_weighted                           0.097762
+L_rmse_87_dev_from_mean                     -0.085310
+L_rmse_87_diff_from_int                      0.010852
+L_rmse_136_output                           -0.005972
+L_rmse_136_conf                             -0.003294
+L_rmse_136_weighted                         -0.103822
+L_rmse_136_dev_from_mean                    -0.141550
+L_rmse_136_diff_from_int                     0.020078
+L_rmse_262_output                            0.110322
+L_rmse_262_conf                             -0.040968
+L_rmse_262_weighted                          0.049036
+L_rmse_262_dev_from_mean                    -0.058594
+L_rmse_262_diff_from_int                    -0.234165
+L_rmse_308_output                            0.305687
+L_rmse_308_conf                             -0.139796
+L_rmse_308_weighted                          0.101603
+L_rmse_308_dev_from_mean                    -0.107168
+L_rmse_308_diff_from_int                     0.168121
+L_rmse_742_output                           -0.001627
+L_rmse_742_conf                             -0.009525
+L_rmse_742_weighted                          0.063389
+L_rmse_742_dev_from_mean                    -0.172616
+L_rmse_742_diff_from_int                     0.190480
+L_rmse_879_output                           -0.172808
+L_rmse_879_conf                              0.048933
+L_rmse_879_weighted                         -0.140482
+L_rmse_879_dev_from_mean                    -0.177707
+L_rmse_879_diff_from_int                    -0.050427
+L_rmse_1035_output                           0.324040
+L_rmse_1035_conf                            -0.102985
+L_rmse_1035_weighted                        -0.077343
+L_rmse_1035_dev_from_mean                   -0.045187
+L_rmse_1035_diff_from_int                    0.149110
+L_rmse_1107_output                          -0.039067
+L_rmse_1107_conf                            -0.001187
+L_rmse_1107_weighted                        -0.078742
+L_rmse_1107_dev_from_mean                   -0.026669
+L_rmse_1107_diff_from_int                   -0.026877
+L_rmse_1151_output                          -0.036309
+L_rmse_1151_conf                             0.017039
+L_rmse_1151_weighted                         0.043958
+L_rmse_1151_dev_from_mean                   -0.127064
+L_rmse_1151_diff_from_int                    0.008628
+chosen_conf_min                              0.060462
+chosen_conf_max                             -0.219177
+chosen_conf_avg                             -0.025191
+highest_chosen_output                        0.400250
+highest_chosen_weighted                      0.066718
+model_avg                                    0.000000
+chosen_model_avg                             0.000000
+models_mean                                 -0.003393
+models_std                                   0.026259
+models_min                                   0.000000
+models_max                                   0.246028
+models_range                                 0.000895
+models_range_dev_high                       -0.018027
+models_range_dev_low                        -0.039129
+diff_mean_10_all                            -0.042732
+abs_diff_mean_10_all                        -0.215132
+BIAS                                        -0.094750
+
+
+Learned GLZ function: 
+feature                                     label0   
+bias                                         0.000000
+min_model                                    0.000000
+max_model                                    0.000000
+avg_model_chosen                             0.000000
+min_weighted                                 0.075355
+max_weighted                                -0.084995
+avg_weighted                                 0.000000
+weighted_avg                                 0.092913
+L_rmse_1_output                              0.010202
+L_rmse_1_conf                                0.000000
+L_rmse_1_weighted                           -0.027435
+L_rmse_1_dev_from_mean                      -0.015625
+L_rmse_1_diff_from_int                      -0.046292
+L_rmse_87_output                             0.162638
+L_rmse_87_conf                              -0.077110
+L_rmse_87_weighted                           0.001458
+L_rmse_87_dev_from_mean                      0.047245
+L_rmse_87_diff_from_int                     -0.027606
+L_rmse_136_output                           -0.038760
+L_rmse_136_conf                              0.011513
+L_rmse_136_weighted                         -0.058746
+L_rmse_136_dev_from_mean                    -0.026618
+L_rmse_136_diff_from_int                    -0.006232
+L_rmse_262_output                            0.220520
+L_rmse_262_conf                             -0.069732
+L_rmse_262_weighted                          0.004302
+L_rmse_262_dev_from_mean                     0.041813
+L_rmse_262_diff_from_int                     0.045930
+L_rmse_308_output                           -0.080248
+L_rmse_308_conf                              0.010779
+L_rmse_308_weighted                         -0.027524
+L_rmse_308_dev_from_mean                    -0.040973
+L_rmse_308_diff_from_int                    -0.037965
+L_rmse_742_output                            0.108944
+L_rmse_742_conf                             -0.044659
+L_rmse_742_weighted                         -0.016631
+L_rmse_742_dev_from_mean                     0.017103
+L_rmse_742_diff_from_int                     0.065841
+L_rmse_879_output                            0.133641
+L_rmse_879_conf                             -0.041808
+L_rmse_879_weighted                         -0.058265
+L_rmse_879_dev_from_mean                     0.023419
+L_rmse_879_diff_from_int                     0.107871
+L_rmse_1035_output                          -0.019551
+L_rmse_1035_conf                             0.003122
+L_rmse_1035_weighted                        -0.057379
+L_rmse_1035_dev_from_mean                   -0.018254
+L_rmse_1035_diff_from_int                   -0.080520
+L_rmse_1107_output                           0.437736
+L_rmse_1107_conf                            -0.134120
+L_rmse_1107_weighted                        -0.010080
+L_rmse_1107_dev_from_mean                    0.118371
+L_rmse_1107_diff_from_int                    0.095242
+L_rmse_1151_output                           0.016578
+L_rmse_1151_conf                            -0.002329
+L_rmse_1151_weighted                        -0.025648
+L_rmse_1151_dev_from_mean                   -0.013223
+L_rmse_1151_diff_from_int                   -0.019107
+chosen_conf_min                             -0.030182
+chosen_conf_max                             -0.062752
+chosen_conf_avg                             -0.035665
+highest_chosen_output                        0.142315
+highest_chosen_weighted                     -0.017952
+model_avg                                    0.000000
+chosen_model_avg                             0.000000
+models_mean                                 -0.039327
+models_std                                   0.018994
+models_min                                   0.000000
+models_max                                  -0.096975
+models_range                                 0.111733
+models_range_dev_high                        0.017878
+models_range_dev_low                         0.020711
+diff_mean_10_all                            -0.134497
+abs_diff_mean_10_all                        -0.024738
+BIAS                                        -0.064884
+
+
+Learned GLZ function: 
+feature                                     label0   
+bias                                         0.000000
+min_model                                    0.000000
+max_model                                    0.000000
+avg_model_chosen                             0.000000
+min_weighted                                 0.238617
+max_weighted                                -0.174459
+avg_weighted                                 0.000000
+weighted_avg                                -0.031146
+L_rmse_1_output                             -0.010415
+L_rmse_1_conf                                0.000000
+L_rmse_1_weighted                            0.210675
+L_rmse_1_dev_from_mean                      -0.374669
+L_rmse_1_diff_from_int                      -0.203387
+L_rmse_87_output                             0.018405
+L_rmse_87_conf                              -0.143287
+L_rmse_87_weighted                           0.045349
+L_rmse_87_dev_from_mean                     -0.034048
+L_rmse_87_diff_from_int                      0.305971
+L_rmse_136_output                           -1.166143
+L_rmse_136_conf                              0.650092
+L_rmse_136_weighted                         -0.196441
+L_rmse_136_dev_from_mean                    -0.820146
+L_rmse_136_diff_from_int                    -0.230587
+L_rmse_262_output                            0.311085
+L_rmse_262_conf                             -0.003536
+L_rmse_262_weighted                          0.134544
+L_rmse_262_dev_from_mean                    -0.089790
+L_rmse_262_diff_from_int                    -0.325224
+L_rmse_308_output                           -0.000930
+L_rmse_308_conf                             -0.114634
+L_rmse_308_weighted                          0.332477
+L_rmse_308_dev_from_mean                    -0.402603
+L_rmse_308_diff_from_int                     0.110341
+L_rmse_742_output                           -0.031375
+L_rmse_742_conf                             -0.089982
+L_rmse_742_weighted                          0.102975
+L_rmse_742_dev_from_mean                    -0.112289
+L_rmse_742_diff_from_int                    -0.104518
+L_rmse_879_output                            0.384293
+L_rmse_879_conf                              0.080598
+L_rmse_879_weighted                         -0.271778
+L_rmse_879_dev_from_mean                    -0.244622
+L_rmse_879_diff_from_int                     0.597486
+L_rmse_1035_output                           1.450814
+L_rmse_1035_conf                            -0.192775
+L_rmse_1035_weighted                        -0.048572
+L_rmse_1035_dev_from_mean                   -0.027711
+L_rmse_1035_diff_from_int                   -0.093255
+L_rmse_1107_output                           0.189787
+L_rmse_1107_conf                            -0.071686
+L_rmse_1107_weighted                        -0.133758
+L_rmse_1107_dev_from_mean                   -0.002388
+L_rmse_1107_diff_from_int                   -0.058199
+L_rmse_1151_output                           0.181733
+L_rmse_1151_conf                             0.206419
+L_rmse_1151_weighted                         0.097231
+L_rmse_1151_dev_from_mean                   -0.207367
+L_rmse_1151_diff_from_int                   -0.067444
+chosen_conf_min                             -0.154438
+chosen_conf_max                             -0.062884
+chosen_conf_avg                              0.024782
+highest_chosen_output                        0.148889
+highest_chosen_weighted                      0.045391
+model_avg                                    0.000000
+chosen_model_avg                             0.000000
+models_mean                                 -0.405215
+models_std                                   0.024181
+models_min                                   0.000000
+models_max                                  -0.037244
+models_range                                 0.058651
+models_range_dev_high                        0.439311
+models_range_dev_low                         0.131958
+diff_mean_10_all                            -0.537940
+abs_diff_mean_10_all                        -0.037606
+BIAS                                        -0.139553
+
+
+Learned GLZ function: 
+feature                                     label0   
+bias                                         0.000000
+min_model                                    0.000000
+max_model                                    0.000000
+avg_model_chosen                             0.000000
+min_weighted                                -0.044532
+max_weighted                                -0.019249
+avg_weighted                                 0.000000
+weighted_avg                                 0.063021
+L_rmse_1_output                              0.192377
+L_rmse_1_conf                                0.000000
+L_rmse_1_weighted                           -0.032294
+L_rmse_1_dev_from_mean                       0.050106
+L_rmse_1_diff_from_int                      -0.060148
+L_rmse_87_output                             0.171666
+L_rmse_87_conf                              -0.052458
+L_rmse_87_weighted                          -0.000842
+L_rmse_87_dev_from_mean                      0.046449
+L_rmse_87_diff_from_int                      0.250205
+L_rmse_136_output                            0.098657
+L_rmse_136_conf                             -0.018885
+L_rmse_136_weighted                         -0.067956
+L_rmse_136_dev_from_mean                     0.033223
+L_rmse_136_diff_from_int                     0.024381
+L_rmse_262_output                            0.113892
+L_rmse_262_conf                             -0.026826
+L_rmse_262_weighted                         -0.014308
+L_rmse_262_dev_from_mean                     0.022449
+L_rmse_262_diff_from_int                    -0.278893
+L_rmse_308_output                           -0.114410
+L_rmse_308_conf                              0.033474
+L_rmse_308_weighted                         -0.032972
+L_rmse_308_dev_from_mean                    -0.045100
+L_rmse_308_diff_from_int                    -0.052454
+L_rmse_742_output                            0.031999
+L_rmse_742_conf                             -0.015481
+L_rmse_742_weighted                         -0.029047
+L_rmse_742_dev_from_mean                     0.004523
+L_rmse_742_diff_from_int                    -0.074700
+L_rmse_879_output                            0.229372
+L_rmse_879_conf                             -0.058458
+L_rmse_879_weighted                         -0.065959
+L_rmse_879_dev_from_mean                     0.071507
+L_rmse_879_diff_from_int                     0.051383
+L_rmse_1035_output                           0.062614
+L_rmse_1035_conf                            -0.008811
+L_rmse_1035_weighted                        -0.068141
+L_rmse_1035_dev_from_mean                    0.023219
+L_rmse_1035_diff_from_int                    0.002382
+L_rmse_1107_output                           0.063129
+L_rmse_1107_conf                            -0.009329
+L_rmse_1107_weighted                        -0.036834
+L_rmse_1107_dev_from_mean                    0.026410
+L_rmse_1107_diff_from_int                    0.038545
+L_rmse_1151_output                          -0.055121
+L_rmse_1151_conf                             0.022055
+L_rmse_1151_weighted                        -0.021367
+L_rmse_1151_dev_from_mean                   -0.024574
+L_rmse_1151_diff_from_int                    0.107702
+chosen_conf_min                             -0.016998
+chosen_conf_max                             -0.026506
+chosen_conf_avg                             -0.020088
+highest_chosen_output                        0.087006
+highest_chosen_weighted                     -0.060223
+model_avg                                    0.000000
+chosen_model_avg                             0.000000
+models_mean                                  0.006676
+models_std                                   0.014201
+models_min                                   0.000000
+models_max                                   0.181601
+models_range                                 0.014961
+models_range_dev_high                        0.033824
+models_range_dev_low                        -0.024299
+diff_mean_10_all                            -0.072741
+abs_diff_mean_10_all                         0.140796
+BIAS                                        -0.132020
+
+processing 10000 predictions...
+
+0%   10   20   30   40   50   60   70   80   90   100%
+|----|----|----|----|----|----|----|----|----|----|
+***************************************************
+ done.
+elapsed: [36.09s cpu, 60299.6588 mticks, 22.56s wall]
+score: 0.4414  baseline: 0.4419  diff: -0.00050
+category UNKNOWN: count 0 avg error 0 baseline avg error 0 avg improvement 0
+category AUTO: count 3291 avg error 0.0207093 baseline avg error 0.0190967 avg improvement -0.00161256
+category POSS: count 6143 avg error 0.195491 baseline avg error 0.198165 avg improvement 0.00267428
+category IMP: count 566 avg error 1.20045 baseline avg error 1.18856 avg improvement -0.0118874
+overall: count 10000 avg error 0.194851 baseline avg error 0.19529 avg improvement 0.000439291
+worst entries: 
+0: 253  label: -1 pred: 0.469017 bl: 0.27635 POSS error_pred: 2.15801 error_bl: 1.62907 improvement: -0.528941
+    min: -0.7125  max: 1 avg: 0.262075
+explanation: 
+    0.156335 0.59200001           L_rmse_262_output
+    0.155190 0.39399999           L_rmse_1035_output
+    0.151141 1                    models_max
+    0.113515 1.7125               models_range
+    0.111964 10.102871            models_std
+   -0.079672 0.40799999           L_rmse_262_diff_from_int
+   -0.066038 0.329                L_rmse_136_output
+   -0.064521 0.39399999           L_rmse_1035_diff_from_int
+    0.051332 0.292                L_rmse_742_output
+    0.045889 0.1965               L_rmse_879_diff_from_int
+    0.515487                      TOTAL
+
+
+1: 8914  label: -1 pred: 0.822863 bl: 0.6812 IMP error_pred: 3.32283 error_bl: 2.82643 improvement: -0.496396
+    min: -0.424  max: 1 avg: 0.337118
+explanation: 
+    0.287339 0.7295               L_rmse_1035_output
+    0.189742 0.71850002           L_rmse_262_output
+    0.151141 1                    models_max
+   -0.148938 0.74199998           L_rmse_136_output
+    0.122969 0.69950002           L_rmse_742_output
+    0.098169 8.8581371            models_std
+    0.094391 1.424                models_range
+    0.089167 -0.3440823           diff_mean_10_all
+   -0.085366 0.3440823            abs_diff_mean_10_all
+    0.069159 0.38999999           L_rmse_1107_output
+    0.869333                      TOTAL
+
+
+2: 8533  label: -1 pred: 0.678117 bl: 0.53145 IMP error_pred: 2.81608 error_bl: 2.34534 improvement: -0.470737
+    min: -0.389  max: 0.964 avg: 0.431035
+explanation: 
+    0.230619 0.5855               L_rmse_1035_output
+    0.148545 0.5625               L_rmse_262_output
+    0.145700 0.96399999           models_max
+    0.122181 0.68900001           L_rmse_1107_output
+   -0.112807 0.56199998           L_rmse_136_output
+    0.096917 0.41500002           L_rmse_879_diff_from_int
+    0.089685 1.3529999            models_range
+   -0.085433 0.4375               L_rmse_262_diff_from_int
+    0.073834 0.41999999           L_rmse_742_output
+   -0.068719 0.43103474           models_mean
+    0.724587                      TOTAL
+
+
+3: 4306  label: -1 pred: 0.652425 bl: 0.54745 IMP error_pred: 2.73051 error_bl: 2.3946 improvement: -0.335906
+    min: -0.2665  max: 0.975 avg: 0.444167
+explanation: 
+    0.189852 0.48199999           L_rmse_1035_output
+    0.149866 0.5675               L_rmse_262_output
+    0.147362 0.97500002           models_max
+    0.110655 0.62400001           L_rmse_1107_output
+   -0.107187 0.53399998           L_rmse_136_output
+    0.096687 0.55000001           L_rmse_742_output
+    0.091429 0.3915               L_rmse_879_diff_from_int
+   -0.084456 0.4325               L_rmse_262_diff_from_int
+    0.082294 1.2415               models_range
+   -0.078931 0.48199999           L_rmse_1035_diff_from_int
+    0.698895                      TOTAL
+
+
+4: 1993  label: -1 pred: -0.0184238 bl: -0.1929 POSS error_pred: 0.963492 error_bl: 0.65141 improvement: -0.312082
+    min: -0.758  max: 0.569 avg: -0.172667
+explanation: 
+   -0.119150 -0.30250001          L_rmse_1035_output
+    0.087961 1.327                models_range
+    0.085999 0.56900001           models_max
+    0.072512 0.3105               L_rmse_879_diff_from_int
+    0.061321 -0.3055              L_rmse_136_output
+    0.060798 5.4860291            models_std
+   -0.055948 -0.31549999          L_rmse_1107_output
+   -0.049537 0.30250001           L_rmse_1035_diff_from_int
+    0.031936 0.28299999           L_rmse_308_diff_from_int
+   -0.030184 -0.31549999          highest_chosen_output
+    0.028046                      TOTAL
+
+
+5: 2392  label: -1 pred: 0.51312 bl: 0.41385 IMP error_pred: 2.28953 error_bl: 1.99897 improvement: -0.290559
+    min: -0.448  max: 0.854 avg: 0.401099
+explanation: 
+    0.130573 0.33149999           L_rmse_1035_output
+    0.129074 0.85399997           models_max
+    0.098238 0.37200001           L_rmse_262_output
+    0.094815 0.40599999           L_rmse_879_diff_from_int
+    0.086667 0.493                L_rmse_742_output
+    0.086304 1.302                models_range
+   -0.076376 0.38049999           L_rmse_136_output
+   -0.072642 0.37200001           L_rmse_262_diff_from_int
+   -0.063946 0.40109947           models_mean
+    0.063634 5.7419462            models_std
+    0.559590                      TOTAL
+
+
+6: 2441  label: -1 pred: 0.309124 bl: 0.19995 POSS error_pred: 1.7138 error_bl: 1.43988 improvement: -0.273924
+    min: -1  max: 0.5845 avg: 0.0539605
+explanation: 
+    0.137663 0.3495               L_rmse_1035_output
+    0.105030 1.5845001            models_range
+    0.088743 0.38                 L_rmse_879_diff_from_int
+    0.088342 0.58450001           models_max
+   -0.073967 0.36849999           L_rmse_136_output
+   -0.057233 0.3495               L_rmse_1035_diff_from_int
+    0.056461 5.0946903            models_std
+    0.051100 0.1935               L_rmse_262_output
+    0.041496 0.234                L_rmse_1107_output
+    0.037832 -0.14598952          diff_mean_10_all
+    0.355593                      TOTAL
+
+
+7: 1572  label: -1 pred: 0.442612 bl: 0.3449 IMP error_pred: 2.08113 error_bl: 1.80876 improvement: -0.272374
+    min: -0.0955  max: 0.7065 avg: 0.291038
+explanation: 
+    0.146722 0.3725               L_rmse_1035_output
+    0.106781 0.70649999           models_max
+    0.092013 0.39399999           L_rmse_879_diff_from_int
+    0.081865 0.31                 L_rmse_262_output
+    0.079356 0.44749999           L_rmse_1107_output
+    0.073834 0.41999999           L_rmse_742_output
+   -0.073265 0.36500001           L_rmse_136_output
+   -0.061000 0.3725               L_rmse_1035_diff_from_int
+   -0.060535 0.31                 L_rmse_262_diff_from_int
+    0.053161 0.80199999           models_range
+    0.489082                      TOTAL
+
+
+8: 2444  label: -1 pred: 0.346087 bl: 0.24745 POSS error_pred: 1.81195 error_bl: 1.55613 improvement: -0.255818
+    min: -0.828  max: 0.933 avg: 0.167764
+explanation: 
+    0.141014 0.93300003           models_max
+    0.116730 1.761                models_range
+    0.105561 0.26800001           L_rmse_1035_output
+    0.072746 0.31150001           L_rmse_879_diff_from_int
+   -0.060920 0.3035               L_rmse_136_output
+    0.055639 0.31650001           L_rmse_742_output
+    0.050122 4.5226588            models_std
+   -0.043887 0.26800001           L_rmse_1035_diff_from_int
+    0.040520 0.22849999           L_rmse_1107_output
+   -0.036066 0.28349999           L_rmse_1_diff_from_int
+    0.392557                      TOTAL
+
+
+9: 5486  label: -1 pred: 0.477452 bl: 0.39175 IMP error_pred: 2.18286 error_bl: 1.93697 improvement: -0.245896
+    min: 0.0295  max: 0.853 avg: 0.439516
+explanation: 
+    0.158735 0.403                L_rmse_1035_output
+    0.128923 0.85299999           models_max
+    0.125438 0.47499999           L_rmse_262_output
+   -0.092755 0.47499999           L_rmse_262_diff_from_int
+    0.092480 0.396                L_rmse_879_diff_from_int
+    0.088488 0.49900001           L_rmse_1107_output
+   -0.084003 0.41850001           L_rmse_136_output
+    0.076998 0.43799999           L_rmse_742_output
+   -0.070071 0.43951651           models_mean
+   -0.065994 0.403                L_rmse_1035_diff_from_int
+    0.523922                      TOTAL
+
+
+10: 4388  label: -1 pred: 0.580596 bl: 0.50275 IMP error_pred: 2.49828 error_bl: 2.25826 improvement: -0.240027
+    min: 0.047  max: 0.958 avg: 0.548507
+explanation: 
+    0.186898 0.4745               L_rmse_1035_output
+    0.157260 0.59549999           L_rmse_262_output
+    0.144793 0.958                models_max
+    0.115531 0.65149999           L_rmse_1107_output
+    0.095866 0.41049999           L_rmse_879_diff_from_int
+   -0.089624 0.4465               L_rmse_136_output
+   -0.087447 0.54850739           models_mean
+    0.087370 0.49700001           L_rmse_742_output
+   -0.078989 0.40450001           L_rmse_262_diff_from_int
+   -0.077703 0.4745               L_rmse_1035_diff_from_int
+    0.627066                      TOTAL
+
+
+11: 7993  label: -1 pred: 0.404104 bl: 0.31715 POSS error_pred: 1.97151 error_bl: 1.73488 improvement: -0.236625
+    min: -0.5285  max: 0.726 avg: 0.2467
+explanation: 
+    0.148494 0.377                L_rmse_1035_output
+    0.109728 0.72600001           models_max
+    0.093881 0.35550001           L_rmse_262_output
+    0.087459 0.37450001           L_rmse_879_diff_from_int
+    0.083156 1.2545               models_range
+   -0.072863 0.36300001           L_rmse_136_output
+   -0.069420 0.35550001           L_rmse_262_diff_from_int
+   -0.061737 0.377                L_rmse_1035_diff_from_int
+    0.053530 0.30450001           L_rmse_742_output
+    0.050389 4.5468154            models_std
+    0.450574                      TOTAL
+
+
+12: 6313  label: 0 pred: -0.815096 bl: -0.6559 POSS error_pred: 0.664381 error_bl: 0.430205 improvement: -0.234176
+    min: -0.9425  max: 0.2545 avg: -0.434007
+explanation: 
+   -0.291671 -0.74049997          L_rmse_1035_output
+   -0.159271 -0.90600002          L_rmse_742_output
+    0.151949 -0.75700003          L_rmse_136_output
+   -0.137982 -0.52249998          L_rmse_262_output
+   -0.102143 -0.57599998          L_rmse_1107_output
+   -0.093244 0.47750002           L_rmse_262_diff_from_int
+   -0.086677 -0.90600002          highest_chosen_output
+    0.079344 1.197                models_range
+    0.069193 -0.43400738          models_mean
+   -0.062654 0.49250001           L_rmse_1_diff_from_int
+   -0.768626                      TOTAL
+
+
+13: 4470  label: -1 pred: 0.267214 bl: 0.17155 POSS error_pred: 1.60583 error_bl: 1.37253 improvement: -0.233302
+    min: -0.568  max: 0.6905 avg: 0.196045
+explanation: 
+    0.104363 0.69050002           models_max
+    0.093351 0.237                L_rmse_1035_output
+    0.083421 1.2585001            models_range
+    0.065105 5.874649             models_std
+    0.059938 0.338                L_rmse_1107_output
+    0.058384 0.25                 L_rmse_879_diff_from_int
+   -0.053594 0.26699999           L_rmse_136_output
+   -0.038811 0.237                L_rmse_1035_diff_from_int
+   -0.031255 0.19604518           models_mean
+    0.029973 0.1705               L_rmse_742_output
+    0.313684                      TOTAL
+
+
+14: 3008  label: -0.5 pred: 0.787182 bl: 0.6937 IMP error_pred: 1.65684 error_bl: 1.42492 improvement: -0.231917
+    min: 0.2065  max: 0.943 avg: 0.612979
+explanation: 
+    0.299746 0.76099998           L_rmse_1035_output
+    0.194495 0.73650002           L_rmse_262_output
+   -0.148336 0.73900002           L_rmse_136_output
+    0.142526 0.94300002           models_max
+    0.129649 0.73750001           L_rmse_742_output
+    0.118457 0.66799998           L_rmse_1107_output
+   -0.097726 0.61297959           models_mean
+    0.075665 0.324                L_rmse_879_diff_from_int
+    0.054627 0.57099998           highest_chosen_output
+    0.053835 0.676                L_rmse_879_output
+    0.833652                      TOTAL
+
+
+15: 337  label: -1 pred: 0.0816839 bl: -0.0297 IMP error_pred: 1.17004 error_bl: 0.941482 improvement: -0.228558
+    min: -0.3265  max: 0.5225 avg: -0.00829106
+explanation: 
+    0.078971 0.52249998           models_max
+    0.056277 0.84899998           models_range
+    0.036334 3.2785494            models_std
+    0.023937 0.1025               L_rmse_879_diff_from_int
+   -0.019639 0.12878327           chosen_conf_max
+   -0.016163 0.12878327           L_rmse_308_conf
+    0.013655 0.077                L_rmse_1107_output
+   -0.013632 0.087862186          L_rmse_87_conf
+   -0.013603 0.094975397          L_rmse_742_conf
+    0.012043 -0.059999999         L_rmse_136_output
+    0.128154                      TOTAL
+
+
+16: 8674  label: -1 pred: 0.503154 bl: 0.4271 IMP error_pred: 2.25947 error_bl: 2.03661 improvement: -0.222857
+    min: -0.2175  max: 0.9765 avg: 0.407007
+explanation: 
+    0.226287 0.57450002           L_rmse_1035_output
+    0.147589 0.97649997           models_max
+    0.118103 0.66600001           L_rmse_1107_output
+    0.114665 0.491                L_rmse_879_diff_from_int
+   -0.106786 0.53200001           L_rmse_136_output
+    0.082921 0.31400001           L_rmse_262_output
+    0.079145 1.194                models_range
+   -0.069679 0.42549998           L_rmse_1035_diff_from_int
+   -0.064888 0.4070074            models_mean
+   -0.061316 0.31400001           L_rmse_262_diff_from_int
+    0.549623                      TOTAL
+
+
+17: 6814  label: -1 pred: 0.373328 bl: 0.2898 IMP error_pred: 1.88603 error_bl: 1.66358 improvement: -0.222445
+    min: -0.3945  max: 0.8235 avg: 0.364489
+explanation: 
+    0.124464 0.82349998           models_max
+    0.123286 0.31299999           L_rmse_1035_output
+    0.095493 0.53850001           L_rmse_1107_output
+    0.080736 1.2179999            models_range
+    0.077767 0.333                L_rmse_879_diff_from_int
+    0.073505 6.6326008            models_std
+   -0.059716 0.29750001           L_rmse_136_output
+   -0.058110 0.36448869           models_mean
+   -0.051256 0.31299999           L_rmse_1035_diff_from_int
+    0.040257 0.229                L_rmse_742_output
+    0.419798                      TOTAL
+
+
+18: 9879  label: -1 pred: 0.0976822 bl: -0.00875 POSS error_pred: 1.20491 error_bl: 0.982577 improvement: -0.222329
+    min: -0.644  max: 0.653 avg: 0.0642497
+explanation: 
+    0.098695 0.653                models_max
+    0.085973 1.2969999            models_range
+    0.071989 6.4958382            models_std
+    0.041407 0.2335               L_rmse_1107_output
+   -0.026497 0.17375484           chosen_conf_max
+   -0.022392 0.14431909           L_rmse_87_conf
+   -0.022308 0.15575629           L_rmse_742_conf
+   -0.021807 0.17375484           L_rmse_308_conf
+   -0.018917 0.072999783          diff_mean_10_all
+   -0.018111 0.072999783          abs_diff_mean_10_all
+    0.144152                      TOTAL
+
+
+19: 5802  label: -1 pred: 0.114043 bl: 0.0096 POSS error_pred: 1.24109 error_bl: 1.01929 improvement: -0.221799
+    min: -0.576  max: 0.6645 avg: -0.114993
+explanation: 
+    0.100433 0.6645               models_max
+    0.082228 1.2405               models_range
+    0.073456 6.6281624            models_std
+    0.061792 0.3515               L_rmse_742_output
+   -0.055150 -0.31099999          L_rmse_1107_output
+   -0.044509 -0.113               L_rmse_1035_output
+    0.032287 -0.12459262          diff_mean_10_all
+   -0.030911 0.12459262           abs_diff_mean_10_all
+   -0.029753 -0.31099999          highest_chosen_output
+   -0.024276 0.15919094           chosen_conf_max
+    0.160513                      TOTAL
+
+
+20: 1274  label: -1 pred: 0.286309 bl: 0.1973 POSS error_pred: 1.65459 error_bl: 1.43353 improvement: -0.221064
+    min: -0.68  max: 0.6065 avg: 0.189275
+explanation: 
+    0.115014 0.292                L_rmse_1035_output
+    0.091667 0.60650003           models_max
+    0.085277 1.2865               models_range
+    0.079869 0.34200001           L_rmse_879_diff_from_int
+    0.067819 6.1195812            models_std
+   -0.061823 0.308                L_rmse_136_output
+   -0.047817 0.292                L_rmse_1035_diff_from_int
+    0.041064 0.15549999           L_rmse_262_output
+    0.038658 0.21799999           L_rmse_1107_output
+   -0.030365 0.15549999           L_rmse_262_diff_from_int
+    0.332779                      TOTAL
+
+
+21: 2131  label: 1 pred: -0.262147 bl: -0.17435 POSS error_pred: 1.59301 error_bl: 1.3791 improvement: -0.213916
+    min: -0.836  max: 0.7185 avg: -0.101676
+explanation: 
+    0.108595 0.71850002           models_max
+   -0.107137 -0.27200001          L_rmse_1035_output
+    0.103042 1.5545001            models_range
+   -0.100724 -0.56800002          L_rmse_1107_output
+    0.066545 6.0046067            models_std
+   -0.054340 -0.56800002          highest_chosen_output
+   -0.049643 0.32553825           chosen_conf_max
+   -0.044542 0.27200001           L_rmse_1035_diff_from_int
+    0.040546 -0.20200001          L_rmse_136_output
+   -0.039257 -0.18490574          min_weighted
+   -0.215677                      TOTAL
+
+
+22: 9641  label: -0.5 pred: 0.675232 bl: 0.5809 IMP error_pred: 1.38117 error_bl: 1.16834 improvement: -0.212824
+    min: 0.091  max: 0.9025 avg: 0.542732
+explanation: 
+    0.235543 0.59799999           L_rmse_1035_output
+    0.185120 0.70099998           L_rmse_262_output
+    0.136405 0.90249997           models_max
+   -0.115517 0.57550001           L_rmse_136_output
+    0.107309 0.45950001           L_rmse_879_diff_from_int
+    0.102409 0.57749999           L_rmse_1107_output
+    0.087810 0.49950001           L_rmse_742_output
+   -0.086527 0.542732             models_mean
+   -0.065831 0.40200001           L_rmse_1035_diff_from_int
+   -0.058387 0.29900002           L_rmse_262_diff_from_int
+    0.721701                      TOTAL
+
+
+23: 7124  label: -0.5 pred: 0.582591 bl: 0.48445 POSS error_pred: 1.172 error_bl: 0.969142 improvement: -0.202861
+    min: -0.0025  max: 0.938 avg: 0.498195
+explanation: 
+    0.239285 0.60750002           L_rmse_1035_output
+    0.141770 0.93800002           models_max
+    0.132023 0.74449998           L_rmse_1107_output
+   -0.123145 0.6135               L_rmse_136_output
+    0.093297 0.39950001           L_rmse_879_diff_from_int
+    0.092556 0.52649999           L_rmse_742_output
+   -0.079426 0.49819505           models_mean
+    0.070245 0.266                L_rmse_262_output
+   -0.064275 0.39249998           L_rmse_1035_diff_from_int
+    0.062342 0.94050002           models_range
+    0.629061                      TOTAL
+
+
+24: 8377  label: -1 pred: 0.597945 bl: 0.5343 IMP error_pred: 2.55343 error_bl: 2.35408 improvement: -0.199351
+    min: 0.142  max: 0.974 avg: 0.533174
+explanation: 
+    0.187686 0.4765               L_rmse_1035_output
+    0.149073 0.56449997           L_rmse_262_output
+    0.147211 0.97399998           models_max
+    0.115833 0.49599999           L_rmse_879_diff_from_int
+    0.101873 0.57950002           L_rmse_742_output
+   -0.097954 0.48800001           L_rmse_136_output
+   -0.085042 0.43550003           L_rmse_262_diff_from_int
+   -0.085003 0.53317332           models_mean
+    0.079710 0.44949999           L_rmse_1107_output
+   -0.078031 0.4765               L_rmse_1035_diff_from_int
+    0.644415                      TOTAL
+
+
+25: 7896  label: 0 pred: 0.671906 bl: 0.5023 POSS error_pred: 0.451458 error_bl: 0.252305 improvement: -0.199152
+    min: -0.204  max: 0.96 avg: 0.41519
+explanation: 
+    0.202063 0.51300001           L_rmse_1035_output
+    0.179575 0.68000001           L_rmse_262_output
+    0.145095 0.95999998           models_max
+    0.112797 0.48300001           L_rmse_879_diff_from_int
+   -0.100362 0.5                  L_rmse_136_output
+    0.089304 0.50800002           L_rmse_742_output
+    0.086449 0.48750001           L_rmse_1107_output
+   -0.079750 0.48699999           L_rmse_1035_diff_from_int
+    0.077157 1.164                models_range
+   -0.066193 0.41519028           models_mean
+    0.718376                      TOTAL
+
+
+26: 3948  label: 1 pred: -0.0197241 bl: 0.08155 POSS error_pred: 1.03984 error_bl: 0.84355 improvement: -0.196287
+    min: -0.5085  max: 0.536 avg: 0.112083
+explanation: 
+    0.081011 0.53600001           models_max
+    0.069236 1.0445               models_range
+    0.048082 4.3386374            models_std
+   -0.040582 0.31900001           L_rmse_1_diff_from_int
+   -0.032655 0.21414101           chosen_conf_max
+   -0.030764 -0.175               L_rmse_742_output
+   -0.030670 0.21414101           L_rmse_742_conf
+   -0.020934 0.1349227            L_rmse_87_conf
+    0.018369 0.27399999           L_rmse_1151_diff_from_int
+   -0.017869 0.11208253           models_mean
+    0.026746                      TOTAL
+
+
+27: 7900  label: 0 pred: 0.698383 bl: 0.5434 POSS error_pred: 0.487738 error_bl: 0.295284 improvement: -0.192455
+    min: 0.036  max: 0.958 avg: 0.516561
+explanation: 
+    0.238497 0.60549998           L_rmse_1035_output
+    0.164522 0.62300003           L_rmse_262_output
+    0.144793 0.958                models_max
+    0.112597 0.64050001           L_rmse_742_output
+    0.098551 0.42199999           L_rmse_879_diff_from_int
+    0.087956 0.49599999           L_rmse_1107_output
+   -0.085509 0.426                L_rmse_136_output
+   -0.082354 0.51656127           models_mean
+   -0.073618 0.37699997           L_rmse_262_diff_from_int
+   -0.064602 0.39450002           L_rmse_1035_diff_from_int
+    0.744853                      TOTAL
+
+
+28: 8998  label: -0.5 pred: 0.693756 bl: 0.6104 IMP error_pred: 1.42505 error_bl: 1.23299 improvement: -0.192065
+    min: 0.203  max: 0.8995 avg: 0.609985
+explanation: 
+    0.210531 0.5345               L_rmse_1035_output
+    0.201625 0.76349998           L_rmse_262_output
+    0.135951 0.89950001           models_max
+    0.111191 0.63249999           L_rmse_742_output
+    0.110743 0.62449998           L_rmse_1107_output
+    0.109061 0.46700001           L_rmse_879_diff_from_int
+   -0.107187 0.53399998           L_rmse_136_output
+   -0.097249 0.60998523           models_mean
+   -0.076229 0.4655               L_rmse_1035_diff_from_int
+    0.053891 0.58950001           L_rmse_87_output
+    0.740226                      TOTAL
+
+
+29: 1088  label: -0.5 pred: 0.637573 bl: 0.55025 IMP error_pred: 1.29407 error_bl: 1.10303 improvement: -0.191047
+    min: 0.2445  max: 0.967 avg: 0.551988
+explanation: 
+    0.226090 0.574                L_rmse_1035_output
+    0.172973 0.65499997           L_rmse_262_output
+    0.146153 0.96700001           models_max
+   -0.117123 0.58350003           L_rmse_136_output
+    0.106310 0.5995               L_rmse_1107_output
+    0.097150 0.41600001           L_rmse_879_diff_from_int
+    0.094929 0.54000002           L_rmse_742_output
+   -0.088002 0.55198872           models_mean
+   -0.069761 0.426                L_rmse_1035_diff_from_int
+   -0.067370 0.34500003           L_rmse_262_diff_from_int
+    0.684043                      TOTAL
+
+
+30: 3533  label: -1 pred: 0.505968 bl: 0.4414 IMP error_pred: 2.26794 error_bl: 2.07763 improvement: -0.190306
+    min: 0.034  max: 0.792 avg: 0.473887
+explanation: 
+    0.172915 0.43900001           L_rmse_1035_output
+    0.123061 0.46599999           L_rmse_262_output
+    0.119703 0.792                models_max
+    0.113147 0.48449999           L_rmse_879_diff_from_int
+    0.094695 0.53399998           L_rmse_1107_output
+   -0.090998 0.46599999           L_rmse_262_diff_from_int
+   -0.086713 0.43200001           L_rmse_136_output
+   -0.075551 0.4738875            models_mean
+    0.075240 0.428                L_rmse_742_output
+   -0.071890 0.43900001           L_rmse_1035_diff_from_int
+    0.552438                      TOTAL
+
+
+31: 7846  label: -1 pred: -0.37062 bl: -0.5405 POSS error_pred: 0.396119 error_bl: 0.21114 improvement: -0.184979
+    min: -0.998  max: 0.859 avg: -0.420834
+explanation: 
+   -0.221560 -0.5625              L_rmse_1035_output
+    0.129830 0.85900003           models_max
+    0.123093 1.8570001            models_range
+    0.116521 -0.58050001          L_rmse_136_output
+   -0.110121 -0.417               L_rmse_262_output
+    0.096800 0.4145               L_rmse_879_diff_from_int
+   -0.094754 -0.53899997          L_rmse_742_output
+   -0.081429 0.417                L_rmse_262_diff_from_int
+   -0.076518 -0.43149999          L_rmse_1107_output
+   -0.071644 0.4375               L_rmse_1035_diff_from_int
+   -0.324150                      TOTAL
+
+
+32: 8796  label: -0.5 pred: 0.439173 bl: 0.3353 POSS error_pred: 0.882046 error_bl: 0.697726 improvement: -0.18432
+    min: -0.235  max: 0.9535 avg: 0.300753
+explanation: 
+    0.146525 0.37200001           L_rmse_1035_output
+    0.144113 0.95349997           models_max
+    0.084890 0.3635               L_rmse_879_diff_from_int
+    0.078781 1.1884999            models_range
+   -0.069451 0.34599999           L_rmse_136_output
+    0.066539 0.37850001           L_rmse_742_output
+    0.063511 0.2405               L_rmse_262_output
+    0.062066 0.34999999           L_rmse_1107_output
+   -0.060918 0.37200001           L_rmse_1035_diff_from_int
+   -0.047948 0.30075282           models_mean
+    0.485643                      TOTAL
+
+
+33: 1614  label: 0.5 pred: -0.766781 bl: -0.69215 IMP error_pred: 1.60473 error_bl: 1.42122 improvement: -0.183513
+    min: -0.8675  max: -0.187 avg: -0.585745
+explanation: 
+   -0.238300 -0.60500002          L_rmse_1035_output
+   -0.211792 -0.80199999          L_rmse_262_output
+   -0.134483 -0.76499999          L_rmse_742_output
+    0.132478 -0.66000003          L_rmse_136_output
+   -0.095759 -0.54000002          L_rmse_1107_output
+    0.093384 -0.58574498          models_mean
+    0.079518 0.3405               L_rmse_879_diff_from_int
+   -0.076727 -0.80199999          highest_chosen_output
+   -0.069706 -0.76249999          L_rmse_87_output
+   -0.064684 0.39499998           L_rmse_1035_diff_from_int
+   -0.720311                      TOTAL
+
+
+34: 8453  label: 0 pred: 0.757197 bl: 0.62555 POSS error_pred: 0.573348 error_bl: 0.391313 improvement: -0.182035
+    min: -0.0095  max: 0.9635 avg: 0.467935
+explanation: 
+    0.276310 0.7015               L_rmse_1035_output
+    0.164918 0.62449998           L_rmse_262_output
+    0.145624 0.96350002           models_max
+   -0.132679 0.66100001           L_rmse_136_output
+    0.112871 0.6365               L_rmse_1107_output
+    0.110048 0.62599999           L_rmse_742_output
+    0.086524 0.37050003           L_rmse_879_diff_from_int
+   -0.074602 0.46793485           models_mean
+   -0.073326 0.37550002           L_rmse_262_diff_from_int
+    0.064496 0.97300005           models_range
+    0.803667                      TOTAL
+
+
+35: 6795  label: -1 pred: -0.27532 bl: -0.41405 POSS error_pred: 0.525162 error_bl: 0.343337 improvement: -0.181824
+    min: -0.7945  max: 0.418 avg: -0.22653
+explanation: 
+   -0.191822 -0.48699999          L_rmse_1035_output
+    0.113731 0.48699999           L_rmse_879_diff_from_int
+    0.109094 -0.54350001          L_rmse_136_output
+   -0.081042 -0.461               L_rmse_742_output
+    0.080372 1.2125               models_range
+   -0.079750 0.48699999           L_rmse_1035_diff_from_int
+   -0.078558 -0.44299999          L_rmse_1107_output
+    0.068162 6.1504979            models_std
+    0.063177 0.41800001           models_max
+   -0.048595 0.18751958           diff_mean_10_all
+   -0.228850                      TOTAL
+
+
+36: 6780  label: -0.5 pred: 0.206063 bl: 0.06525 POSS error_pred: 0.498525 error_bl: 0.319508 improvement: -0.179017
+    min: -0.4835  max: 0.8265 avg: 0.0866138
+explanation: 
+    0.124918 0.8265               models_max
+    0.086835 1.3099999            models_range
+    0.078383 0.199                L_rmse_1035_output
+    0.073131 6.5989032            models_std
+    0.050967 0.193                L_rmse_262_output
+    0.048145 0.27149999           L_rmse_1107_output
+    0.041102 0.176                L_rmse_879_diff_from_int
+   -0.037688 0.193                L_rmse_262_diff_from_int
+   -0.036331 0.18099999           L_rmse_136_output
+   -0.033189 0.21763776           chosen_conf_max
+    0.252533                      TOTAL
+
+
+37: 8510  label: -1 pred: 0.492796 bl: 0.4316 IMP error_pred: 2.22844 error_bl: 2.04948 improvement: -0.178963
+    min: -0.166  max: 0.7325 avg: 0.346312
+explanation: 
+    0.206002 0.523                L_rmse_1035_output
+    0.115403 0.43700001           L_rmse_262_output
+    0.110711 0.73250002           models_max
+    0.106258 0.45500001           L_rmse_879_diff_from_int
+   -0.106183 0.52899998           L_rmse_136_output
+    0.086626 0.4885               L_rmse_1107_output
+   -0.085335 0.43700001           L_rmse_262_diff_from_int
+    0.080075 0.45550001           L_rmse_742_output
+   -0.078112 0.477                L_rmse_1035_diff_from_int
+    0.059558 0.89850003           models_range
+    0.539266                      TOTAL
+
+
+38: 551  label: -1 pred: 0.600691 bl: 0.5439 IMP error_pred: 2.56221 error_bl: 2.38363 improvement: -0.178586
+    min: 0.021  max: 0.752 avg: 0.477411
+explanation: 
+    0.223923 0.56849998           L_rmse_1035_output
+    0.140095 0.53049999           L_rmse_262_output
+    0.113658 0.75199997           models_max
+    0.107192 0.45899999           L_rmse_879_diff_from_int
+   -0.106986 0.53299999           L_rmse_136_output
+    0.103916 0.58600003           L_rmse_1107_output
+    0.092029 0.52350003           L_rmse_742_output
+   -0.091681 0.46950001           L_rmse_262_diff_from_int
+   -0.076113 0.47741139           models_mean
+   -0.070661 0.43150002           L_rmse_1035_diff_from_int
+    0.647161                      TOTAL
+
+
+39: 5806  label: -1 pred: 0.325281 bl: 0.25625 IMP error_pred: 1.75637 error_bl: 1.57816 improvement: -0.178206
+    min: -0.4185  max: 0.9365 avg: 0.218058
+explanation: 
+    0.141543 0.93650001           models_max
+    0.129982 0.33000001           L_rmse_1035_output
+    0.089817 1.355                models_range
+    0.076132 0.32600001           L_rmse_879_diff_from_int
+   -0.066440 0.331                L_rmse_136_output
+    0.057759 5.2117887            models_std
+   -0.054040 0.33000001           L_rmse_1035_diff_from_int
+   -0.039182 0.308                L_rmse_1_diff_from_int
+    0.036839 0.13950001           L_rmse_262_output
+    0.036038 0.205                L_rmse_742_output
+    0.371751                      TOTAL
+
+
+40: 9897  label: -1 pred: -0.0287989 bl: -0.1244 POSS error_pred: 0.943232 error_bl: 0.766675 improvement: -0.176556
+    min: -0.7055  max: 0.451 avg: -0.180552
+explanation: 
+    0.076660 1.1565               models_range
+    0.068164 0.45100001           models_max
+    0.064729 5.8407412            models_std
+   -0.055341 -0.14049999          L_rmse_1035_output
+   -0.035071 -0.19949999          L_rmse_742_output
+   -0.033161 -0.18700001          L_rmse_1107_output
+    0.032578 0.13950001           L_rmse_879_diff_from_int
+    0.028785 -0.18055256          models_mean
+    0.028403 -0.1415              L_rmse_136_output
+   -0.023008 0.14049999           L_rmse_1035_diff_from_int
+    0.017671                      TOTAL
+
+
+41: 6413  label: -1 pred: -0.152293 bl: -0.26365 POSS error_pred: 0.718608 error_bl: 0.542211 improvement: -0.176397
+    min: -0.719  max: 0.494 avg: -0.264259
+explanation: 
+   -0.089480 -0.509               L_rmse_742_output
+    0.080405 1.2129999            models_range
+    0.074664 0.49399999           models_max
+    0.070478 6.3594322            models_std
+   -0.062719 -0.2375              L_rmse_262_output
+   -0.059283 0.46599999           L_rmse_1_diff_from_int
+    0.049427 0.43799999           L_rmse_308_diff_from_int
+   -0.048696 -0.509               highest_chosen_output
+   -0.046378 0.2375               L_rmse_262_diff_from_int
+    0.042130 -0.26425934          models_mean
+   -0.105823                      TOTAL
+
+
+42: 3364  label: 0 pred: 0.792596 bl: 0.6739 POSS error_pred: 0.628209 error_bl: 0.454141 improvement: -0.174068
+    min: 0.369  max: 0.9785 avg: 0.697727
+explanation: 
+    0.279658 0.70999998           L_rmse_1035_output
+    0.223940 0.84799999           L_rmse_262_output
+    0.147891 0.97850001           models_max
+   -0.136694 0.68099999           L_rmse_136_output
+    0.123936 0.70499998           L_rmse_742_output
+    0.122713 0.69199997           L_rmse_1107_output
+   -0.111237 0.69772679           models_mean
+    0.085941 0.36799997           L_rmse_879_diff_from_int
+    0.075740 0.82849997           L_rmse_87_output
+   -0.060745 0.47750002           L_rmse_1_diff_from_int
+    0.839066                      TOTAL
+
+
+43: 4914  label: 0.5 pred: -0.231467 bl: -0.101 POSS error_pred: 0.535044 error_bl: 0.361201 improvement: -0.173843
+    min: -0.455  max: 0.2295 avg: -0.140881
+explanation: 
+   -0.058362 -0.221               L_rmse_262_output
+   -0.055150 -0.31099999          L_rmse_1107_output
+    0.045373 0.68449998           models_range
+   -0.043156 0.221                L_rmse_262_diff_from_int
+    0.037349 3.3701615            models_std
+    0.034687 0.2295               models_max
+   -0.029753 -0.31099999          highest_chosen_output
+   -0.027572 -0.07                L_rmse_1035_output
+    0.022460 -0.1408814           models_mean
+   -0.018725 0.12278957           chosen_conf_max
+   -0.184997                      TOTAL
+
+
+44: 4377  label: -1 pred: 0.609265 bl: 0.5549 IMP error_pred: 2.58973 error_bl: 2.41771 improvement: -0.172019
+    min: 0.013  max: 0.959 avg: 0.532163
+explanation: 
+    0.244996 0.62199998           L_rmse_1035_output
+    0.144944 0.95899999           models_max
+   -0.127962 0.63749999           L_rmse_136_output
+    0.114179 0.64950001           L_rmse_742_output
+    0.109147 0.61549997           L_rmse_1107_output
+    0.108405 0.41049999           L_rmse_262_output
+   -0.084842 0.5321629            models_mean
+    0.082671 0.35399997           L_rmse_879_diff_from_int
+   -0.080160 0.41049999           L_rmse_262_diff_from_int
+    0.062707 0.94599998           models_range
+    0.655735                      TOTAL
+
+
+45: 7081  label: 0 pred: 0.796343 bl: 0.6818 POSS error_pred: 0.634162 error_bl: 0.464851 improvement: -0.169311
+    min: 0.256  max: 0.9935 avg: 0.572475
+explanation: 
+    0.301518 0.76550001           L_rmse_1035_output
+    0.177198 0.671                L_rmse_262_output
+    0.150158 0.99349999           models_max
+   -0.146128 0.72799999           L_rmse_136_output
+    0.133265 0.75150001           L_rmse_1107_output
+    0.114355 0.6505               L_rmse_742_output
+   -0.091268 0.57247478           models_mean
+    0.080453 0.34450001           L_rmse_879_diff_from_int
+   -0.064245 0.329                L_rmse_262_diff_from_int
+    0.060702 0.63450003           highest_chosen_output
+    0.842813                      TOTAL
+
+
+46: 8272  label: -0.5 pred: 0.603136 bl: 0.5239 POSS error_pred: 1.21691 error_bl: 1.04837 improvement: -0.168537
+    min: -0.192  max: 0.882 avg: 0.495894
+explanation: 
+    0.212107 0.53850001           L_rmse_1035_output
+    0.142867 0.54100001           L_rmse_262_output
+    0.133306 0.88200003           models_max
+    0.110832 0.625                L_rmse_1107_output
+   -0.108090 0.53850001           L_rmse_136_output
+    0.100770 0.43150002           L_rmse_879_diff_from_int
+   -0.089631 0.45899999           L_rmse_262_diff_from_int
+    0.082184 0.4675               L_rmse_742_output
+   -0.079059 0.49589357           models_mean
+   -0.075574 0.46149999           L_rmse_1035_diff_from_int
+    0.649606                      TOTAL
+
+
+47: 3836  label: 1 pred: -0.277579 bl: -0.2099 POSS error_pred: 1.63221 error_bl: 1.46386 improvement: -0.168349
+    min: -0.667  max: 0.881 avg: 0.163329
+explanation: 
+   -0.262721 -0.667               L_rmse_1035_output
+    0.133155 0.88099998           models_max
+    0.126156 -0.62849998          L_rmse_136_output
+    0.102611 1.548                models_range
+   -0.096720 0.37322927           diff_mean_10_all
+   -0.092598 0.37322927           abs_diff_mean_10_all
+    0.089132 8.0427017            models_std
+    0.088626 0.37949997           L_rmse_879_diff_from_int
+   -0.085376 0.55986404           chosen_conf_max
+   -0.078469 -0.4425              L_rmse_1107_output
+   -0.231109                      TOTAL
+
+
+48: 4860  label: -1 pred: -0.146518 bl: -0.2513 POSS error_pred: 0.728432 error_bl: 0.560552 improvement: -0.16788
+    min: -0.7735  max: 0.297 avg: -0.283348
+explanation: 
+   -0.085079 -0.21600001          L_rmse_1035_output
+    0.070959 1.0705               models_range
+    0.055581 0.23800001           L_rmse_879_diff_from_int
+   -0.050273 -0.28349999          L_rmse_1107_output
+    0.048407 4.3679399            models_std
+    0.048174 -0.23999999          L_rmse_136_output
+    0.045174 -0.28334838          models_mean
+    0.044889 0.29699999           models_max
+   -0.041663 -0.237               L_rmse_742_output
+   -0.039876 -0.15099999          L_rmse_262_output
+   -0.100048                      TOTAL
+
+
+49: 7064  label: -1 pred: 0.354858 bl: 0.2916 POSS error_pred: 1.83564 error_bl: 1.66823 improvement: -0.16741
+    min: -0.584  max: 0.5485 avg: 0.281664
+explanation: 
+    0.124271 0.31549999           L_rmse_1035_output
+    0.082901 0.5485               models_max
+    0.080280 0.30399999           L_rmse_262_output
+    0.075069 1.1324999            models_range
+    0.072746 0.31150001           L_rmse_879_diff_from_int
+    0.062155 0.35049999           L_rmse_1107_output
+   -0.061823 0.308                L_rmse_136_output
+   -0.059363 0.30399999           L_rmse_262_diff_from_int
+    0.057046 0.32449999           L_rmse_742_output
+   -0.051666 0.31549999           L_rmse_1035_diff_from_int
+    0.401328                      TOTAL
+
+
+best entries: 
+0: 7277  label: 1 pred: 0.132972 bl: -0.07685 POSS error_pred: 0.751738 error_bl: 1.15961 improvement: 0.407869
+1: 1304  label: 1 pred: -0.118132 bl: -0.2794 IMP error_pred: 1.25022 error_bl: 1.63686 improvement: 0.386645
+2: 3642  label: 1 pred: 0.118083 bl: -0.07035 POSS error_pred: 0.777778 error_bl: 1.14565 improvement: 0.367871
+3: 3141  label: 1 pred: -0.0689774 bl: -0.21565 IMP error_pred: 1.14271 error_bl: 1.4778 improvement: 0.335092
+4: 7722  label: 1 pred: 0.0402472 bl: -0.10025 POSS error_pred: 0.921125 error_bl: 1.21055 improvement: 0.289425
+5: 4268  label: 1 pred: -0.0254881 bl: -0.15355 POSS error_pred: 1.05163 error_bl: 1.33068 improvement: 0.279052
+6: 3959  label: 1 pred: -0.397402 bl: -0.493 IMP error_pred: 1.95273 error_bl: 2.22905 improvement: 0.276318
+7: 155  label: 1 pred: 0.0257793 bl: -0.10265 POSS error_pred: 0.949106 error_bl: 1.21584 improvement: 0.266731
+8: 2856  label: -1 pred: 0.169907 bl: 0.26765 IMP error_pred: 1.36868 error_bl: 1.60694 improvement: 0.238253
+9: 4150  label: 1 pred: 0.236774 bl: 0.0986 POSS error_pred: 0.582513 error_bl: 0.812522 improvement: 0.230008
+10: 437  label: 1 pred: -0.0685481 bl: -0.16835 IMP error_pred: 1.1418 error_bl: 1.36504 improvement: 0.223247
+11: 1315  label: -1 pred: -0.1405 bl: -0.02225 POSS error_pred: 0.738741 error_bl: 0.955995 improvement: 0.217254
+12: 6608  label: -0.5 pred: -0.105693 bl: 0.1076 POSS error_pred: 0.155478 error_bl: 0.369178 improvement: 0.2137
+13: 8270  label: 1 pred: 0.187942 bl: 0.0732 POSS error_pred: 0.659439 error_bl: 0.858958 improvement: 0.19952
+14: 4826  label: 0.5 pred: -0.0570642 bl: -0.213 POSS error_pred: 0.31032 error_bl: 0.508369 improvement: 0.198049
+15: 3213  label: 1 pred: 0.230424 bl: 0.11305 POSS error_pred: 0.592247 error_bl: 0.78668 improvement: 0.194433
+16: 8386  label: 1 pred: 0.191693 bl: 0.08455 POSS error_pred: 0.65336 error_bl: 0.838049 improvement: 0.184689
+17: 1431  label: 1 pred: -0.142965 bl: -0.2202 IMP error_pred: 1.30637 error_bl: 1.48889 improvement: 0.18252
+18: 3633  label: 1 pred: 0.275572 bl: 0.16015 POSS error_pred: 0.524795 error_bl: 0.705348 improvement: 0.180553
+19: 2522  label: -1 pred: -0.759599 bl: -0.5147 POSS error_pred: 0.0577927 error_bl: 0.235516 improvement: 0.177723
+20: 1983  label: -1 pred: -0.196222 bl: -0.0939 POSS error_pred: 0.646059 error_bl: 0.821017 improvement: 0.174958
+21: 3697  label: -1 pred: 0.894386 bl: 0.93965 IMP error_pred: 3.5887 error_bl: 3.76224 improvement: 0.173544
+22: 8289  label: -0.5 pred: 0.501898 bl: 0.5849 IMP error_pred: 1.0038 error_bl: 1.17701 improvement: 0.173209
+23: 427  label: 1 pred: 0.249076 bl: 0.1421 POSS error_pred: 0.563887 error_bl: 0.735992 improvement: 0.172105
+24: 4422  label: -1 pred: 0.11484 bl: 0.1865 IMP error_pred: 1.24287 error_bl: 1.40778 improvement: 0.164914
+25: 8581  label: 1 pred: 0.385692 bl: 0.2636 POSS error_pred: 0.377375 error_bl: 0.542285 improvement: 0.16491
+26: 73  label: -1 pred: -0.277757 bl: -0.17305 IMP error_pred: 0.521635 error_bl: 0.683846 improvement: 0.162211
+27: 3425  label: -1 pred: -0.247466 bl: -0.1482 POSS error_pred: 0.566308 error_bl: 0.725563 improvement: 0.159256
+28: 7488  label: 1 pred: 0.462888 bl: 0.3318 POSS error_pred: 0.288489 error_bl: 0.446491 improvement: 0.158002
+29: 1685  label: -1 pred: 0.00294215 bl: 0.0786 IMP error_pred: 1.00589 error_bl: 1.16338 improvement: 0.157485
+30: 3804  label: 1 pred: 0.423458 bl: 0.3003 POSS error_pred: 0.332401 error_bl: 0.48958 improvement: 0.157179
+31: 3448  label: -1 pred: -0.0880431 bl: -0.0057 IMP error_pred: 0.831665 error_bl: 0.988633 improvement: 0.156967
+32: 5269  label: 1 pred: 0.296637 bl: 0.194 POSS error_pred: 0.494719 error_bl: 0.649636 improvement: 0.154917
+33: 7894  label: 1 pred: 0.429631 bl: 0.3118 POSS error_pred: 0.325321 error_bl: 0.473619 improvement: 0.148299
+34: 6853  label: -1 pred: -0.22347 bl: -0.13385 IMP error_pred: 0.602999 error_bl: 0.750216 improvement: 0.147216
+35: 5057  label: 1 pred: -0.0488545 bl: -0.1159 POSS error_pred: 1.1001 error_bl: 1.24523 improvement: 0.145137
+36: 8589  label: 1 pred: 0.475607 bl: 0.35255 POSS error_pred: 0.274989 error_bl: 0.419191 improvement: 0.144203
+37: 5180  label: 1 pred: -0.0427956 bl: -0.1094 POSS error_pred: 1.08742 error_bl: 1.23077 improvement: 0.143346
+38: 1593  label: -1 pred: -0.447449 bl: -0.33045 POSS error_pred: 0.305313 error_bl: 0.448297 improvement: 0.142985
+39: 4518  label: 0.5 pred: -0.103515 bl: -0.21095 POSS error_pred: 0.364231 error_bl: 0.50545 improvement: 0.141219
+40: 1764  label: 1 pred: 0.510416 bl: 0.38425 POSS error_pred: 0.239692 error_bl: 0.379148 improvement: 0.139456
+41: 6894  label: 1 pred: 0.380726 bl: 0.2772 POSS error_pred: 0.383501 error_bl: 0.52244 improvement: 0.138939
+42: 9128  label: 1 pred: 0.310865 bl: 0.21805 POSS error_pred: 0.474907 error_bl: 0.611446 improvement: 0.136539
+43: 9108  label: 1 pred: -0.078159 bl: -0.13965 IMP error_pred: 1.16243 error_bl: 1.2988 improvement: 0.136375
+44: 379  label: 1 pred: 0.254987 bl: 0.16855 POSS error_pred: 0.555045 error_bl: 0.691309 improvement: 0.136264
+45: 3751  label: 1 pred: 0.126505 bl: 0.0518 POSS error_pred: 0.762994 error_bl: 0.899083 improvement: 0.136089
+46: 3315  label: 1 pred: 0.355784 bl: 0.25825 POSS error_pred: 0.415014 error_bl: 0.550193 improvement: 0.135179
+47: 8541  label: 1 pred: 0.0302528 bl: -0.03655 POSS error_pred: 0.94041 error_bl: 1.07444 improvement: 0.134026
+48: 3381  label: -1 pred: 0.0244043 bl: 0.0878 IMP error_pred: 1.0494 error_bl: 1.18331 improvement: 0.133905
+49: 7422  label: -1 pred: -0.109323 bl: -0.03775 IMP error_pred: 0.793306 error_bl: 0.925925 improvement: 0.132619
+
+total is 0
+score for UNKNOWN: nan baseline: nan diff:    nan
+total is 3291
+score for AUTO: 0.1439 baseline: 0.1382 diff: 0.0057
+total is 6143
+score for POSS: 0.4421 baseline: 0.4452 diff: -0.0030
+total is 566
+score for IMP: 1.0957 baseline: 1.0902 diff: 0.0054
+writing 50000 official test outputs
+
+0%   10   20   30   40   50   60   70   80   90   100%
+|----|----|----|----|----|----|----|----|----|----|
+***************************************************
+scores: [ 0.441419 ]
+0.4414 +/-    nan
+49.11user 0.68system 0:25.11elapsed 198%CPU (0avgtext+0avgdata 0maxresident)k
+0inputs+1104outputs (0major+273915minor)pagefaults 0swaps
