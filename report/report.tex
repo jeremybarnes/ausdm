@@ -29,7 +29,7 @@ We describe how we combined 1151 ``black box'' models into a more powerful ensem
 
 On the large AUC task, the baseline AOC\footnote{AOC = 1 - AUC} performance\footnote{The average of the most accurate 20 models over a held-out set of 20\% of the training set.  These scores are not the official scores, which are calculated on data for which the labels were not available.} of 0.1635 was improved to 0.1461.  On the more difficult medium task, the baseline performance of 0.3384 was improved to 0.3144.  On the simpler small task, the baseline of 0.0597 was improved to 0.0571.
 
-Less attention was given to the RMSE task, and very little improvement was possible.  The best result, on the large task, reduced the baseline of 0.4419 to 0.4385\footnote{These RMSE scores are calculated on a ratings scale of [-1,1] not [1000,5000] as in the competition, and so are not directly comparable.}.
+Less attention was given to the RMSE task, and very little improvement was possible.  The best result, on the large task, reduced the baseline of 0.4419 to 0.4385\footnote{These RMSE scores are calculated on a ratings scale of [-1,1] not [1000,5000] as in the competition, and so are not directly comparable (they should be multiplied by 2000).}.
 
 The ``black box'' nature of the competition and the underlying noise in the labels (to which the RMSE score is particularly sensitive) make progress difficult.  An alternative framework for ensembling is discussed which, whilst placing more requirements on model builders, would likely lead to better improvement in the ensembles.
 
@@ -97,8 +97,10 @@ Intuitively, the goal of this task is to separate the two classes as much as pos
 Table \ref{auc} shows details of the three tasks and the likely correspondence between the $\pm 1$ values and the number of stars.  A baseline AUC score using the average RMSE of the 20 models with the highest AUC score is also provided\footnote{The AOC (area over the curve, $\mathrm{AOC} = 1 - \mathrm{AUC}$) was used so that the score could be interpreted as an error like the RMSE.}
 The medium task is much more difficult than the large task, which is more difficult than the small task.  On the other hand, the more difficult tasks had more scope for improvement than the small task.
 
+%cat ../download/S_AUC_Train.csv | head -n 20000 | tr ',' ' ' | awk 'NR > 1 { counts[$2] += 1; total += 1.0 * $2; mytotal = 0;  cnt = 0;  for (i = 3;  i <= NF;  ++i) { mytotal += $(i);  cnt += 1; } totals[$2] += mytotal / cnt; } END { for (c in counts) { print c, counts[c], counts[c] / (NR - 1), totals[c] / counts[c]; } print "mean ", total/(NR - 1); }' | sort
+
 \begin{table}[t]
-\caption{AUC Task and guessed correspondence between $\pm 1$ and star values.}
+\caption{AUC Task and correspondence between $\pm 1$ and star values, inferred from comparison of model means with RMSE dataset.}
 \label{auc}
 \vskip 0.15in
 \begin{center}
@@ -151,16 +153,12 @@ When adapting the work to the large and particularly the medium task at the end 
 \subsection{Modelling State-Space Accuracy}
 
 It is unlikely that ensembling algorithm would ever be sufficiently well informed to extrapolate outside the range spanned by its component models, especially in a black-box setting.
-One way to look at the task, then, is to select those component models that are likely to be more accurate than the others in a particular situation, and to have these influence the final result more heavily.
-For example, a pure statistical model would probably be more accurate on those users and movies for which it had lots of data than on those for which it had little or no data.  An algorithm that looked at the words in the title of the movie would probably be less accurate on foreign titled films, and so on.
 
-One way to choose the most accurate models is to use a confidence function, which models explicitly the accuracy of each model on each data point.
-For the RMSE task, we could try to learn the probability that the output of a given model was within one ranking of the correct ranking.  
-For the AUC task, we could try to learn the probability that the given model is closer to the $+1$ value than the $-1$ value.
+One way to look at the task, then, is to select those component models that are likely to be more accurate than the others in a particular situation, and to have these influence the final result more heavily.  This was attempted via a gating function, which was designed to allow the most accurate models to contribute more heavily in a weighted sum.
 
-Once these accuracy values are obtained, we can produce an improved estimate by gating each model by the probability that it is correct.
+The accuracy can be measured by a classifier trained on part of the data.  Several target values for the classifier were tried.  For the AUC task, we said that a prediction of $1 \leq \hat{x} < 3$ was accurate for the $-1$ label, and that $3 \leq \hat{x} \leq 5$ for the $+1$ class.  For RMSE, we tried to learn directly the error (difference between the label and the prediction) and a binary function of whether $|x - \hat{x}| < 1$ (whether the predicted value was within one star of the correct value).
 
-It proved to be extremely difficult to learn sufficiently accurate confidence functions for this task (the confidence functions of all models tended to be highly correlated).
+It proved to be extremely difficult to learn useful gating functions.  The output of the function tended to be nearly identical over all input models, and thus the gating returned a value close to the average of the models.
 
 \subsection{Decompositions}
 
@@ -623,15 +621,11 @@ RMSE & 100 & 1.51 & 4.56 & 4.08 & 2.84 \\
 
 Looking at the results of the \texttt{gated} (SVD decomposition), \texttt{gated3} (DNAE1 decomposition), \texttt{gated4} (DNAE2 decomposition) and \texttt{gated4} (DNAE3 decomposition) algorithms (which differ only in the decomposition used), it appears that the SVD decomposition is the most useful, followed by the DNAE3, DNAE2 and DNAE1 decompositions.  These results are disappointing.  It is possible that allowing interactions between the features (as in \cite{larochelle2009}) would improve matters, but as they stand these results would have to be considered a failure.
 
-\subsection{Model and Blending Results}
+\subsection{AUC Results}
 
-% cat ../loadbuild/merged/L_rmse_official.txt.log | awk -v baseline=0.4419 'NF == 2 && $1 == "dn1" { go=1; ++iter; } !go { next; } $1 == "bias" || $1 == "combined" { go = 0; } iter < 11 { total[$1] += $2;  scores[$1,iter] = $2; } iter == 11 { score[$1] = $2; } END { for (model in total) { mean = total[model] / 10; var = 0;  for (j = 1;  j <= 10;  ++j) var += (scores[model,j] - mean) * (scores[model,j] - mean); printf("%-10s & %6.4f(%7.4f) & %7.4f$\\pm$%6.4f \\\\\n", model, score[model], baseline-score[model], mean, sqrt(var)); } printf("merged     & %6.4f(%7.4f) &         &        \\\\\n", score["combined"], baseline-score["combined"]); }'  | sort
-
-We present the results in several tables, which show the performance of the component models and the blended result.  The table for each task contains two columns of numerical information.  The first describes the error score of the model, with the lift (reduction in error) as compared with the baseline model.  The second shows the average blending weight of the model (over 10 folds) as well as the standard deviation in this value.
+We present the AUC results in table \ref{table:auc-results}, showing the performance of both the component models and the blended result.  The table for each task contains two columns of numerical information.  The first describes the error score of the model, with the lift (reduction in error) as compared with the baseline model, multiplied by 1000.  The second shows the average blending weight of the model (over 10 folds) as well as the standard deviation in this value.  The blending weights give an idea of the import of the model to the final result.
 
 %(cat ../loadbuild/merged/S_auc_official.txt.log; echo "next"; cat ../loadbuild/merged/M_auc_official.txt.log; echo "next"; cat ../loadbuild/merged/L_auc_official.txt.log; echo "next") | awk -v baseline1=0.0597 -v baseline2=0.3384 -v baseline3=0.1635 -f tabulate_results.awk | sort
-
-\subsubsection{AUC}
 
 \begin{table*}[t]
 \caption{AUC Blending Results.  The lift is 1000 times the improvement over the baseline score.  The weight values, which describe the blending weight in the final model, are reported as mean $\pm$ standard deviation.}
@@ -682,7 +676,7 @@ combined   & 0.0571 &   2.6 &  & 0.3144 &  24.0 &  & 0.1461 &  17.4 &   \\
 \vskip -0.1in
 \end{table*}
 
-Looking at the AUC results in table \ref{table:auc-results}, we see that the multiple regression models appear to be the most consistently accurate, followed by the gated models.  The deep network models appeared to be used mostly to attenuate noise, as their blending weights were more negative than positive.  The greatest lift was obtained on the medium task (which was also the hardest, and consequently had the most scope for improvement).  A significant improvement was also obtained on the medium task.  The lift on the small task was small, but (as will be discussed below) there was not much scope for improvement due to the noise ceiling.
+The multiple regression models appear to be the most consistently accurate, followed by the gated models.  The deep network models appeared to be used mostly to attenuate noise, as their blending weights were more negative than positive.  The greatest lift was obtained on the medium task (which was also the hardest, and consequently had the most scope for improvement).  A significant improvement was also obtained on the medium task.  The lift on the small task was small, but (as will be discussed below) there was not much scope for improvement due to the noise ceiling.
 
 It is instructive to compare the multiple regression models to determine the effect of the various strategies.  Recall from table \ref{table:multiple-regression-models} that \texttt{mr1} contained only the component models, \texttt{mr2} augmented this with an SVD and \texttt{mr3} with the extra features.  Any improvement in \texttt{mr1} is therefore attribuable to the calibration of the component scores from the RMSE (quadratic error) task to the AUC (linear error) task.
 
@@ -694,7 +688,11 @@ In all cases, the \texttt{gated} model worked better than \texttt{gated2} throug
 
 Overall, the AUC results successully provided a modest lift.  It was particularly encouraging to see that the merged model on the large dataset was significantly more accurate than any of its component predictors.
 
-\subsubsection{RMSE}
+\subsubsection{Noise}
+
+On the small AUC task, only a small improvement was possible.  This is most likely due to the extra noise in the $-1$ labels, which correspond to a ranking of one star, and the high baseline performance (which left little scope for improvement).
+
+\subsection{RMSE Results}
 
 %cat ../loadbuild/merged/S_rmse_official.txt.log; echo "next"; cat ../loadbuild/merged/M_rmse_official.txt.log; echo "next"; cat ../loadbuild/merged/L_rmse_official.txt.log; echo "next") | awk -v baseline1=0.4398 -v baseline2=0.4307 -v baseline3=0.4419 -f tabulate_results.awk | sort
 
@@ -754,18 +752,43 @@ combined   & 0.4381 &   1.7 &  & 0.4277 &   3.0 &  & 0.4385 &   3.4 &   \\
 
 The RMSE task results presented in table \ref{table:rmse-results} are not encouraging.  The deep network results were all very poor and the gated results only rarely beat the baseline.  The multiple regression results were nearly uniform which means that the effect of the extra features and the decompositions was minimal.  The final lift obtained is far too small to be detectable by a user of such a system.  The inescapable conculsion is that we failed to achieve a significant improvement in the RMSE task.  It is probable, based upon the state of the leaderboard of the competition for the small task, that no team managed to achieve a significant improvement on the baseline.
 
-TODO
+\subsubsection{RMSE Considered Harmful}
 
-This phenomena is probably explained by the use of a RMSE metric, and the amount of noise in the data.  The RMSE metric penalises very heavily incorrect predictions at the extreme ends of the scale: a prediction of 1 has 4 times the potential error.
+This phenomena is probably explained by the use of a RMSE metric, and the amount of noise in the data.  The RMSE metric penalises very heavily incorrect predictions at the extreme ends of the scale: a prediction of 1 has 4 times the potential MSE error (16 points) than a prediction of 3 (4 points).  As the noise in the data increases, it becomes more and more costly to deviate significantly from the 3 prediction.
 
-\subsection{Deep Network Results}
+The data is also skewed towards the top end of the spectrum, with fewer one predictions than 5 predictions.  Table \ref{table:label-frequency} shows this; the mean label is 3.67.  A ranking of 1, at a distance of 2.67 from the mean, becomes even more dangerous.  Looking at the last column, we see that the scores from the models have already been clustered about the mean: the average prediction for the 1 class is 2.86.
 
-The final submission for the small AUC task that is presented in table \ref{table:auc-results} is not in fact the best results that were obtained for this task.  During development of the denoising auto-encoders, an initial autoencoder was produced that, when trained into a deep network using supervised backprop, produced results significantly better than these.  However, due to numerical issues and thread-order nondeterminism, these results could not be duplicated nor closely matched.  There are two possible explanations.  The first is that, in speeding up the code to run at an acceptable speed for the large task, an error was introduced.  The second is that these methods are inherently based upon good luck, and that luck ran out\footnote{Of course, one can make one's own luck.  This is why proponents of deep networks suggest to make them both wide and deep: somewhere within the wide network, there is likely to be a neuron that starts at a point where it will learn something useful.  Unfortunately, the computational resources were not available to train significantly larger networks than the ones described here.}.
+%cat ../download/L_RMSE_Train.csv | tr ',' ' ' | awk '{ counts[$2] += 1; total += 1.0 * $2; } END { for (c in counts) { print c, counts[c], counts[c] / 50000; } print "mean ", total/50000; }'
+\begin{table}[t]
+\caption{Label distribution for the large RMSE training set (50,000 samples).  The mean label is 3.67.  The Mean Model column gives the mean output over all models for each class.}
+\label{table:label-frequency}
+\vskip 0.15in
+\begin{center}
+\begin{small}
+\begin{sc}
+\begin{tabular}{lrrr}
+\hline
+\abovespace\belowspace
+Label & Freq & Percent & Mean Model\\
+\hline
+\abovespace
+1 &  2534 &  5.1 & 2.86 \\
+2 &  4877 &  9.8 & 3.09 \\
+3 & 12489 & 25.0 & 3.40 \\
+4 & 16422 & 32.8 & 3.76 \\
+\belowspace
+5 & 13678 & 27.3 & 4.20\\
+\hline
+\end{tabular}
+\end{sc}
+\end{small}
+\end{center}
+\vskip -0.1in
+\end{table}
 
+Assuming that random noise is added equally to each label, label 1000 already becomes difficult to predict.  If we also consider that label 1000 would most likely be used by people for emotional reactions to films (likely, some proportion of the 1 ratings are due to vitriol), they become even more difficult to model.
 
-
-\subsection{Difficulty Values of Rows}
-
+\paragraph{Row Breakdown}
 It is instructive to break the dataset into different types of rows, based upon the ease with which a prediction can be made:
 \begin{itemize}
 \item \emph{easy}: all models are within one star of the correct answer;
@@ -776,7 +799,7 @@ It is instructive to break the dataset into different types of rows, based upon 
 Table \ref{table:row-types-rmse} shows the result of this breakdown on the large RMSE dataset, and the contribution of the different row types to the total MSE for the baseline model.  Considering that it is very unlikely that any improvement could be made on these positions, it is still very important to pick a good middle value for them, as they account for $1/3$ of the error. 
 
 \begin{table}[t]
-\caption{RMSE large set broken down by row difficulty.  In the last column, we see that 1/3 of the MSE comes from the impossible positions, which account for just 5.7\% of the data.}
+\caption{Large RMSE training set broken down by row difficulty.  In the last column, we see that 1/3 of the MSE comes from the impossible positions, which account for just 5.7\% of the data.}
 \label{table:row-types-rmse}
 \vskip 0.15in
 \begin{center}
@@ -801,20 +824,7 @@ Total         & 1.000 & 0.195 & 0.1953 \\
 \vskip -0.1in
 \end{table}
 
-\tableofcontents
-
-
-\subsection{Noise}
-
-It was observed that progress was difficult in the small AUC competition, and that the data had many characteristics of noisy data.  
-
-
-\subsection{Possible Improvements}
-
-\subsubsection{RMSE Considered Harmful}
-
-The RMSE measure used has the effect of clustering the predictions around the dataset mean.  This is especially true for the lower rankings of 1, which are already exceedingly rare.
-
+The upshot of this is that it is nearly impossible to make progress on the RMSE metric.  It would be more useful to either a) use a linear metric such as the mean error, or b) remove the impossible entries from the evaluation dataset.
 
 \subsubsection{Cracking Open the Black Box}
 
@@ -829,12 +839,23 @@ One way to allow this tradeoff to be explicitly made is to provide a way to cont
 
 In order to generate a confidence function, it suffices to train a classifier on some held-out data.  The features for this confidence function need to be provided by the designer of the algorithm, and they need to provide information about the failure modes of the algorithm.  For example, a statistical model might perform poorly when there is little data available about the user; in this case, the amount of data available about the user might be provided as a confidence variable.  It then becomes easier to create an algorithm.  The algorithm is allowed to make really bad predictions, so long as its confidence is low in these cases; this frees it to move its predictions away from the dataset mean.
 
-An ensembling algorithm can then use these confidence values to consider only the high-precision (high-confidence) part of any given algorithm's output.  If the selection of algorithms is significantly diverse, it is possible to 
+An ensembling algorithm can then use these confidence values to trade-off between precision and recall.  If the selection of algorithms is significantly diverse, it will be possible to predict most examples using the subset of models that is accurate for the particular example.
 
+\begin{figure}[t]
+\vskip 0.2in
+\caption{Ensembling with confidence information.}
+\begin{center}
+\centerline{\includegraphics{betterblender}}
+\label{fig:ensembling-confidence}
+\end{center}
+\vskip -0.2in
+\end{figure} 
 
-In order to determine the accuracy of a prediction of a particular model, it is
-therefore necessary to use information about predictions from the other models.
+Figure \ref{figure-ensembling-confidence} shows one way to implement such a scheme using a gating function.  The confidence classifiers could either be part of the black box, trained externally from the features, or learned implicitly as part of the gating function (which would receive only the features).  Such a scheme requires extra work from the model builders (they need to think about the failure modes of their algorithm and provide features to describe them), but would likely result in better performance from the merged system.  On the other hand, model builders would not need to be so careful to provide good suggestions over all of the dataset, only on those examples with high confidence.
 
+\subsection{Deep Network Results}
+
+The final submission for the small AUC task that is presented in table \ref{table:auc-results} is not in fact the best results that were obtained for this task.  During development of the denoising auto-encoders, an initial autoencoder was produced that, when trained into a deep network using supervised backprop, produced results significantly better than these.  However, due to numerical issues and thread-order nondeterminism, these results could not be duplicated nor closely matched.  There are two possible explanations.  The first is that, in speeding up the code to run at an acceptable speed for the large task, an error was introduced.  The second is that these methods are inherently based upon good luck, and that luck ran out\footnote{Of course, one can make one's own luck.  This is why proponents of deep networks suggest to make them both wide and deep: somewhere within the wide network, there is likely to be a neuron that starts at a point where it will learn something useful.  Unfortunately, the computational resources were not available to train significantly larger networks than the ones described here.}.
 
 \section{Conclusion}
 
