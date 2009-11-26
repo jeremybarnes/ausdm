@@ -42,7 +42,7 @@ struct DNAE_Decomposition : public Decomposition {
 
     /// Apply the decomposition, returning the decomposed element
     virtual distribution<float>
-    decompose(const distribution<float> & model_outputs) const;
+    decompose(const distribution<float> & model_outputs, int order = -1) const;
 
     virtual distribution<float>
     recompose(const distribution<float> & model_outputs,

@@ -46,7 +46,7 @@ struct SVD_Decomposition : public Decomposition {
 
     /// Apply the decomposition, returning the decomposed element
     virtual distribution<float>
-    decompose(const distribution<float> & vals) const;
+    decompose(const distribution<float> & vals, int order = -1) const;
 
     virtual distribution<float>
     recompose(const distribution<float> & model_outputs,

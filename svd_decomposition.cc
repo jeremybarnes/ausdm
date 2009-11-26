@@ -127,8 +127,15 @@ extract_for_order(int order)
 
 distribution<float>
 SVD_Decomposition::
-decompose(const distribution<float> & vals) const
+decompose(const distribution<float> & vals, int order) const
 {
+    //cerr << "decompose: order = " << order << " this->order = "
+    //     << this->order << " singular_values.size() = "
+    //     << singular_values.size() << endl;
+
+    if (order == -1) order = this->order;
+    if (order > singular_values.size()) order = singular_values.size();
+
     if (singular_values.empty())
         throw Exception("apply_decomposition(): no decomposition was done");
         
@@ -150,7 +157,7 @@ decompose(const distribution<float> & vals) const
     //cerr << "singular for model: " << target_singular << endl;
         
     return distribution<float>(target_singular.begin(),
-                               target_singular.end());
+                               target_singular.begin() + order);
 }
 
 distribution<float>
@@ -162,8 +169,11 @@ recompose(const distribution<float> & model_outputs,
     if (order == -1 || order > decomposition.size())
         order = decomposition.size();
 
-    if (decomposition.size() > this->order)
+    if (decomposition.size() > this->order) {
+        cerr << "order = " << order << " decomposition.size() = "
+             << decomposition.size() << "this->order = " << this->order << endl;
         throw Exception("unknown decomposition");
+    }
 
     if (singular_values.empty())
         throw Exception("apply_decomposition(): no decomposition was done");
@@ -172,6 +182,8 @@ recompose(const distribution<float> & model_outputs,
 
     for (unsigned i = 0;  i < order;  ++i)
         scaled[i] *= singular_values_order[i];
+    for (unsigned i = order;  i < scaled.size();  ++i)
+        scaled[i] = 0.0;
     
     distribution<double> result(nm);
     for (unsigned i = 0;  i < nm;  ++i)

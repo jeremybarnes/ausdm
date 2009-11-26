@@ -74,17 +74,18 @@ DNAE_Decomposition()
 
 distribution<float>
 DNAE_Decomposition::
-decompose(const distribution<float> & model_outputs) const
+decompose(const distribution<float> & model_outputs, int order) const
 {
+    if (order == -1) order = stack.size() - 1;
+    if (order > stack.size() - 1)
+        order = stack.size() - 1;
+
     distribution<float> output = 0.8 * (model_outputs - means), result;
     
-    // How many layers do we output?
-    int nlayers = 1;
-
     // Go down the stack
-    for (unsigned l = 0;  l < stack.size();  ++l) {
+    for (unsigned l = 0;  l <= order;  ++l) {
         output = stack[l].apply(output);
-        if (l >= stack.size() - nlayers)
+        if (l == order)
             result.insert(result.begin(), output.begin(), output.end());
     }
     

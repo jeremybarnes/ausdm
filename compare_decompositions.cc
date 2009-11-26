@@ -32,6 +32,9 @@
 #include "decomposition.h"
 #include "svd_decomposition.h"
 #include "dnae_decomposition.h"
+#include "stats/distribution_simd.h"
+#include "stats/distribution_ops.h"
+#include "algebra/lapack.h"
 
 
 using namespace std;
@@ -104,16 +107,15 @@ struct Do_Test_Job {
 
             distribution<float> input = data.examples[x]->models;
 
-            distribution<float> out_svd = svd.decompose(input);
-            distribution<float> out_dnae1 = dnae1.decompose(input);
-            distribution<float> out_dnae2 = dnae2.decompose(input);
-            distribution<float> out_dnae3 = dnae3.decompose(input);
+            distribution<float> out_svd = svd.decompose(input, order_svd);
+            distribution<float> out_dnae1 = dnae1.decompose(input, order_dnae);
+            distribution<float> out_dnae2 = dnae2.decompose(input, order_dnae);
+            distribution<float> out_dnae3 = dnae3.decompose(input, order_dnae);
 
             decomp_svd[x] = out_svd;
             decomp_dnae1[x] = out_dnae1;
             decomp_dnae2[x] = out_dnae2;
             decomp_dnae3[x] = out_dnae3;
-            decomp_dnae4[x] = out_dnae4;
 
             distribution<float> recomp_svd = svd.recompose(input, out_svd, order_svd);
             distribution<float> recomp_dnae1 = dnae1.recompose(input, out_dnae1, order_dnae);
@@ -138,6 +140,70 @@ struct Do_Test_Job {
         total_error_dnae3 += l_total_error_dnae3;
     }
 };
+
+distribution<double>
+calc_r_squared(distribution<float> & labels,
+               double label_mean, double label_std,
+               const vector<distribution<float> > & outputs)
+{
+    if (outputs.empty())
+        throw Exception("outputs are empty");
+
+    int nx = outputs.size(), nm = outputs[0].size();
+
+    if (nm == 0) throw Exception("no models");
+    if (labels.size() != nx)
+        throw Exception("no labels");
+
+
+    int nx_svd = std::min(5000, nx);
+    int nvalues = std::min(nx_svd, nm);
+
+    distribution<double> svalues(nvalues);
+    boost::multi_array<double, 2> data(boost::extents[nx_svd][nm]);
+
+    for (unsigned x = 0;  x < nx_svd;  ++x) {
+        for (unsigned m = 0;  m < nm;  ++m)
+            data[x][m] = outputs[x][m];
+    }
+    
+    
+    int result = LAPack::gesdd("N", nm, nx_svd,
+                               data.data(), nm,
+                               &svalues[0],
+                               0, nm,
+                               0, nvalues);
+    if (result != 0)
+        throw Exception("gesdd returned non-zero");
+
+    //cerr << "svalues = " << svalues << endl;
+    int nsvalues = (svalues >= svalues.max() * 0.01).count();
+
+
+    distribution<double> output_totals(nm);
+
+    for (unsigned x = 0;  x < nx;  ++x)
+        output_totals += outputs[x];
+
+    distribution<double> output_means = output_totals / nx;
+
+    distribution<double> output_total_variance(nm);
+    distribution<double> output_correlation(nm);
+
+    for (unsigned x = 0;  x < nx;  ++x) {
+        output_total_variance += sqr(outputs[x] - output_means);
+        output_correlation
+            += (outputs[x] - output_means)
+            * (labels[x] - label_mean);
+    }
+
+    distribution<double> stds = sqrt(output_total_variance / nx);
+
+    //cerr << "stds = " << stds << endl;
+   
+    return output_correlation / (nx * label_std * stds);
+}
+
 
 int main(int argc, char ** argv)
 {
@@ -188,8 +254,8 @@ int main(int argc, char ** argv)
     else if (target == RMSE) targ_type_uc = "RMSE";
     else throw Exception("unknown target type");
 
-    Data data_train;
-    data_train.load("download/" + size + "_" + targ_type_uc + "_Train.csv.gz",
+    Data data;
+    data.load("download/" + size + "_" + targ_type_uc + "_Train.csv.gz",
                     target);
     
     
@@ -214,7 +280,13 @@ int main(int argc, char ** argv)
         = boost::dynamic_pointer_cast<DNAE_Decomposition>
         (Decomposition::load(decomp4));
 
-    int nx = data_train.nx();
+    int nx = data.nx();
+
+    double label_mean = data.targets.mean();
+    double label_std  = data.targets.std();
+
+    //cerr << "label_mean = " << label_mean << endl;
+    //cerr << "label_std = " << label_std << endl;
 
     for (unsigned i = 0;  i < dnae1->stack.size();  ++i) {
 
@@ -259,7 +331,7 @@ int main(int argc, char ** argv)
                                 *svd, *dnae1, *dnae2, *dnae3,
                                 lock, total_error_svd, total_error_dnae1,
                                 total_error_dnae2, total_error_dnae3,
-                                data_train, order, i,
+                                data, order, i,
                                 decomp_svd, decomp_dnae1, decomp_dnae2,
                                 decomp_dnae3);
                 // Send it to a thread to be processed
@@ -277,5 +349,41 @@ int main(int argc, char ** argv)
         
         cerr << "RMSE: svd " << err_svd << " dnae1 " << err_dnae1
              << " dnae2 " << err_dnae2 << " dnae3 " << err_dnae3 << endl;
+
+        // Now calculate the r^2 for each of the features
+        distribution<double> r2_svd
+            = calc_r_squared(data.targets, label_mean, label_std,
+                             decomp_svd);
+        r2_svd = abs(r2_svd);
+        std::sort(r2_svd.rbegin(), r2_svd.rend());
+        cerr << "SVD: highest " << r2_svd[0] << " 10th: " << r2_svd[9]
+             << " mean: " << r2_svd.mean() << endl;
+
+
+        distribution<double> r2_dnae1
+            = calc_r_squared(data.targets, label_mean, label_std,
+                             decomp_dnae1);
+        r2_dnae1 = abs(r2_dnae1);
+        std::sort(r2_dnae1.rbegin(), r2_dnae1.rend());
+        cerr << "DNAE1: highest " << r2_dnae1[0] << " 10th: " << r2_dnae1[9]
+             << " mean: " << r2_dnae1.mean() << endl;
+        
+
+        distribution<double> r2_dnae2
+            = calc_r_squared(data.targets, label_mean, label_std,
+                             decomp_dnae2);
+        r2_dnae2 = abs(r2_dnae2);
+        std::sort(r2_dnae2.rbegin(), r2_dnae2.rend());
+        cerr << "DNAE2: highest " << r2_dnae2[0] << " 10th: " << r2_dnae2[9]
+             << " mean: " << r2_dnae2.mean() << endl;
+        
+        distribution<double> r2_dnae3
+            = calc_r_squared(data.targets, label_mean, label_std,
+                             decomp_dnae3);
+        r2_dnae3 = abs(r2_dnae3);
+        std::sort(r2_dnae3.rbegin(), r2_dnae3.rend());
+        cerr << "DNAE3: highest " << r2_dnae3[0] << " 10th: " << r2_dnae3[9]
+             << " mean: " << r2_dnae3.mean() << endl;
+        
     }
 }

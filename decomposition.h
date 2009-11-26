@@ -22,7 +22,8 @@ struct Decomposition {
     virtual ~Decomposition() {}
 
     virtual distribution<float>
-    decompose(const distribution<float> & model_outputs) const = 0;
+    decompose(const distribution<float> & model_outputs, int order = -1)
+        const = 0;
 
     /** Perform a decomposition to the given order (number of values) and
         then reconstruct, returning the reconstructed version.  If order is
