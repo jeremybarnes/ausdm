@@ -8,33 +8,33 @@
 #include "dnae_decomposition.h"
 #include "svd_decomposition.h"
 
-#include "algebra/matrix_ops.h"
-#include "math/xdiv.h"
-#include "algebra/lapack.h"
-#include "arch/atomic_ops.h"
+#include "jml/algebra/matrix_ops.h"
+#include "jml/math/xdiv.h"
+#include "jml/algebra/lapack.h"
+#include "jml/arch/atomic_ops.h"
 
 #include <boost/progress.hpp>
 #include <boost/bind.hpp>
 #include <boost/tuple/tuple.hpp>
 #include <boost/assign/list_of.hpp>
 
-#include "boosting/worker_task.h"
-#include "boosting/registry.h"
+#include "jml/utils/worker_task.h"
+#include "jml/boosting/registry.h"
 
-#include "arch/timers.h"
-#include "utils/info.h"
-#include "utils/guard.h"
-#include "arch/threads.h"
-#include "arch/atomic_ops.h"
-#include "stats/distribution_simd.h"
-#include "stats/distribution_ops.h"
+#include "jml/arch/timers.h"
+#include "jml/utils/info.h"
+#include "jml/utils/guard.h"
+#include "jml/arch/threads.h"
+#include "jml/arch/atomic_ops.h"
+#include "jml/stats/distribution_simd.h"
+#include "jml/stats/distribution_ops.h"
 
-#include "db/persistent.h"
+#include "jml/db/persistent.h"
 
 #include <limits>
 
-#include "neural/auto_encoder_trainer.h"
-#include "neural/twoway_layer.h"
+#include "jml/neural/auto_encoder_trainer.h"
+#include "jml/neural/twoway_layer.h"
 
 
 using namespace std;

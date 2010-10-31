@@ -10,13 +10,13 @@
 
 
 #include "blender.h"
-#include "boosting/dense_features.h"
-#include "boosting/classifier.h"
-#include "algebra/irls.h"
-#include "utils/filter_streams.h"
-#include "neural/layer_stack.h"
-#include "neural/dense_layer.h"
-#include "neural/twoway_layer.h"
+#include "jml/boosting/dense_features.h"
+#include "jml/boosting/classifier.h"
+#include "jml/algebra/irls.h"
+#include "jml/utils/filter_streams.h"
+#include "jml/neural/layer_stack.h"
+#include "jml/neural/dense_layer.h"
+#include "jml/neural/twoway_layer.h"
 
 
 namespace ML {

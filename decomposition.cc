@@ -7,8 +7,8 @@
 
 
 #include "decomposition.h"
-#include "boosting/registry.h"
-#include "utils/filter_streams.h"
+#include "jml/boosting/registry.h"
+#include "jml/utils/filter_streams.h"
 
 
 using namespace std;

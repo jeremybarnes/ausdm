@@ -1,3 +1,9 @@
+CXX := g++
+FC := gfortran
+NODEJS_ENABLED:=1
+PYTHON_ENABLED:=1
+
+
 -include local.mk
 
 default: all
@@ -9,13 +15,21 @@ OBJ     := $(BUILD)/$(ARCH)/obj
 BIN     := $(BUILD)/$(ARCH)/bin
 TESTS   := $(BUILD)/$(ARCH)/tests
 SRC     := .
+TEST_TMP := $(TESTS)
 
 JML_TOP := jml
+INCLUDE := -I.
+
+export JML_TOP
+export BIN
+export BUILD
+export TEST_TMP
 
 include $(JML_TOP)/arch/$(ARCH).mk
+CFLAGS += -fno-strict-overflow
 
-CXXFLAGS += -Ijml -Wno-deprecated
-CXXLINKFLAGS += -Ljml/../build/$(ARCH)/bin -Wl,--rpath,jml/../build/$(ARCH)/bin
+CXXFLAGS += -Wno-deprecated -Wno-uninitialized -Winit-self -fno-omit-frame-pointer -I.
+CXXLINKFLAGS += -Wl,--copy-dt-needed-entries
 
 ifeq ($(MAKECMDGOALS),failed)
 include .target.mk
@@ -29,20 +43,20 @@ include $(JML_TOP)/rules.mk
 $(shell echo GOALS := $(MAKECMDGOALS) > .target.mk)
 endif
 
+$(eval $(call include_sub_make,jml,jml,jml.mk))
 
+CWD:=
 
 LIBAUSDM_SOURCES := \
 	data.cc blender.cc boosting_blender.cc gated_blender.cc \
 	decomposition.cc svd_decomposition.cc dnae_decomposition.cc \
-	deep_net_blender.cc multiple_regression_blender.cc utils.cc \
+	deep_net_blender.cc multiple_regression_blender.cc \
 	classifier_blender.cc
 
 LIBAUSDM_LINK := \
 	utils ACE boost_date_time-mt db arch boosting algebra neural
 
 $(eval $(call library,ausdm,$(LIBAUSDM_SOURCES),$(LIBAUSDM_LINK)))
-
-$(eval $(call add_sources,exception_hook.cc))
 
 $(eval $(call program,ausdm,ausdm utils ACE boost_program_options-mt db arch boosting neural,ausdm.cc exception_hook.cc,tools))
 
@@ -57,3 +71,4 @@ $(eval $(call test,dnae_unit_tests,ausdm,boost))
 $(eval $(call program,compare_decompositions,ausdm utils ACE boost_program_options-mt db arch boosting neural,compare_decompositions.cc exception_hook.cc,tools))
 
 include loadbuild.mk
+

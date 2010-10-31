@@ -7,11 +7,11 @@
 
 #include "classifier_blender.h"
 #include "utils.h"
-#include "boosting/worker_task.h"
-#include "utils/guard.h"
-#include "boosting/classifier_generator.h"
+#include "jml/utils/worker_task.h"
+#include "jml/utils/guard.h"
+#include "jml/boosting/classifier_generator.h"
 #include "decomposition.h"
-#include "stats/distribution_ops.h"
+#include "jml/stats/distribution_ops.h"
 
 #include <boost/bind.hpp>
 #include <boost/progress.hpp>

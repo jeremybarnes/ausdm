@@ -11,16 +11,16 @@
 #include <iterator>
 #include <iostream>
 
-#include "arch/exception.h"
-#include "utils/string_functions.h"
-#include "utils/pair_utils.h"
-#include "utils/vector_utils.h"
-#include "utils/filter_streams.h"
-#include "utils/configuration.h"
-#include "arch/timers.h"
-#include "utils/info.h"
-#include "utils/guard.h"
-#include "arch/threads.h"
+#include "jml/arch/exception.h"
+#include "jml/utils/string_functions.h"
+#include "jml/utils/pair_utils.h"
+#include "jml/utils/vector_utils.h"
+#include "jml/utils/filter_streams.h"
+#include "jml/utils/configuration.h"
+#include "jml/arch/timers.h"
+#include "jml/utils/info.h"
+#include "jml/utils/guard.h"
+#include "jml/arch/threads.h"
 #include <boost/program_options/cmdline.hpp>
 #include <boost/program_options/options_description.hpp>
 #include <boost/program_options/positional_options.hpp>
@@ -28,8 +28,8 @@
 #include <boost/program_options/variables_map.hpp>
 
 #include "dnae_decomposition.h"
-#include "neural/auto_encoder_trainer.h"
-#include "neural/twoway_layer.h"
+#include "jml/neural/auto_encoder_trainer.h"
+#include "jml/neural/twoway_layer.h"
 
 using namespace std;
 using namespace ML;

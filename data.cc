@@ -6,21 +6,21 @@
 */
 
 #include "data.h"
-#include "utils/parse_context.h"
-#include "stats/distribution_ops.h"
-#include "stats/distribution_simd.h"
-#include "utils/vector_utils.h"
-#include "utils/pair_utils.h"
-#include "algebra/lapack.h"
-#include "arch/timers.h"
-#include "arch/threads.h"
+#include "jml/utils/parse_context.h"
+#include "jml/stats/distribution_ops.h"
+#include "jml/stats/distribution_simd.h"
+#include "jml/utils/vector_utils.h"
+#include "jml/utils/pair_utils.h"
+#include "jml/algebra/lapack.h"
+#include "jml/arch/timers.h"
+#include "jml/arch/threads.h"
 #include "decomposition.h"
-#include "boosting/worker_task.h"
-#include "utils/guard.h"
+#include "jml/utils/worker_task.h"
+#include "jml/utils/guard.h"
 #include <boost/bind.hpp>
-#include "stats/rmse.h"
-#include "stats/auc.h"
-#include "utils/filter_streams.h"
+#include "jml/stats/rmse.h"
+#include "jml/stats/auc.h"
+#include "jml/utils/filter_streams.h"
 
 
 using namespace std;

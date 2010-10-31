@@ -10,11 +10,11 @@
 
 
 #include "blender.h"
-#include "boosting/dense_features.h"
-#include "boosting/classifier.h"
-#include "boosting/thread_context.h"
-#include "algebra/irls.h"
-#include "utils/filter_streams.h"
+#include "jml/boosting/dense_features.h"
+#include "jml/boosting/classifier.h"
+#include "jml/boosting/thread_context.h"
+#include "jml/algebra/irls.h"
+#include "jml/utils/filter_streams.h"
 
 
 /*****************************************************************************/

@@ -9,10 +9,10 @@
 #define __ausdm__multiple_regression_blender_h__
 
 #include "blender.h"
-#include "boosting/dense_features.h"
-#include "boosting/classifier.h"
-#include "algebra/irls.h"
-#include "utils/filter_streams.h"
+#include "jml/boosting/dense_features.h"
+#include "jml/boosting/classifier.h"
+#include "jml/algebra/irls.h"
+#include "jml/utils/filter_streams.h"
 #include "dnae_decomposition.h"
 
 

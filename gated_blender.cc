@@ -6,20 +6,20 @@
 */
 
 #include "gated_blender.h"
-#include "utils/vector_utils.h"
-#include "algebra/irls.h"
-#include "boosting/worker_task.h"
-#include "utils/guard.h"
+#include "jml/utils/vector_utils.h"
+#include "jml/algebra/irls.h"
+#include "jml/utils/worker_task.h"
+#include "jml/utils/guard.h"
 #include <boost/bind.hpp>
 #include <boost/progress.hpp>
-#include "algebra/lapack.h"
-#include "algebra/least_squares.h"
-#include "stats/distribution_ops.h"
-#include "utils/filter_streams.h"
-#include "boosting/classifier_generator.h"
+#include "jml/algebra/lapack.h"
+#include "jml/algebra/least_squares.h"
+#include "jml/stats/distribution_ops.h"
+#include "jml/utils/filter_streams.h"
+#include "jml/boosting/classifier_generator.h"
 #include "decomposition.h"
 #include "utils.h"
-#include "stats/distribution_ops.h"
+#include "jml/stats/distribution_ops.h"
 
 using namespace ML;
 using namespace std;

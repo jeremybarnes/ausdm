@@ -9,9 +9,9 @@
 #define __ausdm__decomposition_h__
 
 
-#include "db/persistent_fwd.h"
+#include "jml/db/persistent_fwd.h"
 #include "data.h"
-#include "utils/configuration.h"
+#include "jml/utils/configuration.h"
 
 
 /*****************************************************************************/

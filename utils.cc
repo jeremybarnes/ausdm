@@ -6,9 +6,9 @@
 */
 
 #include "utils.h"
-#include "algebra/lapack.h"
-#include "stats/distribution_ops.h"
-#include "algebra/matrix_ops.h"
+#include "jml/algebra/lapack.h"
+#include "jml/stats/distribution_ops.h"
+#include "jml/algebra/matrix_ops.h"
 
 using namespace std;
 

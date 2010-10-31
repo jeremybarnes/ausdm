@@ -7,8 +7,8 @@
 
 #include "multiple_regression_blender.h"
 #include "utils.h"
-#include "boosting/worker_task.h"
-#include "utils/guard.h"
+#include "jml/utils/worker_task.h"
+#include "jml/utils/guard.h"
 
 #include <boost/bind.hpp>
 #include <boost/progress.hpp>

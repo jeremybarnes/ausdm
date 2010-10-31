@@ -8,10 +8,11 @@
 #ifndef __ausdm__utils_h__
 #define __ausdm__utils_h__
 
-#include "algebra/irls.h"
+#include "jml/algebra/irls.h"
 
 namespace ML {
 
+#if 0
 distribution<float>
 perform_irls(const distribution<float> & correct,
              const boost::multi_array<float, 2> & outputs,
@@ -25,6 +26,7 @@ perform_irls(const distribution<double> & correct,
              const distribution<double> & w,
              Link_Function link_function,
              bool ridge_regression = true);
+#endif
 
 } // namespace ML
 

@@ -13,18 +13,18 @@
 #include <iterator>
 #include <iostream>
 
-#include "arch/exception.h"
-#include "utils/string_functions.h"
-#include "utils/pair_utils.h"
-#include "utils/vector_utils.h"
-#include "utils/filter_streams.h"
-#include "utils/configuration.h"
-#include "arch/timers.h"
-#include "utils/guard.h"
-#include "arch/threads.h"
-#include "stats/distribution_ops.h"
+#include "jml/arch/exception.h"
+#include "jml/utils/string_functions.h"
+#include "jml/utils/pair_utils.h"
+#include "jml/utils/vector_utils.h"
+#include "jml/utils/filter_streams.h"
+#include "jml/utils/configuration.h"
+#include "jml/arch/timers.h"
+#include "jml/utils/guard.h"
+#include "jml/arch/threads.h"
+#include "jml/stats/distribution_ops.h"
 
-#include "boosting/worker_task.h"
+#include "jml/utils/worker_task.h"
 
 #include <boost/program_options/cmdline.hpp>
 #include <boost/program_options/options_description.hpp>
@@ -35,7 +35,7 @@
 #include <boost/tuple/tuple.hpp>
 #include <boost/bind.hpp>
 
-#include "stats/moments.h"
+#include "jml/stats/moments.h"
 
 using namespace std;
 using namespace ML;

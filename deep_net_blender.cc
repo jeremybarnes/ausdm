@@ -8,10 +8,10 @@
 #include "deep_net_blender.h"
 #include <boost/progress.hpp>
 #include <boost/bind.hpp>
-#include "boosting/worker_task.h"
-#include "utils/info.h"
-#include "utils/guard.h"
-#include "arch/timers.h"
+#include "jml/utils/worker_task.h"
+#include "jml/utils/info.h"
+#include "jml/utils/guard.h"
+#include "jml/arch/timers.h"
 #include "dnae_decomposition.h"
 
 

@@ -10,8 +10,8 @@
 
 
 #include "decomposition.h"
-#include "neural/auto_encoder_stack.h"
-#include "arch/threads.h"
+#include "jml/neural/auto_encoder_stack.h"
+#include "jml/arch/threads.h"
 
 
 typedef float LFloat;

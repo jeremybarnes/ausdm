@@ -11,8 +11,8 @@
 
 #include <boost/shared_ptr.hpp>
 #include "data.h"
-#include "utils/configuration.h"
-#include "stats/distribution.h"
+#include "jml/utils/configuration.h"
+#include "jml/stats/distribution.h"
 
 
 extern __thread float correct_prediction;

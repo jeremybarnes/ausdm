@@ -9,9 +9,9 @@
 #define __ausdm__classifier_blender_h__
 
 #include "blender.h"
-#include "boosting/dense_features.h"
-#include "boosting/classifier.h"
-#include "boosting/probabilizer.h"
+#include "jml/boosting/dense_features.h"
+#include "jml/boosting/classifier.h"
+#include "jml/boosting/probabilizer.h"
 
 
 /*****************************************************************************/

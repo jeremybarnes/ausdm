@@ -6,10 +6,10 @@
 */
 
 #include "boosting_blender.h"
-#include "utils/vector_utils.h"
-#include "boosting/boosting_core.h"
-#include "stats/distribution_ops.h"
-#include "algebra/glz.h"
+#include "jml/utils/vector_utils.h"
+#include "jml/boosting/boosting_core.h"
+#include "jml/stats/distribution_ops.h"
+#include "jml/algebra/glz.h"
 
 
 using namespace ML;

@@ -11,16 +11,16 @@
 #include <iterator>
 #include <iostream>
 
-#include "arch/exception.h"
-#include "utils/string_functions.h"
-#include "utils/pair_utils.h"
-#include "utils/vector_utils.h"
-#include "utils/filter_streams.h"
-#include "utils/configuration.h"
-#include "arch/timers.h"
-#include "utils/info.h"
-#include "utils/guard.h"
-#include "arch/threads.h"
+#include "jml/arch/exception.h"
+#include "jml/utils/string_functions.h"
+#include "jml/utils/pair_utils.h"
+#include "jml/utils/vector_utils.h"
+#include "jml/utils/filter_streams.h"
+#include "jml/utils/configuration.h"
+#include "jml/arch/timers.h"
+#include "jml/utils/info.h"
+#include "jml/utils/guard.h"
+#include "jml/arch/threads.h"
 
 #include <boost/program_options/cmdline.hpp>
 #include <boost/program_options/options_description.hpp>
@@ -32,9 +32,9 @@
 #include "decomposition.h"
 #include "svd_decomposition.h"
 #include "dnae_decomposition.h"
-#include "stats/distribution_simd.h"
-#include "stats/distribution_ops.h"
-#include "algebra/lapack.h"
+#include "jml/stats/distribution_simd.h"
+#include "jml/stats/distribution_ops.h"
+#include "jml/algebra/lapack.h"
 
 
 using namespace std;
@@ -177,7 +177,7 @@ calc_r_squared(distribution<float> & labels,
         throw Exception("gesdd returned non-zero");
 
     //cerr << "svalues = " << svalues << endl;
-    int nsvalues = (svalues >= svalues.max() * 0.01).count();
+    //int nsvalues = (svalues >= svalues.max() * 0.01).count();
 
 
     distribution<double> output_totals(nm);

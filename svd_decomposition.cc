@@ -6,10 +6,10 @@
 */
 
 #include "svd_decomposition.h"
-#include "boosting/registry.h"
-#include "algebra/lapack.h"
-#include "stats/distribution_simd.h"
-#include "arch/simd_vector.h"
+#include "jml/boosting/registry.h"
+#include "jml/algebra/lapack.h"
+#include "jml/stats/distribution_simd.h"
+#include "jml/arch/simd_vector.h"
 #include <boost/assign/list_of.hpp>
 
 

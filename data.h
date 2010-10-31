@@ -11,7 +11,7 @@
 #include <boost/multi_array.hpp>
 #include <vector>
 #include <string>
-#include "stats/distribution.h"
+#include "jml/stats/distribution.h"
 #include <boost/shared_ptr.hpp>
 
 /// What kind of target are we calculating?
