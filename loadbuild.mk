@@ -1,10 +1,5 @@
 # loadbuild makefile for Jeremy's AUSDM entry
 
-# Create a directory
- %/.dir_exists:
-	@mkdir $(basename $@)
-	@touch $@
-
 # Perform an SVD decomposition
 # $(1): S, M or L (dataset size)
 # $(2): auc or rmse
